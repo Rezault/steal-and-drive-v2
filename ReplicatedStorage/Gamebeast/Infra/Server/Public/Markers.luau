@@ -1,0 +1,69 @@
+--[[
+    The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
+    All rights reserved.
+    
+    Markers.lua
+    
+    Description:
+        Server-side API for sending engagement markers.
+    
+--]]
+
+--= Root =--
+local Markers = { }
+
+--= Roblox Services =--
+
+local Players = game:GetService("Players")
+
+--= Dependencies =--
+
+local EngagementMarkers = require(script.Parent.Parent.Modules.EngagementMarkers) ---@module EngagementMarkers
+local PurchaseAnalytics = require(script.Parent.Parent.Modules.InternalMarkers.PurchaseAnalytics) ---@module PurchaseAnalytics
+
+--= Types =--
+
+--= Object References =--
+
+--= Constants =--
+
+--= Variables =--
+
+--= Public Variables =--
+
+--= Internal Functions =--
+
+--= API Functions =--
+
+function Markers:SendMarker(markerType : string, value : any | {[string] : any}, position : Vector3?)
+    EngagementMarkers:FireMarker(markerType, value, {position = position})
+end
+
+function Markers:SendPlayerMarker(player : Player, markerType : string, value : any | {[string] : any}, position : Vector3?)
+    EngagementMarkers:FireMarker(markerType, value, {player = player, position = position})
+end
+
+-- Sends an internal Purchase marker for dev products.
+function Markers:SendNewPurchaseGrantedMarker(recieptInfo : {[string] : number | string}, position : Vector3?)
+    if not Players:GetPlayerByUserId(recieptInfo.PlayerId) then
+        return false
+    end
+
+    task.spawn(function()
+        PurchaseAnalytics:DevProductPurchased(true, recieptInfo.PlayerId, recieptInfo.ProductId, position)
+    end)
+end
+
+function Markers:OnMarkersFailed(callback : (failedMarkers : { {[string] : any} } ) -> ()) : RBXScriptConnection
+    -- Fired with the valid markers from a batch that failed to send
+    return EngagementMarkers.MarkersFailed:Connect(callback)
+end
+
+function Markers:RetryFailedMarkersAsync(failedMarkers : { {[string] : any} } ) : boolean
+    -- A failed retry doesn't fire OnMarkersFailed again
+
+    return EngagementMarkers:SendMarkers(failedMarkers)
+end
+
+--= Return Module =--
+return Markers
