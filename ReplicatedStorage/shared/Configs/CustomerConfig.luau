@@ -44,6 +44,7 @@ local UpgradeConfig = require(ReplicatedStorage.shared.Configs.UpgradeConfig)
 	config; GarageConfig requires only the world, paint and weather configs, none of which reach back
 	here, so the order cannot cycle. ]]
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
+local CarNameConfig = require(ReplicatedStorage.shared.Configs.CarNameConfig)
 --- For `tipScaleOf`'s body -> world lookup. Requires only `BalanceConfig`, so it cannot cycle back here.
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
 
@@ -940,7 +941,9 @@ function CustomerConfig.lineFor(pool: { string }, rng: Random, body: string?): s
 	end
 	local text = pool[rng:NextInteger(1, #pool)]
 	if string.find(text, "%%s") then
-		text = string.format(text, if body and body ~= "" then body else CustomerConfig.Lines.UnknownBody)
+		--- The game name ("Challent"), never the real one: the roster is renamed for trademarks (`CarNameConfig`).
+		local name = if body and body ~= "" then CarNameConfig.nameOf(body) or body else CustomerConfig.Lines.UnknownBody
+		text = string.format(text, name)
 	end
 	return UpgradeConfig.oneLine(text)
 end
