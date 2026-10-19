@@ -97,7 +97,14 @@ end
 
 --- What day `index` pays this player right now. Cash is scaled; a car keeps its server-owned body.
 function DailyRewardService._rewardFor(self, player: Player, index: number): (string, number, string?)
-	local spec = DailyRewardConfig.Days[index]
+	return self:priceSpec(player, DailyRewardConfig.Days[index])
+end
+
+--[[ PUBLIC (2026-10-19, `PlaytimeRewardService`): what one reward spec pays this player right now,
+	in `DailyRewardConfig.Days`' shape (`Kind`, `Floor`/`Hours`, `Amount`, `Body`, `FromTop`). The
+	playtime gifts are priced by this same function, so a playtime $ and a daily $ are one formula
+	and cannot drift apart as the economy is retuned. ]]
+function DailyRewardService.priceSpec(self, player: Player, spec): (string, number, string?)
 	if spec.Kind == "Car" and type(spec.FromTop) == "number" then
 		--- The car scales with the player (`DailyRewardConfig.Days`' day 7 note): their world's ladder.
 		local cars = WorldConfig.carsFor(WorldConfig.highestUnlocked(player))
@@ -167,6 +174,27 @@ end
 
 -- === Claiming =================================================================
 
+--[[ PUBLIC (2026-10-19, shared with `PlaytimeRewardService`): pay one priced reward. Answers whether
+	it landed. `source` names the car's origin on `awardCar` ("DailyReward", "Playtime"). Moved out of
+	`_claim` unchanged, so the daily payout is exactly what it was; the caller has already WRITTEN its
+	own record (header "TRUST"), which is what makes a double press one reward. ]]
+function DailyRewardService.pay(self, player: Player, kind: string, amount: number, body: string?, source: string): boolean
+	if kind == "Cash" then
+		local Garage = Shard.get("GarageService")
+		return Garage ~= nil and (Garage:addCash(player, amount) or 0) >= 0
+	elseif kind == "Revive" then
+		local Revive = Shard.get("ReviveService")
+		return Revive ~= nil and Revive:grantLife(player, amount)
+	elseif kind == "Car" and body then
+		local Garage = Shard.get("GarageService")
+		local tier = GarageConfig.TierOfBody[body]
+		if Garage and tier then
+			return Garage:awardCar(player, tier, body, nil, nil, source) ~= "rejected"
+		end
+	end
+	return false
+end
+
 --- Header "TRUST", in order: throttle, check, WRITE, then pay.
 function DailyRewardService._claim(self, player: Player)
 	if not DailyRewardConfig.Enabled or self:_throttled(player) then
@@ -187,21 +215,7 @@ function DailyRewardService._claim(self, player: Player)
 	local kind, amount, body = self:_rewardFor(player, day)
 	profile:Set(DailyRewardConfig.ProfileKey, { Day = day, LastDay = today })
 
-	local paid = false
-	if kind == "Cash" then
-		local Garage = Shard.get("GarageService")
-		paid = Garage ~= nil and (Garage:addCash(player, amount) or 0) >= 0
-	elseif kind == "Revive" then
-		local Revive = Shard.get("ReviveService")
-		paid = Revive ~= nil and Revive:grantLife(player, amount)
-	elseif kind == "Car" and body then
-		local Garage = Shard.get("GarageService")
-		local tier = GarageConfig.TierOfBody[body]
-		if Garage and tier then
-			local outcome = Garage:awardCar(player, tier, body, nil, nil, "DailyReward")
-			paid = outcome ~= "rejected"
-		end
-	end
+	local paid = self:pay(player, kind, amount, body, "DailyReward")
 	if paid then
 		self.log:info(string.format("%s claimed daily reward day %d: %s %s.", player.Name, day, kind, body or tostring(amount)))
 		self:getSignal("Claimed"):Fire(player, day, kind, amount, body)

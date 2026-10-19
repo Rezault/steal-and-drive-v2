@@ -298,6 +298,13 @@ return {
 			never — which reads as "claimable, day 1", so no profile needs migrating. ]]
 		DailyReward = { Day = 0, LastDay = -1 },
 
+		--[[ THE PLAYTIME GIFTS (2026-10-19). Key name comes from `PlaytimeRewardConfig.ProfileKey`;
+			`PlaytimeRewardService` owns every write. `Day` is the UTC day (`QuestConfig.dayIndex`) the
+			other two belong to, `Seconds` how long they have played that day, `Claimed` how many of the
+			day's gifts they have taken. A record from another day reads as a fresh one, so -1 needs no
+			migrating. ]]
+		PlaytimeGifts = { Day = -1, Seconds = 0, Claimed = 0 },
+
 		--[[ EVERY CODE THIS PLAYER HAS REDEEMED, `{ [CODE] = true }`. Key name comes from
 			`CodesConfig.ProfileKey`; `CodesService` owns every write. Empty is "none yet". ]]
 		RedeemedCodes = {},

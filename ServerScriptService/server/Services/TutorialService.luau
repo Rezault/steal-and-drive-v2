@@ -258,6 +258,19 @@ function TutorialService._enter(self, player: Player, index: number, completed: 
 	self:_store(player, step.Id, false)
 	self:_funnel(player, step)
 	self:_publish(player, completed, false)
+
+	--[[ PLACE IS ALREADY DONE IF A CAR IS ALREADY PARKED (2026-10-19). The first car is parked for
+		the player now (`CarryConfig.Guide.AutoParkFirst`), and that park lands while the run is still
+		settling, BEFORE this beat is entered, so the `CarParked` it waits for has already come and
+		gone. A rejoin onto this beat with a car on the lot is the same case. Deferred, so the beat is
+		reached (funnel, card) and then finished, rather than skipped as if it never existed. ]]
+	if step.Id == "place" and self:_bay(player) then
+		task.defer(function()
+			if self:_liveStep(player) == step and self:_bay(player) then
+				self:_advance(player)
+			end
+		end)
+	end
 end
 
 --[[ Tell BOTH funnels that this player has REACHED this stage. See the header on why arrival

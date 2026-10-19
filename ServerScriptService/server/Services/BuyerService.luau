@@ -508,7 +508,8 @@ function BuyerService.forceOffer(self, player: Player, bandKey: unknown, prefer:
 	--- made them walks in (`_tick`'s `fresh`); left to `_tick` they would appear already standing.
 	local _, bay = Garage:locationOf(player, carId)
 	if Customers and bay then
-		local name = Customers:placeBuyer(player, bay, carId, offer, true)
+		local walk = source ~= "Tutorial" or BuyerConfig.Tutorial.WalkIn ~= false
+		local name = Customers:placeBuyer(player, bay, carId, offer, walk)
 		if name and name ~= "" then
 			offer.Name = name
 			self:_write(player, offers)

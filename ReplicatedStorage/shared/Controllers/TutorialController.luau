@@ -140,6 +140,8 @@ local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local PlotConfig = require(ReplicatedStorage.shared.Configs.PlotConfig)
 --- ...and for that event's name, which is the only thing read out of it here.
 local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
+--- The FREE GIFTS panel the finish hands over to (`PlaytimeRewardConfig.ShowAfterTutorial`).
+local PlaytimeRewardConfig = require(ReplicatedStorage.shared.Configs.PlaytimeRewardConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 --- The finish card's confetti: the NEW BEST reveal's paper and its tuning. See `_paintFinish`.
@@ -1678,6 +1680,58 @@ function TutorialController._paintFinish(self)
 	self:_rest()
 	self:_punch(self._titleScale, 1.12)
 	self:_confetti()
+end
+
+--[[ THE FINISH BANNER (`TutorialConfig.FinishBanner`, 2026-10-19): `FinishTitle` in big gold type in
+	the middle of the screen, popped in on a Back ease, held, and faded as the gifts panel opens. Over
+	the confetti (ZIndex 6 against its 4). Built on first use and reused, so a replay of the tutorial
+	(`TutorialService.restart`) plays it again rather than stacking a second one. ]]
+function TutorialController._banner(self)
+	local cfg = TutorialConfig.FinishBanner
+	if not self._root then
+		return
+	end
+	local banner = self._root:FindFirstChild("FinishBanner") :: TextLabel?
+	if not banner then
+		local label = Instance.new("TextLabel")
+		label.Name = "FinishBanner"
+		label.AnchorPoint = Vector2.new(0.5, 0.5)
+		label.Position = UDim2.fromScale(0.5, 0.42)
+		label.Size = UDim2.fromScale(0.8, cfg.Height)
+		label.BackgroundTransparency = 1
+		label.FontFace = Font.fromEnum(Enum.Font.FredokaOne)
+		label.TextScaled = true
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.ZIndex = 6
+		label.Text = oneLine(TutorialConfig.FinishTitle)
+		local gold = Instance.new("UIGradient")
+		gold.Rotation = 90
+		gold.Color = ColorSequence.new(Color3.fromRGB(255, 234, 5), Color3.fromRGB(255, 140, 30))
+		gold.Parent = label
+		local rim = Instance.new("UIStroke")
+		rim.Color = Color3.fromRGB(2, 30, 56)
+		rim.Thickness = 0.06
+		rim.StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize
+		rim.Parent = label
+		local scale = Instance.new("UIScale")
+		scale.Parent = label
+		label.Parent = self._root
+		banner = label
+	end
+	local label = banner :: TextLabel
+	local scale = label:FindFirstChildOfClass("UIScale") :: UIScale
+	local rim = label:FindFirstChildOfClass("UIStroke") :: UIStroke
+	label.Visible = true
+	label.TextTransparency = 0
+	rim.Transparency = 0
+	scale.Scale = cfg.PopFrom
+	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	task.delay(cfg.Seconds - 0.25, function()
+		local fade = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
+		TweenService:Create(rim, fade, { Transparency = 1 }):Play()
+		TweenService:Create(scale, fade, { Scale = 1.15 }):Play()
+	end)
 end
 
 --[[ The finish card's celebration (`TutorialConfig.FinishConfetti`). On its own full-screen layer in
@@ -3505,13 +3559,47 @@ function TutorialController._onState(self, state)
 				end
 				self._step = nil
 				self:_clearPointer()
-				self:_paintFinish()
-				--- "Keep stealing cars", and Play starts calling for the press that does it.
-				Dispatcher:Publish(RaceConfig.PlayBeckon.Event)
+				--- The banner branch below draws its own celebration (`TutorialConfig.FinishBanner`).
+				local bannerFirst = PlaytimeRewardConfig.Enabled and PlaytimeRewardConfig.ShowAfterTutorial and TutorialConfig.FinishBanner.Enabled
+				if not bannerFirst then
+					self:_paintFinish()
+				end
+				--[[ "Keep stealing cars", and Play starts calling for the press that does it. Unless the
+					FREE GIFTS panel takes the moment first (`PlaytimeRewardConfig.ShowAfterTutorial`,
+					2026-10-19): it opens as this card comes down, and Play's call waits for it to close. ]]
+				local giftsFirst = PlaytimeRewardConfig.Enabled and PlaytimeRewardConfig.ShowAfterTutorial
+				if not giftsFirst then
+					Dispatcher:Publish(RaceConfig.PlayBeckon.Event)
+				end
+				--[[ The banner instead of the card when the gifts follow (`TutorialConfig.FinishBanner`):
+					the panel opens as the banner fades, and the card comes down only once the confetti
+					has landed, so the paper is not cut off mid-fall behind the panel. ]]
+				if bannerFirst then
+					self:_setCardShown(false)
+					GameplayFeedback.play("TutorialComplete")
+					self:_confetti()
+					self:_banner()
+					local banner = TutorialConfig.FinishBanner.Seconds
+					task.delay(banner, function()
+						if self._token == token then
+							Dispatcher:Publish(PlaytimeRewardConfig.AfterTutorialEvent)
+						end
+					end)
+					task.delay(math.max(banner, TutorialConfig.FinishConfetti.RainSeconds + 1), function()
+						if self._token == token then
+							self._finishing = false
+							self:_hide()
+						end
+					end)
+					return
+				end
 				task.delay(TutorialConfig.Timing.FinishHold, function()
 					if self._token == token then
 						self._finishing = false
 						self:_hide()
+						if giftsFirst then
+							Dispatcher:Publish(PlaytimeRewardConfig.AfterTutorialEvent)
+						end
 					end
 				end)
 			end

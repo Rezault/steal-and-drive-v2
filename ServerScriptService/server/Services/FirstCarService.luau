@@ -238,9 +238,95 @@ function FirstCarService._onCarryChanged(self, player: Player, key: string?)
 		self.log:info(string.format("%s is holding their first car.", player.Name))
 	end
 
+	--- Parked for them (`CarryConfig.Guide.AutoParkFirst`); the "carry it home" card is not raised.
+	if guide.AutoParkFirst and self:_autoPark(player) then
+		return
+	end
+
 	if self:_guided(player) then
 		self:_publish(player, guide.Carrying)
 	end
+end
+
+--[[ The trip home after the auto-park ends in front of the podium it parked on, facing the car
+	(`CarryConfig.Guide.AutoParkStand`). Called on `RaceService.ReturnedHome`, which fires once the
+	return beat has let go of the character (released, teleported, velocity zeroed), so this is one
+	more move after it rather than a fight with it. Deferred a frame for `CarryService`, which acts on
+	the same signal. A podium that has gone (plot released) leaves them where they landed. ]]
+function FirstCarService._standAtCar(self, player: Player)
+	local bayIndex = self._standAt[player]
+	self._standAt[player] = nil
+	local stand = CarryConfig.Guide.AutoParkStand
+	local Garage = Shard.get("GarageService")
+	if not (bayIndex and Garage and type(stand) == "number" and stand > 0) then
+		return
+	end
+	task.defer(function()
+		local character = player.Character
+		if not character or player.Parent ~= Players then
+			return
+		end
+		for _, bay in Garage:getBays(player) do
+			if bay.index == bayIndex then
+				--[[ Out from the podium's FRONT EDGE, not its centre: `CustomerService._standFor`'s own
+					frame (the slab faces down the aisle; half its depth is the podium). Measured from the
+					centre, 9 studs set the first player down on the deck beside their car. ]]
+				local base = bay.base
+				--- `AutoParkSide` steps them off the buyer's spot in front, toward their own left as they
+				--- face the car (the podium's +X: the player faces back along its LookVector).
+				local side = tonumber(CarryConfig.Guide.AutoParkSide) or 0
+				local spot = base.CFrame * CFrame.new(side, base.Size.Y / 2 + 3, -(base.Size.Z / 2 + stand))
+				character:PivotTo(CFrame.lookAt(spot.Position, Vector3.new(base.Position.X, spot.Position.Y, base.Position.Z)))
+				return
+			end
+		end
+	end)
+end
+
+--[[ Park the first car on the lowest free showroom podium (`CarryConfig.Guide.AutoParkFirst`).
+	Answers whether there was a podium to try, so a full lot falls back to the carry.
+
+	DEFERRED, NOT DONE IN THE SIGNAL. `CarryChanged` fires from inside `GarageService.awardCar`, and
+	parking from there would rewrite the lot in the middle of the award that is still describing it;
+	a deferred call runs once the award has returned. It goes through `placeCarried`, the same door
+	a podium press uses, so `CarParked` fires and `_onParked` latches the funnel and raises the
+	`Parked` card exactly as for a car put down by hand. Checked again inside the defer: the car may
+	have left their hands by then (sold, swapped), and then there is nothing to park. ]]
+function FirstCarService._autoPark(self, player: Player): boolean
+	local Garage = Shard.get("GarageService")
+	if not Garage then
+		return false
+	end
+	local free: number? = nil
+	for _, bay in Garage:getBays(player) do
+		if not Garage:isWorkshopBay(bay.index) and not Garage:getBayCar(player, bay.index) and (not free or bay.index < free) then
+			free = bay.index
+		end
+	end
+	if not free then
+		return false
+	end
+	local bay = free
+	task.defer(function()
+		if player.Parent ~= Players or not Garage:getCarriedCar(player) then
+			return
+		end
+		local ok, reason = Garage:placeCarried(player, bay)
+		if ok then
+			--- Their trip home ends at this podium, not the spawn pad (`CarryConfig.Guide.AutoParkStand`).
+			self._standAt[player] = bay
+			self.log:info(string.format("%s's first car was parked for them on bay %d.", player.Name, bay))
+			local Analytics = Shard.get("AnalyticsService")
+			if Analytics then
+				Analytics:DesignOnce(player, "FirstCar:AutoParked")
+			end
+		elseif self:_guided(player) then
+			--- Refused after all (the bay filled meanwhile): back to the walkthrough, card and all.
+			self.log:info(string.format("%s's first car could not be parked for them (%s).", player.Name, reason))
+			self:_publish(player, CarryConfig.Guide.Carrying)
+		end
+	end)
+	return true
 end
 
 --[[ The car now in their hands came home from a run, they have parked a car before, and nobody has
@@ -328,6 +414,7 @@ function FirstCarService._onLeaving(self, player: Player)
 	end
 	self._profiles[player] = nil
 	self._bankedAt[player] = nil
+	self._standAt[player] = nil
 end
 
 --[[ Cache the profile off the join path, then derive the attribute from scratch.
@@ -360,6 +447,8 @@ FirstCarService:withLifecycle({
 	init = function(self)
 		self._profiles = {} :: { [Player]: any }
 		self._bankedAt = {} :: { [Player]: number }
+		--- The podium a player's next trip home ends at (`_standAtCar`): their auto-parked first car.
+		self._standAt = {} :: { [Player]: number }
 		self._trove = Trove.new()
 	end,
 
@@ -381,6 +470,14 @@ FirstCarService:withLifecycle({
 		self._trove:Add(Garage:getSignal("CarParked"):Connect(function(player: Player)
 			self:_onParked(player)
 		end))
+
+		--- Home to the car, not the spawn pad, after the run that auto-parked it (`_standAtCar`).
+		local Race = Shard.get("RaceService")
+		if Race then
+			self._trove:Add(Race:getSignal("ReturnedHome"):Connect(function(player: Player)
+				self:_standAtCar(player)
+			end))
+		end
 
 		--- When a run last banked, for `_offerCustomize`. The car lands in the hands just after.
 		local Reward = Shard.get("RewardService")

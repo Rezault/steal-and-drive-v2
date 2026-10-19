@@ -1495,6 +1495,21 @@ TutorialConfig.FinishConfetti = {
 	RainSeconds = 2.5,
 }
 
+--[[ A BANNER, NOT A CARD, WHEN THE GIFTS COME NEXT (2026-10-19). The owner: "too much of a
+	disconnect between the tutorial end and the reward ui; the final tutorial text is too much". So
+	when the FREE GIFTS panel follows (`PlaytimeRewardConfig.ShowAfterTutorial`), the finish card and
+	its hint are not shown: `FinishTitle` pops in big and gold in the middle of the screen with the
+	confetti, holds `Seconds`, and fades as the panel opens. The confetti keeps falling behind the
+	panel until it lands (`FinishConfetti.RainSeconds`). `Enabled = false`, or the gifts off: the
+	finish card for `Timing.FinishHold`, as before. ]]
+TutorialConfig.FinishBanner = {
+	Enabled = true,
+	Seconds = 1.2,
+	--- Its height as a share of the screen's, and the pop it arrives with.
+	Height = 0.12,
+	PopFrom = 0.4,
+}
+
 --[[ Which side of the screen the card rests on when it has nothing to sit beside: "Left" or
 	"Right". Left since 2026-10-06 (Leaf: "def on the left cuz this is annoying"); on the right it
 	covered the road on the BOOST and GET AWAY WITH IT beats. It rests under Roblox's top bar either

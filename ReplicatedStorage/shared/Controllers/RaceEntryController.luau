@@ -100,12 +100,16 @@ It is also why a WRECK does not bring any of it back. `RaceEnd` is fired by `lea
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+--- The beckon arrow's bob (`_beckonArrow`).
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local CarryConfig = require(ReplicatedStorage.shared.Configs.CarryConfig)
 local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
+--- The tutorial's arrow art, reused over Play (`_beckonArrow`).
+local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
 local ButtonBeckon = require(ReplicatedStorage.shared.Modules.ButtonBeckon)
 local UIRoot = require(ReplicatedStorage.shared.Modules.UIRoot)
@@ -350,8 +354,46 @@ function RaceEntryController._applyBeckon(self)
 		self._beckonOn = nil
 	end
 	if want and button and not self._beckonStop then
-		self._beckonStop = ButtonBeckon.start(button, RaceConfig.PlayBeckon)
+		local stopBeckon = ButtonBeckon.start(button, RaceConfig.PlayBeckon)
+		local stopArrow = self:_beckonArrow(button)
+		self._beckonStop = function()
+			stopBeckon()
+			stopArrow()
+		end
 		self._beckonOn = button
+	end
+end
+
+--[[ The tutorial's arrow over Play while it beckons (`RaceConfig.PlayBeckon.Arrow`). Answers the
+	undo. Sized and bobbed in SCALE of the button, the tutorial arrow's own reason (`_arrowPos`): an
+	offset bob moves in whole pixels and stutters. ]]
+function RaceEntryController._beckonArrow(self, button: GuiObject): () -> ()
+	local cfg = RaceConfig.PlayBeckon
+	if not cfg.Arrow then
+		return function() end
+	end
+	local arrow = Instance.new("ImageLabel")
+	arrow.Name = "BeckonArrow"
+	arrow.AnchorPoint = Vector2.new(0.5, 1)
+	arrow.BackgroundTransparency = 1
+	--- The art points DOWN at whatever is under it (`TutorialController._build`'s note).
+	arrow.Image = UIAssets.url(UIAssets.Tutorial.Arrow)
+	arrow.ScaleType = Enum.ScaleType.Stretch
+	arrow.Size = UDim2.fromScale(cfg.ArrowSize, cfg.ArrowSize)
+	arrow.ZIndex = button.ZIndex + 5
+	local square = Instance.new("UIAspectRatioConstraint")
+	square.AspectRatio = 1
+	square.DominantAxis = Enum.DominantAxis.Height
+	square.Parent = arrow
+	arrow.Parent = button
+	local started = os.clock()
+	local bob = RunService.RenderStepped:Connect(function()
+		local swing = (1 + math.sin((os.clock() - started) * 2 * math.pi / cfg.ArrowBobPeriod)) / 2
+		arrow.Position = UDim2.fromScale(0.5, -0.05 - swing * cfg.ArrowBob)
+	end)
+	return function()
+		bob:Disconnect()
+		arrow:Destroy()
 	end
 end
 

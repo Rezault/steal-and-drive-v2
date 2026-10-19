@@ -90,6 +90,16 @@ local RaceConfig = {
 		Shine = true,
 		ShineTime = 0.5,
 		ShineAlpha = 0.85,
+		--[[ THE TUTORIAL'S ARROW, BACK OVER PLAY (2026-10-19, "make the play arrow show again after
+			the tutorial ends"). The tutorial's own green arrow (`UIAssets.Tutorial.Arrow`), bobbing
+			over Play for exactly as long as the beckon runs, so it pauses for a page or a run and is
+			gone for the session after the press. Parented to Play, so it rides the swell. `ArrowSize`
+			is its side as a share of Play's height, `ArrowBob` how far it bobs in the same unit, once
+			per `ArrowBobPeriod` seconds. `Arrow = false`: the beckon alone, as before. ]]
+		Arrow = true,
+		ArrowSize = 0.7,
+		ArrowBob = 0.12,
+		ArrowBobPeriod = 1,
 	},
 
 	--[[ Published on Dispatcher the moment the ENTRY's loading screen starts to lift off a run

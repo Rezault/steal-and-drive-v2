@@ -125,6 +125,7 @@ local RadioConfig = require(ReplicatedStorage.shared.Configs.RadioConfig)
 local SettingsConfig = require(ReplicatedStorage.shared.Configs.SettingsConfig)
 --- The daily reward's door (`DailyRewardConfig.Topbar`). A config; it requires nothing.
 local DailyRewardConfig = require(ReplicatedStorage.shared.Configs.DailyRewardConfig)
+local PlaytimeRewardConfig = require(ReplicatedStorage.shared.Configs.PlaytimeRewardConfig)
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local GamepadInput = require(ReplicatedStorage.shared.Modules.GamepadInput)
 local UIRoot = require(ReplicatedStorage.shared.Modules.UIRoot)
@@ -524,6 +525,7 @@ function TopbarController._setRacing(self, racing: boolean)
 		{ self._radio, not racing },
 		{ self._icon, not racing },
 		{ self._daily, not racing },
+		{ self._playtime, not racing },
 		{ self._settings, not self._raceOnly or racing },
 	} do
 		local icon, enabled = entry[1], entry[2]
@@ -644,6 +646,40 @@ TopbarController:withLifecycle({
 		local daily = DailyRewardConfig.Topbar
 		if DailyRewardConfig.Enabled and daily.Enabled and UIRoot.isNewUI() then
 			self._daily = self:_buildPageDoor("DailyRewardToggle", daily.Order, daily.Icon or UIAssets.GiftGlyph, daily.Caption, DailyRewardConfig.PageName)
+		end
+
+		--[[ THE PLAYTIME GIFT (2026-10-19, `PlaytimeRewardConfig`): not a door but a button with a clock
+			on it. Its label is the countdown to the next gift, or CLAIM! with a notice badge when one is
+			waiting, drawn from `PlaytimeRewardController.LabelEvent`. A press is `oneClick`, so it never
+			sticks selected, and it opens the FREE GIFTS panel (or shuts it); the claim is on the panel. ]]
+		if PlaytimeRewardConfig.Enabled then
+			self:_settleGamepad()
+			local gift = PlaytimeRewardConfig.Topbar
+			local icon = Icon.new()
+				:setName("PlaytimeGift")
+				:setOrder(gift.Order)
+				:setLeft()
+				:setImage(UIAssets.url(UIAssets.GiftGlyph))
+				:setCaption(gift.Caption)
+				:setLabel("...")
+				:oneClick(true)
+			icon:bindEvent("selected", function()
+				local controller = Shard.get("PlaytimeRewardController")
+				if controller then
+					controller:toggle()
+				end
+			end)
+			local badged = false
+			Dispatcher:Subscribe("PlaytimeGiftLabel", function(label: string, ready: boolean)
+				icon:setLabel(label)
+				if ready and not badged then
+					icon:notify()
+				elseif not ready and badged then
+					icon:clearNotices()
+				end
+				badged = ready
+			end)
+			self._playtime = icon
 		end
 
 		--[[ ...and the mute, ONLY when the radio panel it now lives on cannot be reached. The header

@@ -86,7 +86,10 @@ BuyerConfig.CheckSeconds = 2
 BuyerConfig.Tutorial = {
 	Enabled = true,
 	Beat = "sell",
-	Delay = 3,
+	--- 2026-10-19: WAS 3, plus the walk in from the lot's entrance. The tutorial no longer ends on a
+	--- wait: the buyer is there the moment the car is parked. `WalkIn = true` brings the walk back.
+	Delay = 0,
+	WalkIn = false,
 	Band = "Good",
 }
 
