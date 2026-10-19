@@ -25,6 +25,8 @@ local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local StealNudgeConfig = require(ReplicatedStorage.shared.Configs.StealNudgeConfig)
+--- The quiet after a steal (`StealJuiceConfig.OneMoment.QuietNudge`).
+local StealJuiceConfig = require(ReplicatedStorage.shared.Configs.StealJuiceConfig)
 local ReminderSchedule = require(ReplicatedStorage.shared.Modules.StealReminderSchedule)
 local CarRarity = require(ReplicatedStorage.shared.Modules.CarRarity)
 local CarStats = require(ReplicatedStorage.shared.Modules.CarStats)
@@ -231,6 +233,10 @@ function StealNudgeController._step(self, dt: number)
 	self._sinceSteal += dt
 	self._sinceNudge += dt
 	if self._showing or not self:_canSpeak() then
+		return
+	end
+	--- Quiet for a beat after a steal (`StealJuiceConfig.OneMoment.QuietNudge`): the toast has the screen.
+	if StealJuiceConfig.oneMoment("QuietNudge") and self._stoleThisRun and self._sinceSteal < StealJuiceConfig.OneMoment.QuietNudgeSeconds then
 		return
 	end
 

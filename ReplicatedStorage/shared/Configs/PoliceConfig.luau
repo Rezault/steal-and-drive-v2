@@ -270,6 +270,76 @@ PoliceConfig.StealHeat = {
 	IgnoreCooldown = false,
 }
 
+--[[ HEAT (2026-10-19, Aleafo: "u steal an egg u get chased by guard immediately ... u do something
+	and there is a direct consequence, for us there isnt one"). EVERY steal now calls the police, not
+	only a top-rung one (`StealHeat`), and every steal raises the heat:
+
+	    a steal              +`PerSteal` stars (+`HighValueBonus` for a top-rung car), up to `Max`
+	    a steal mid-chase    the chase runs `ExtendOnSteal` seconds longer, and the heat still rises
+	    more stars           a longer chase (`DurationPerStar`), the second cruiser at `SecondCruiserAt`
+	                         and the helicopter at `HeliAt`
+	    losing the cops      the live heat clears ("LOST THEM")
+	    banking              pays 1 + `PayoutPerStar` x the stars EARNED this run (capped at `Max`)
+
+	THE TRUCK ALREADY WAITS FOR AN ESCAPE (`GetawayConfig.PoliceLock`): no truck while a chase is on.
+	So the loop becomes steal, escape, bank, and the greed question is "one more steal, or bank now
+	while it is quiet?": the next car is more money at the bank and another chase to survive first.
+
+	THE PAYOUT IS THE SERVER'S. `RewardService` counts the stars off `StealService.CarStolen`, the
+	steals it verified against its own encounter tokens, with the same `heatOfSteal`; the HUD's count
+	is the client's own tally of the same rule and only draws it.
+
+	A ROAD CHASE IS AS BEFORE: the full pair and the helicopter, as if at `RoadStars`. The tutorial's
+	run gets no heat at all, the same exemption `StealHeat` makes for it.
+
+	`Enabled = false`: a steal calls the police only for a top-rung car, no stars, no bonus, exactly as
+	before. This is the switch an A/B test flips. ]]
+PoliceConfig.Heat = {
+	Enabled = true,
+	Max = 5,
+	PerSteal = 1,
+	HighValueBonus = 1,
+	--- Seconds added to the rolled `Duration` per star past the first.
+	DurationPerStar = 5,
+	ExtendOnSteal = 8,
+	SecondCruiserAt = 2,
+	HeliAt = 3,
+	RoadStars = 3,
+	--- 0.15 a star: an escape from a five-star run banks 1.75x. A taste call to start from: it has to
+	--- beat banking early on a quiet road, and stay under a weather mutation's jackpot (`WeatherConfig`).
+	PayoutPerStar = 0.15,
+	--[[ The HUD's readout: its top-left corner and the stars' height, as screen shares, and its words.
+		TOP LEFT, under Roblox's topbar (0.02..0.09) where the rail stood before a run took it away
+		(`RaceConfig.HideRailDuringRace`). WAS centred at 0.16 (2026-10-19), inside the band the speed
+		trap warning and the chase bar's caption share (`Hud.Alert`'s measured survey), and the three
+		drew over each other. ]]
+	HudX = 0.02,
+	HudY = 0.11,
+	HudHeight = 0.04,
+	Star = "★",
+	EmptyStar = "☆",
+	BonusFormat = "x%s CASH",
+	LostSubText = "Heat cleared. Bank it for x%s",
+}
+
+--- Stars one steal adds (`Heat`). 0 with heat off. Shared, so the HUD and the payout count alike.
+function PoliceConfig.heatOfSteal(tier: unknown): number
+	local heat = PoliceConfig.Heat
+	if not (PoliceConfig.Enabled and heat.Enabled) then
+		return 0
+	end
+	return heat.PerSteal + (if PoliceConfig.isHighValueSteal(tier) then heat.HighValueBonus else 0)
+end
+
+--- What a bank pays for `stars` earned this run: 1 + `PayoutPerStar` a star, capped at `Max`.
+function PoliceConfig.heatMultiplier(stars: unknown): number
+	local heat = PoliceConfig.Heat
+	if not (PoliceConfig.Enabled and heat.Enabled) or type(stars) ~= "number" or stars ~= stars then
+		return 1
+	end
+	return 1 + heat.PayoutPerStar * math.clamp(stars, 0, heat.Max)
+end
+
 --- Seconds the pursuers take to peel off after the chase is survived, and how far they go while
 --- doing it. The cruisers fall back and the helicopter climbs away, both under their own easing, so
 --- the end of a chase is something you watch happen rather than a set of vehicles blinking out.
@@ -1423,8 +1493,12 @@ PoliceConfig.Hud = {
 			interrupt. It clears the getaway card horizontally without being told to, because
 			`TextScaled` fills a box's HEIGHT and one short word at this size is about 0.15 of the
 			screen wide whatever its box says. ]]
-		CentreY = 0.4,
-		Height = 0.085,
+		--- 2026-10-19: WAS 0.4, over the car. Now the STOLEN! toast's spot (0.24), nudged down to clear
+		--- the chase bar that comes up with it (caption+bar end at ~0.224): the alert takes over the toast.
+		CentreY = 0.265,
+		--- 2026-10-19: WAS 0.085, and the word covered the road ahead ("too big when it starts, I can
+		--- barely see in front of me"). About 40% smaller: still the loudest thing on screen.
+		Height = 0.05,
 		ArmText = "POLICE",
 		--- BOTH HALVES OF THE RULE IN ONE LINE, and it has to be both: a player told only about their
 		--- speed learns the wrong lesson from the crash that busts them. Short enough to read in the
@@ -1437,7 +1511,9 @@ PoliceConfig.Hud = {
 
 			Kept SHORTER than the line above on purpose: `TextScaled` fills a box's height, and it
 			answers a line too long for the width by wrapping it rather than by shrinking it. ]]
-		StealSubText = "THAT CAR WAS REPORTED",
+		--- 2026-10-19: a steal's banner has its own headline too, "POLICE ALERT / VEHICLE REPORTED STOLEN".
+		StealText = "POLICE ALERT",
+		StealSubText = "VEHICLE REPORTED STOLEN",
 		LostText = "LOST THEM",
 		LostSubText = "",
 		--- Seconds the alert holds at full before it goes. The arm's is longer because it carries a
@@ -1565,6 +1641,13 @@ PoliceConfig.Hud = {
 		Blue = Color3.fromRGB(40, 90, 255),
 		--- Fraction of the screen's short side the tint reaches in from each edge.
 		Reach = 0.34,
+		--[[ THE HEARTBEAT (2026-10-19, "a small red border flash during a police chase, to make it
+			more thrilling"). The wash above is tied to the bar and is NOT there at a full one, which is
+			right for "you are in trouble" but leaves a clean chase looking calm. So for as long as a
+			chase is live, all four edges also pulse a faint red between `Min` and `Max`, once every
+			`Period` seconds. The bar's wash wins wherever it is stronger, in its own red and blue, so
+			trouble still looks like trouble. `Enabled = false`: the bar's wash alone, as before. ]]
+		Pulse = { Enabled = true, Min = 0.04, Max = 0.2, Period = 0.9 },
 	},
 
 	--[[ THE BUST LIGHTS -----------------------------------------------------------------------

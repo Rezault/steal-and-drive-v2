@@ -44,6 +44,7 @@ local RunService = game:GetService("RunService")
 
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local GetawayConfig = require(ReplicatedStorage.shared.Configs.GetawayConfig)
+local StealJuiceConfig = require(ReplicatedStorage.shared.Configs.StealJuiceConfig)
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 
 local GetawayHudController = Shard.new("GetawayHudController"):withDependencies({
@@ -509,7 +510,13 @@ function GetawayHudController._loop(self, dt: number)
 	local locked = getaway:isPoliceLocked()
 
 	local remaining, total = getaway:getCountdown()
-	self:_stepCard(dt, remaining, total, truck ~= nil)
+	--- A chase holds the truck anyway (`PoliceLock`), so the card waits, from the call to the end of the chase (`StealJuiceConfig.OneMoment.HoldTruckCard`).
+	local police = Shard.get("PoliceController")
+	if (locked or (police and police:isCallPending())) and StealJuiceConfig.oneMoment("HoldTruckCard") then
+		self:_stepCard(dt, nil, nil, false)
+	else
+		self:_stepCard(dt, remaining, total, truck ~= nil)
+	end
 	self:_stepMarker(dt, if chipped or locked then nil else truck)
 end
 

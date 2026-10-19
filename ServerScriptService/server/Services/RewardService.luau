@@ -72,6 +72,9 @@ local RunService = game:GetService("RunService")
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local NearMissConfig = require(ReplicatedStorage.shared.Configs.NearMissConfig)
+--- The heat a bank is multiplied by (`PoliceConfig.Heat`), and the tutorial run's exemption from it.
+local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
+local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 --- Whether a near miss must name an issued car (`addNearMiss`'s dated block).
 local EncounterConfig = require(ReplicatedStorage.shared.Configs.EncounterConfig)
 local RewardConfig = require(ReplicatedStorage.shared.Configs.RewardConfig)
@@ -176,6 +179,8 @@ function RewardService.beginRun(self, player: Player, car: Model)
 		bonus = 0,
 		misses = 0,
 		paint = 0,
+		--- The stars this run has earned (`PoliceConfig.Heat`), off the steals `StealService` verified.
+		heat = 0,
 		nearStreak = 0,
 		nearAt = nil, -- os.clock() of the last ACCEPTED near miss; drives both guards below
 		-- The open half of a possible thread: the side of the last clean pass that has not threaded
@@ -450,6 +455,11 @@ function RewardService.settleRun(self, player: Player, banked: boolean, mutation
   if Garage then Garage:tryStarterInsurance(player, stolen, state.world) end
  end
 	local multiplier = WeatherConfig.multiplierOf(mutation)
+	--[[ HEAT PAYS ON A BANK ONLY (`PoliceConfig.Heat`, 2026-10-19). It is the price of the escape the
+		truck waited for (`GetawayConfig.PoliceLock`); a wreck escaped nothing. Counted here off the
+		server's own verified steals (the `CarStolen` hook in `start`), never off the client. ]]
+	local heatMultiplier = if banked then PoliceConfig.heatMultiplier(state.heat) else 1
+	multiplier *= heatMultiplier
 
 	--[[ THE PAYOUT IS CONFIRMED AGAINST THE BALANCE, not assumed from the call.
 
@@ -652,6 +662,24 @@ RewardService:withLifecycle({
 		Players.PlayerRemoving:Connect(function(player)
 			self:endRun(player)
 		end)
+
+		--[[ HEAT, counted off the steals the server verified (`StealService.CarStolen`, which only fires
+			for a redeemed encounter token), with the same rule the HUD draws by
+			(`PoliceConfig.heatOfSteal`). The tutorial's run earns none, the client's exemption read off
+			the same attribute the server publishes. ]]
+		local Steals = Shard.get("StealService")
+		if Steals then
+			Steals:getSignal("CarStolen"):Connect(function(player: Player, tier: number)
+				local state = self._runs[player]
+				if not state or state.settled then
+					return
+				end
+				if TutorialConfig.isTutorialRun(player:GetAttribute(TutorialConfig.StepAttribute)) then
+					return
+				end
+				state.heat = math.min(PoliceConfig.Heat.Max, state.heat + PoliceConfig.heatOfSteal(tier))
+			end)
+		end
 	end,
 })
 

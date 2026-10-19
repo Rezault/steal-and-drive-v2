@@ -170,6 +170,51 @@ StealJuiceConfig.Toast = {
 	TitleColor = Color3.fromRGB(255, 214, 64),
 }
 
+--[[ ONE STEAL, ONE MOMENT (2026-10-19, Aleafo: "the number of popups we have when u steal a car, its
+	like 5 things in 5s"). A steal used to raise the STOLEN! toast, a price pill over the car, a
+	POLICE banner a second later (every steal, since heat), a heat-star pop, the getaway card and now
+	and then a steal nudge. With this on there is one card, the toast, and it says all of it:
+
+	    MergeValue    the car's worth rides the rarity line ("RARE · $12,400"); no price pill
+	    MergeHeat     a red line under it, "+1★ POLICE INCOMING" (or "HEAT RISING" mid-chase), and no
+	                  POLICE banner for a chase a steal called in. A road chase keeps its banner:
+	                  nothing else announces it
+	    QuietStars    the heat stars change without popping
+	    HoldTruckCard the getaway card stays down while a chase is on; the truck cannot come then anyway
+	    QuietNudge    no steal nudge for `QuietNudgeSeconds` after a steal
+	    OneLine       the toast is STOLEN! over one line, "RED GARNEX • UNCOMMON"
+	    AlertCuts     the POLICE ALERT takes the toast down when it lands: one big message at a time,
+	                  and the danger is never queued behind the receipt
+
+	2026-10-19 (sequence pass): STOLEN! -> POLICE ALERT -> the chase bar. MergeHeat is OFF again: the
+	call is worth its own banner, and the toast gets out of its way instead (AlertCuts).
+
+	`Enabled = false`, or any one flag false: that piece exactly as it was before. ]]
+StealJuiceConfig.OneMoment = {
+	Enabled = true,
+	--- 2026-10-19: off, the price pill over the car stays; it reads better there than on the toast.
+	MergeValue = false,
+	MergeHeat = false,
+	QuietStars = true,
+	HoldTruckCard = true,
+	QuietNudge = true,
+	OneLine = true,
+	AlertCuts = true,
+	QuietNudgeSeconds = 6,
+	--- `OneLine`: the name in white, then the rarity in its own colour (rich text).
+	OneLineFormat = '<font color="#FFFFFF">%s</font> • %s',
+	ValueFormat = "%s · %s",
+	HeatIncoming = "+%d★ POLICE INCOMING",
+	HeatRising = "+%d★ HEAT RISING",
+	HeatColor = Color3.fromRGB(255, 80, 80),
+}
+
+--- Is one piece of `OneMoment` on? The master switch and that piece's own flag. Pure.
+function StealJuiceConfig.oneMoment(piece: string): boolean
+	local cfg = StealJuiceConfig.OneMoment
+	return cfg.Enabled == true and cfg[piece] == true
+end
+
 -- === The player's switch for the cinematic ======================================
 --[[ A SETTINGS ROW THAT TURNS `Cinematic` OFF FOR ONE PLAYER (2026-10-02, the owner: "some people
 	wont want it enabled"). The cinematic takes the camera away for about a second on every steal, and

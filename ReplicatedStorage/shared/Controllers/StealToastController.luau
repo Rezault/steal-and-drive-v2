@@ -23,6 +23,9 @@ local Shard = require(ReplicatedStorage.Packages.Shard)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local StealJuiceConfig = require(ReplicatedStorage.shared.Configs.StealJuiceConfig)
 local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
+--- The merged lines (`StealJuiceConfig.OneMoment`): the car's worth, and the heat the steal adds.
+local MarketValueConfig = require(ReplicatedStorage.shared.Configs.MarketValueConfig)
+local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
 local CarRarity = require(ReplicatedStorage.shared.Modules.CarRarity)
 local NoticeLane = require(ReplicatedStorage.shared.Modules.NoticeLane)
 
@@ -78,6 +81,9 @@ function StealToastController._build(self)
 	local rarity = line(root, "Rarity", cfg.TitleHeight, cfg.LineHeight)
 	local name = line(root, "Name", cfg.TitleHeight + cfg.LineHeight, cfg.LineHeight)
 	name.TextColor3 = Color3.new(1, 1, 1)
+	--- The heat the steal raised (`StealJuiceConfig.OneMoment.MergeHeat`); blank when there is none.
+	local heat = line(root, "Heat", cfg.TitleHeight + cfg.LineHeight * 2, cfg.LineHeight)
+	heat.TextColor3 = StealJuiceConfig.OneMoment.HeatColor
 
 	--[[ The rarity flash's four edges (`StealJuiceConfig.RarityFlash`): a frame along each side with a
 		gradient running clear toward the middle, so the colour washes in from the rim. ]]
@@ -102,8 +108,15 @@ function StealToastController._build(self)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	self._gui, self._scale, self._root = gui, scale, root
-	self._labels = { title, rarity, name }
-	self._rarity, self._name = rarity, name
+	--- `OneMoment.OneLine`: the name rides the rarity line, so the toast is two lines, not three.
+	if StealJuiceConfig.oneMoment("OneLine") then
+		rarity.RichText = true
+		name.Visible, heat.Visible = false, false
+		self._labels = { title, rarity }
+	else
+		self._labels = { title, rarity, name, heat }
+	end
+	self._rarity, self._name, self._heat = rarity, name, heat
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
 		local maxScale = self:_fit()
 		self._scale.Scale = math.min(self._scale.Scale, maxScale)
@@ -117,7 +130,7 @@ function StealToastController._fit(self): number
 	local narrowLandscape = compact and viewport.X < 700 and viewport.Y <= viewport.X
 	local width = if narrowLandscape then viewport.X * 0.45 else if compact then math.min(280, viewport.X - 24) else cfg.Width
 	local titleHeight, lineHeight = if compact then 26 else cfg.TitleHeight, if compact then 18 else cfg.LineHeight
-	self._root.Size = UDim2.fromOffset(width, titleHeight + lineHeight * 2)
+	self._root.Size = UDim2.fromOffset(width, titleHeight + lineHeight * (#self._labels - 1))
 	-- Keep the short receipt beside the road and below the rare-car card, clear of the chase gauge (2026-10-12).
 	self._root.AnchorPoint = if compact then Vector2.new(1, 0) else Vector2.new(0.5, 0.5)
 	self._root.Position = if compact then UDim2.new(1, -12, 0, if viewport.X < 700 then 182 else 140)
@@ -193,19 +206,47 @@ function StealToastController._burst(self, colour: Color3, band: number)
 	end)
 end
 
-function StealToastController._show(self, body: unknown, paint: unknown, mutation: unknown)
+function StealToastController._show(self, body: unknown, paint: unknown, mutation: unknown, tier: unknown)
 	if type(body) ~= "string" or not self._gui then
 		return
 	end
 	local cfg = StealJuiceConfig.Toast
+	local one = StealJuiceConfig.OneMoment
 	local word, band = CarRarity.of(body)
 	local colour = CarRarity.colourOf(band)
 	self:_flash(colour, band)
 	self:_burst(colour, band)
 	local tag = if type(mutation) == "string" then string.upper(WeatherConfig.nameOf(mutation)) .. " " else ""
-	self._rarity.Text = tag .. string.upper(word)
+	local rarityText = tag .. string.upper(word)
+	--- What it is worth, on the toast instead of a pill over the car (`OneMoment.MergeValue`): the
+	--- price tag's own figure (`StealTagController`), so the two can never have said different things.
+	if StealJuiceConfig.oneMoment("MergeValue") then
+		local mutationKey = if type(mutation) == "string" then mutation else nil
+		local value = MarketValueConfig.valueOf(GarageConfig.TierOfBody[body], mutationKey)
+		rarityText = string.format(one.ValueFormat, rarityText, GarageConfig.formatCash(value))
+	end
+	local carName = GarageConfig.carName(body, if type(paint) == "number" then paint else nil)
+	self._rarity.Text = if StealJuiceConfig.oneMoment("OneLine")
+		then string.format(one.OneLineFormat, string.upper(carName), rarityText)
+		else rarityText
 	self._rarity.TextColor3 = colour
-	self._name.Text = GarageConfig.carName(body, if type(paint) == "number" then paint else nil)
+	self._name.Text = carName
+
+	--[[ The chase it calls, said here and not by a POLICE banner a second later (`OneMoment.MergeHeat`):
+		the stars this steal adds, by the rule the police and the payout count by (`heatOfSteal`), and
+		whether that is a new chase coming or a live one getting worse. Blank with no heat (heat off, the
+		tutorial run), which `getHeat` answers nil for. ]]
+	local heatText = ""
+	local police = Shard.get("PoliceController")
+	if StealJuiceConfig.oneMoment("MergeHeat") and police and police.getHeat and police:getHeat() then
+		local added = PoliceConfig.heatOfSteal(tier)
+		if added > 0 then
+			local chase = police:getChase()
+			local live = chase ~= nil and (chase.state == "live" or chase.state == "pit")
+			heatText = string.format(if live then one.HeatRising else one.HeatIncoming, added)
+		end
+	end
+	self._heat.Text = heatText
 
 	self._token = (self._token or 0) + 1
 	local token = self._token
@@ -226,23 +267,36 @@ function StealToastController._show(self, body: unknown, paint: unknown, mutatio
 	):Play()
 
 	task.delay(cfg.PopTime + byBand(cfg.Hold, band), function()
-		if self._token ~= token then
-			return -- a newer steal took the toast over
+		if self._token == token then -- else a newer steal took the toast over
+			self:_fadeOut(token)
 		end
-		local fade = TweenInfo.new(cfg.FadeTime)
-		for _, label in self._labels do
-			TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
-			local stroke = label:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
-			end
-		end
-		task.delay(cfg.FadeTime, function()
-			if self._token == token then
-				self._gui.Enabled = false
-			end
-		end)
 	end)
+end
+
+function StealToastController._fadeOut(self, token: number)
+	local fadeTime = StealJuiceConfig.Toast.FadeTime
+	local fade = TweenInfo.new(fadeTime)
+	for _, label in self._labels do
+		TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
+		local stroke = label:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
+		end
+	end
+	task.delay(fadeTime, function()
+		if self._token == token then
+			self._gui.Enabled = false
+		end
+	end)
+end
+
+--- PUBLIC (`PoliceHudController`): fade the toast now, for a message that outranks it.
+function StealToastController.dismiss(self)
+	if not (self._gui and self._gui.Enabled) then
+		return
+	end
+	self._token += 1
+	self:_fadeOut(self._token)
 end
 
 function StealToastController._clear(self)
@@ -270,8 +324,8 @@ StealToastController:withLifecycle({
 			return
 		end
 		self:_build()
-		Dispatcher:Subscribe("CarStolen", function(body, paint, mutation)
-			self:_show(body, paint, mutation)
+		Dispatcher:Subscribe("CarStolen", function(body, paint, mutation, tier)
+			self:_show(body, paint, mutation, tier)
 		end)
 	end,
 })

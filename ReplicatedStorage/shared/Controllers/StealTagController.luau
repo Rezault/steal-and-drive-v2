@@ -28,6 +28,8 @@ local Shard = require(ReplicatedStorage.Packages.Shard)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local InterfaceConfig = require(ReplicatedStorage.shared.Configs.InterfaceConfig)
 local MarketValueConfig = require(ReplicatedStorage.shared.Configs.MarketValueConfig)
+--- Whether the toast has taken the price over (`StealJuiceConfig.OneMoment.MergeValue`).
+local StealJuiceConfig = require(ReplicatedStorage.shared.Configs.StealJuiceConfig)
 local StealTagConfig = require(ReplicatedStorage.shared.Configs.StealTagConfig)
 local ArcadeKit = require(ReplicatedStorage.shared.Modules.ArcadeKit)
 local CarRarity = require(ReplicatedStorage.shared.Modules.CarRarity)
@@ -180,6 +182,10 @@ StealTagController:withLifecycle({
 			return
 		end
 		Dispatcher:Subscribe("CarStolen", function(body, _paint, mutation)
+			--- The toast carries the price now (`StealJuiceConfig.OneMoment.MergeValue`): one card, not two.
+			if StealJuiceConfig.oneMoment("MergeValue") then
+				return
+			end
 			--- Spawned: the kit's shelf can still be on its way in, and `ArcadeKit.shelf` waits for it.
 			task.spawn(function()
 				self:_show(body, mutation)

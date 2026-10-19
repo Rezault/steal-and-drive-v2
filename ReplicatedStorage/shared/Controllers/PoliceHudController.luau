@@ -49,6 +49,8 @@ local RunService = game:GetService("RunService")
 
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
+--- Which steal popups have folded into the toast (`StealJuiceConfig.OneMoment`).
+local StealJuiceConfig = require(ReplicatedStorage.shared.Configs.StealJuiceConfig)
 local NoticeLane = require(ReplicatedStorage.shared.Modules.NoticeLane)
 
 local PoliceHudController = Shard.new("PoliceHudController"):withDependencies({ "PoliceController" })
@@ -186,6 +188,84 @@ function PoliceHudController._buildVignette(self, gui: ScreenGui)
 
 		table.insert(self._tints, { frame = tint, red = side.red })
 	end
+end
+
+--[[ THE HEAT READOUT (`PoliceConfig.Heat`, 2026-10-19): the live stars and what the run will bank
+	for, on a screen of its own because it is up for the whole run and the chase's screen is not
+	(it switches itself off between chases, see `_loop`). Red stars while the police are on you or
+	coming; grey once you have lost them; the gold multiplier under them is the bank's, and stays. ]]
+function PoliceHudController._buildHeat(self)
+	local cfg = PoliceConfig.Heat
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "HeatHud"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = DISPLAY_ORDER
+	gui.Enabled = false
+	local stars = Instance.new("TextLabel")
+	stars.AnchorPoint = Vector2.new(0, 0)
+	stars.Position = UDim2.fromScale(cfg.HudX, cfg.HudY)
+	stars.Size = UDim2.fromScale(0.16, cfg.HudHeight)
+	stars.BackgroundTransparency = 1
+	stars.FontFace = FONT
+	stars.TextScaled = true
+	stars.TextXAlignment = Enum.TextXAlignment.Left
+	stars.Parent = gui
+	local starStroke = Instance.new("UIStroke")
+	starStroke.Color = Color3.fromRGB(8, 10, 14)
+	starStroke.Thickness = 2
+	starStroke.Parent = stars
+	local scale = Instance.new("UIScale")
+	scale.Parent = stars
+	local bonus = Instance.new("TextLabel")
+	bonus.AnchorPoint = Vector2.new(0, 0)
+	bonus.Position = UDim2.fromScale(cfg.HudX, cfg.HudY + cfg.HudHeight * 1.05)
+	bonus.Size = UDim2.fromScale(0.16, cfg.HudHeight * 0.65)
+	bonus.BackgroundTransparency = 1
+	bonus.FontFace = FONT
+	bonus.TextScaled = true
+	bonus.TextXAlignment = Enum.TextXAlignment.Left
+	bonus.TextColor3 = Color3.fromRGB(255, 214, 64)
+	bonus.Parent = gui
+	local bonusStroke = Instance.new("UIStroke")
+	bonusStroke.Color = Color3.fromRGB(8, 10, 14)
+	bonusStroke.Thickness = 1.5
+	bonusStroke.Parent = bonus
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	self._heatGui, self._heatStars, self._heatBonus, self._heatScale = gui, stars, bonus, scale
+	self._heatShown = -1
+end
+
+--- "1.45" for a multiplier, trailing zeros off.
+local function multiplierText(value: number): string
+	return (string.gsub(string.format("%.2f", value), "%.?0+$", ""))
+end
+
+--- One frame of the heat readout. Up whenever the run has heat to show; a new star pops it.
+function PoliceHudController._stepHeat(self, heat, now: number)
+	local gui = self._heatGui
+	if not gui then
+		return
+	end
+	local show = heat ~= nil and (heat.stars > 0 or heat.earned > 0)
+	gui.Enabled = show
+	if not show then
+		self._heatShown = -1
+		return
+	end
+	local cfg = PoliceConfig.Heat
+	if heat.stars ~= self._heatShown then
+		--- No pop with `OneMoment.QuietStars`: the toast already said what the steal did.
+		if heat.stars > self._heatShown and self._heatShown >= 0 and not StealJuiceConfig.oneMoment("QuietStars") then
+			self._heatPop = now
+		end
+		self._heatShown = heat.stars
+		self._heatStars.Text = string.rep(cfg.Star, heat.stars) .. string.rep(cfg.EmptyStar, cfg.Max - heat.stars)
+		self._heatStars.TextColor3 = if heat.stars > 0 then Color3.fromRGB(255, 70, 70) else Color3.fromRGB(170, 175, 185)
+	end
+	self._heatBonus.Text = string.format(cfg.BonusFormat, multiplierText(heat.multiplier))
+	local t = math.clamp((now - (self._heatPop or -math.huge)) / 0.35, 0, 1)
+	self._heatScale.Scale = 1 + 0.35 * (1 - t) * (1 - t)
 end
 
 function PoliceHudController._build(self)
@@ -483,12 +563,26 @@ function PoliceHudController._stepLights(self, bar: number, alpha: number, redLi
 		return
 	end
 	local intensity = math.clamp((cfg.From - bar) / math.max(cfg.From, 1e-3), 0, 1) * cfg.Max * alpha
+	--- The heartbeat (`Vignette.Pulse`): a faint red on every edge for the whole of a live chase.
+	local pulse = cfg.Pulse
+	local beat = 0
+	if pulse and pulse.Enabled then
+		local wave = 0.5 + 0.5 * math.sin(os.clock() * 2 * math.pi / math.max(pulse.Period, 1e-3))
+		beat = (pulse.Min + (pulse.Max - pulse.Min) * wave) * alpha
+	end
 	for _, tint in self._tints do
 		--- The lit pair is at full intensity and the other pair at a fifth of it, rather than at
 		--- nothing. Taking one pair to zero makes the screen look like it is being wiped from side
 		--- to side; leaving a trace of the off colour reads as two lights, one of which is brighter.
 		local lit = tint.red == redLit
-		tint.frame.BackgroundTransparency = 1 - intensity * (if lit then 1 else 0.2)
+		local wash = intensity * (if lit then 1 else 0.2)
+		if beat > wash then
+			tint.frame.BackgroundColor3 = cfg.Red
+			tint.frame.BackgroundTransparency = 1 - beat
+		else
+			tint.frame.BackgroundColor3 = if tint.red then cfg.Red else cfg.Blue
+			tint.frame.BackgroundTransparency = 1 - wash
+		end
 	end
 end
 
@@ -510,6 +604,9 @@ function PoliceHudController._loop(self, dt: number)
 	local police = self._police
 	local chase = police and police:getChase()
 	local now = os.clock()
+	--- First, and on its own screen: the heat outlives every chase in the run (`_buildHeat`).
+	local heat = police and police.getHeat and police:getHeat()
+	self:_stepHeat(heat, now)
 
 	--- The two transitions this file cares about, both detected by comparing against the last frame
 	--- rather than by subscribing to anything. See the header for why that is the point.
@@ -522,11 +619,25 @@ function PoliceHudController._loop(self, dt: number)
 				to work out from the bar anyway (`PoliceConfig.StealHeat`, and `Hud.Alert`'s note on
 				why the steal line is the shorter of the two). Falls back to the rule for any reason
 				this file has not been told about. ]]
-			local sub = if chase.reason == "steal" then cfg.StealSubText or cfg.ArmSubText else cfg.ArmSubText
-			self:_say(cfg.ArmText, sub, cfg.ArmColor, cfg.ArmHold)
+			local stolen = chase.reason == "steal"
+			local sub = if stolen then cfg.StealSubText or cfg.ArmSubText else cfg.ArmSubText
+			--- A chase a steal called in was already announced on the STOLEN! toast
+			--- (`StealJuiceConfig.OneMoment.MergeHeat`); only a road chase gets the banner.
+			if not (stolen and StealJuiceConfig.oneMoment("MergeHeat")) then
+				self:_say(if stolen then cfg.StealText or cfg.ArmText else cfg.ArmText, sub, cfg.ArmColor, cfg.ArmHold)
+				--- One big message at a time, and the danger first (`StealJuiceConfig.OneMoment.AlertCuts`).
+				local toast = StealJuiceConfig.oneMoment("AlertCuts") and Shard.get("StealToastController")
+				if toast then
+					toast:dismiss()
+				end
+			end
 			self._shown = 1
 		elseif state == "leaving" then
-			self:_say(cfg.LostText, cfg.LostSubText, cfg.LostColor, cfg.LostHold)
+			--- With heat, the escape says what it was worth: the bank's multiplier, now the truck can come.
+			local sub = if heat and heat.earned > 0
+				then string.format(PoliceConfig.Heat.LostSubText, multiplierText(heat.multiplier))
+				else cfg.LostSubText
+			self:_say(cfg.LostText, sub, cfg.LostColor, cfg.LostHold)
 		end
 		self._lastState = state
 	end
@@ -587,6 +698,9 @@ PoliceHudController:withLifecycle({
 		--- `WaitForChild`.
 		task.spawn(function()
 			self:_build()
+			if PoliceConfig.Heat.Enabled then
+				self:_buildHeat()
+			end
 			RunService.RenderStepped:Connect(function(dt)
 				self:_loop(dt)
 			end)

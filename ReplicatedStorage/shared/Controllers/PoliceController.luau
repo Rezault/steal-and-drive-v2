@@ -492,9 +492,35 @@ function PoliceController.reportSteal(self, tier: number?)
 
 		`_active` gates it because a call is a piece of RACE state: outside a race there is no
 		folder to parent a cruiser into, which is the same thing `debugArm` refuses on. ]]
+	--[[ HEAT (`PoliceConfig.Heat`, 2026-10-19): EVERY steal is answered, not only a top-rung one. The
+		stars rise either way; a chase already live is extended rather than restarted, so a steal made
+		to get away is a steal that makes getting away harder. ]]
+	local added = if self._active and not self._tutorialRun then PoliceConfig.heatOfSteal(tier) else 0
+	if added > 0 then
+		local max = PoliceConfig.Heat.Max
+		self._heat = math.min(max, self._heat + added)
+		self._heatEarned = math.min(max, self._heatEarned + added)
+		if self._state == "live" then
+			self._endsAt += PoliceConfig.Heat.ExtendOnSteal
+		else
+			self._stealArmAt = now + PoliceConfig.StealHeat.Delay
+		end
+		return
+	end
 	if self._active and not self._tutorialRun and PoliceConfig.isHighValueSteal(tier) then
 		self._stealArmAt = now + PoliceConfig.StealHeat.Delay
 	end
+end
+
+--[[ PUBLIC (`PoliceHudController`): this run's heat, or nil outside a race or with heat off. `stars` is
+	the live heat (what the police are on you for now), `earned` what this run will bank for, and
+	`multiplier` that, priced (`PoliceConfig.heatMultiplier`). The server pays its own count of the
+	same rule; this one is for drawing. ]]
+function PoliceController.getHeat(self)
+	if not (self._active and PoliceConfig.Enabled and PoliceConfig.Heat.Enabled) or self._tutorialRun then
+		return nil
+	end
+	return { stars = self._heat, earned = self._heatEarned, multiplier = PoliceConfig.heatMultiplier(self._heatEarned) }
 end
 
 -- === Building a pursuer =====================================================
@@ -1018,7 +1044,10 @@ function PoliceController._callDue(self, now: number): boolean
 		self._stealArmAt = 0
 		return false
 	end
-	return PoliceConfig.StealHeat.IgnoreCooldown or now >= self._cooldownUntil
+	--- With heat on, a steal is always answered: the consequence has to be the same every time or it
+	--- is not a rule (`PoliceConfig.Heat`). The road's cooldown is still the road's.
+	local heatOn = PoliceConfig.Heat.Enabled and self._heat > 0
+	return PoliceConfig.StealHeat.IgnoreCooldown or heatOn or now >= self._cooldownUntil
 end
 
 --- Which stretch of road we are on, as the tile's own `TileIndex`, or nil off the live road. The
@@ -1061,7 +1090,14 @@ function PoliceController._arm(self, reason: string?)
 	self._swoopAge = math.huge
 	self:_endPit()
 	self._graceUntil = now + PoliceConfig.Grace
+	--[[ HOW HOT (`PoliceConfig.Heat`): a steal's chase is as big as the stars behind it; a road chase is
+		the full one it always was (`RoadStars`). With heat off, every chase is the full one. ]]
+	local heat = PoliceConfig.Heat
+	local stars = if not heat.Enabled then heat.Max
+		elseif self._armReason == "steal" then math.max(self._heat, 1)
+		else math.max(self._heat, heat.RoadStars)
 	self._endsAt = now + self._rng:NextNumber(PoliceConfig.Duration[1], PoliceConfig.Duration[2])
+		+ (if heat.Enabled then (stars - 1) * heat.DurationPerStar else 0)
 	--- What nitro has taken off `_endsAt` so far, against `PoliceConfig.Nitro.MaxCut`. Per chase.
 	self._nitroCut = 0
 	self._armedAt = now
@@ -1073,12 +1109,12 @@ function PoliceController._arm(self, reason: string?)
 	self._stealArmAt = 0
 
 	self:_spawnPursuer("car", 1, -1)
-	if PoliceConfig.Cruisers.Count > 1 then
+	if PoliceConfig.Cruisers.Count > 1 and (not heat.Enabled or stars >= heat.SecondCruiserAt) then
 		for index = 2, PoliceConfig.Cruisers.Count do
 			self:_spawnPursuer("car", index, if index % 2 == 0 then 1 else -1)
 		end
 	end
-	if PoliceConfig.Helicopter.Enabled then
+	if PoliceConfig.Helicopter.Enabled and (not heat.Enabled or stars >= heat.HeliAt) then
 		self:_spawnPursuer("heli", 1, 1)
 	end
 
@@ -1112,6 +1148,8 @@ function PoliceController._lose(self)
 	self._state = "leaving"
 	self._leaveAt = os.clock() + PoliceConfig.PullAway.Time
 	self._cooldownUntil = self._leaveAt + PoliceConfig.Cooldown
+	--- Lost them: the live heat clears (`PoliceConfig.Heat`); what this run earned stays for the bank.
+	self._heat = 0
 	self:_reportChase(false)
 	for _, rec in self._pursuers do
 		if rec.siren then
@@ -1839,6 +1877,9 @@ function PoliceController._onRaceStart(self, world: number?)
 
 	self._active = true
 	self._state = "off"
+	--- A run starts cold (`PoliceConfig.Heat`).
+	self._heat = 0
+	self._heatEarned = 0
 	self._bar = 1
 	self._lead = 0
 	self._swoopAmount = 0
@@ -1970,6 +2011,11 @@ function PoliceController._teardown(self)
 end
 
 -- === What the HUD reads =====================================================
+
+--- Whether a steal has called the police and the chase has not armed yet (`StealHeat.Delay`).
+function PoliceController.isCallPending(self): boolean
+	return self._active and self._stealArmAt > 0
+end
 
 --[[ PUBLIC (`PoliceHudController`). Everything on screen, in one table, or nil when there is no
 	chase to draw.
@@ -2211,6 +2257,9 @@ PoliceController:withLifecycle({
 		self._lead = 0
 		self._swoopAmount = 0
 		self._chases = 0
+		--- The run's heat (`PoliceConfig.Heat`): the live stars, and the stars it will bank for.
+		self._heat = 0
+		self._heatEarned = 0
 		--- The chain: when the last strike landed and how many links deep it was. Counted off the
 		--- CLOCK rather than off the bar, which is the whole of what makes "too close together"
 		--- different from "twice" (see `reportStrike`). -inf = no strike this chase.
