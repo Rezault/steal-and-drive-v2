@@ -697,7 +697,26 @@ end
 
 -- Approved economy balance, 2026-10-04.
 local Balance = require(script.Parent.BalanceConfig)
-WorldConfig.MapCompletionTiles = 8
+--[[ Road tiles to 100% of a world (2026-10-20, Aleafo: "did we make the world unlock thing longer"; the
+	owner: "its very simple to drive to the end of a world right now"). WAS 8, then 20 the same day
+	("2.5x is too long, make it 60% longer"). Studs are what is saved, so a retune re-derives everyone's
+	percentage: a player who was at 100% is now at 61%, and a world already bought stays bought
+	(`UnlockAttribute` is not re-checked). ]]
+WorldConfig.MapCompletionTiles = 13
+
+--[[ The card after a run that moved you down a road whose end unlocks the next world
+	(`WorldProgressController`). It is there because the requirement was invisible: the only place it
+	was written was the Play screen's locked row. `%s` are the world driven, then the world it unlocks. ]]
+WorldConfig.ProgressCard = {
+	Enabled = true,
+	--- Seconds after the lobby comes back, so the server's settle has replicated the new best.
+	Delay = 1.5,
+	Hold = 6,
+	Title = "%s: %s DRIVEN",
+	Text = "Drive to the END of %s to unlock %s",
+	DoneTitle = "%s COMPLETE!",
+	DoneText = "%s is unlocked to buy in Play",
+}
 for index, world in WorldConfig.Worlds do
  if index > 1 then
   world.Unlock.Cost = Balance.WorldCosts[index]

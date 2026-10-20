@@ -1616,6 +1616,10 @@ function TutorialController._stepLook(self, step)
 	end
 	local stoodAt: number? = nil
 	self:_stopLook()
+	if TutorialConfig.Cinematic.Enabled then
+		self._lookStop = self:_buyerCinematic(head, model)
+		return
+	end
 	self._lookStop = CameraFacing.watch(function(): Vector3?
 		if not (head.Parent and model.Parent) then
 			return nil
@@ -1628,6 +1632,133 @@ function TutorialController._stepLook(self, step)
 		end
 		return head.Position
 	end, cfg)
+end
+
+--[[ THE FIRST BUYER'S WALK-UP, AS A SHOT (`TutorialConfig.Cinematic`, 2026-10-20). Dip to black,
+	cut to a fixed camera ahead of the buyer and off to one side, which pans to keep them framed as
+	they walk up and past it to the car; dip again and hand back the player's own camera, behind them,
+	with the card (now "Walk over to the buyer") back up. The player's controls and the card are off for
+	the shot, which is what made the old turn-the-camera-under-you version feel wrong: nothing is being
+	steered while the camera moves.
+
+	Ends on the buyer standing at the car (`Linger` later), on `MaxSeconds`, on the buyer going away,
+	or on `stop` (the returned function, which `_stopLook` calls). Every way out fades back the same. ]]
+function TutorialController._buyerCinematic(self, head: BasePart, model: Model): () -> ()
+	local cfg = TutorialConfig.Cinematic
+	local camera = workspace.CurrentCamera
+	local player = Players.LocalPlayer
+
+	local gui = self._cineGui
+	if not gui then
+		gui = Instance.new("ScreenGui")
+		gui.Name = "TutorialCinematic"
+		gui.IgnoreGuiInset = true
+		gui.ResetOnSpawn = false
+		gui.DisplayOrder = cfg.DisplayOrder
+		local black = Instance.new("Frame")
+		black.Name = "Black"
+		black.Size = UDim2.fromScale(1, 1)
+		black.BackgroundColor3 = Color3.new(0, 0, 0)
+		black.BackgroundTransparency = 1
+		black.BorderSizePixel = 0
+		black.Parent = gui
+		gui.Parent = player:WaitForChild("PlayerGui")
+		self._cineGui = gui
+	end
+	local black = gui:FindFirstChild("Black") :: Frame
+
+	local function controls(enabled: boolean)
+		pcall(function()
+			local module = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule", 2) :: any)
+			local stock = module:GetControls()
+			if enabled then
+				stock:Enable()
+			else
+				stock:Disable()
+			end
+		end)
+	end
+	local function dip(to: number, after: (() -> ())?)
+		local tween = TweenService:Create(black, TweenInfo.new(cfg.Fade, Enum.EasingStyle.Quad), { BackgroundTransparency = to })
+		if after then
+			tween.Completed:Once(after)
+		end
+		tween:Play()
+	end
+
+	local done = false
+	local conn: RBXScriptConnection? = nil
+	local function finish()
+		if done then
+			return
+		end
+		done = true
+		dip(0, function()
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
+			camera.CameraType = Enum.CameraType.Custom
+			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				camera.CameraSubject = humanoid
+			end
+			CameraFacing.behindCharacter()
+			controls(true)
+			self._cinematic = false
+			if self._card then
+				self._card.Visible = self._cardOn == true
+			end
+			dip(1)
+		end)
+	end
+
+	self._cinematic = true
+	if self._card then
+		self._card.Visible = false
+	end
+	controls(false)
+	dip(0, function()
+		if done then
+			return
+		end
+		local root = model:FindFirstChild("HumanoidRootPart")
+		local at = if root and root:IsA("BasePart") then root else head
+		--- The way they are walking, flat; their facing when the velocity has not replicated yet.
+		local velocity = at.AssemblyLinearVelocity
+		local ahead = Vector3.new(velocity.X, 0, velocity.Z)
+		if ahead.Magnitude < 1 then
+			ahead = Vector3.new(at.CFrame.LookVector.X, 0, at.CFrame.LookVector.Z)
+		end
+		ahead = if ahead.Magnitude > 1e-3 then ahead.Unit else Vector3.new(0, 0, -1)
+		local side = ahead:Cross(Vector3.yAxis)
+		local from = head.Position + ahead * cfg.Ahead + side * cfg.Side + Vector3.yAxis * cfg.Rise
+		local aim = head.Position
+		camera.CameraType = Enum.CameraType.Scriptable
+		camera.CFrame = CFrame.lookAt(from, aim)
+
+		local started, stoodAt = os.clock(), nil :: number?
+		conn = RunService.RenderStepped:Connect(function(dt: number)
+			if done then
+				return
+			end
+			if not (head.Parent and model.Parent) or os.clock() - started > cfg.MaxSeconds then
+				finish()
+				return
+			end
+			if model:GetAttribute(BUYER_ARRIVED) == true then
+				stoodAt = stoodAt or os.clock()
+				if os.clock() - stoodAt >= cfg.Linger then
+					finish()
+					return
+				end
+			end
+			aim = aim:Lerp(head.Position, 1 - math.exp(-cfg.PanRate * dt))
+			camera.CFrame = CFrame.lookAt(from, aim)
+		end)
+		dip(1)
+	end)
+	return finish
 end
 
 --- Hand the camera back if `_stepLook` has it. Idempotent.
@@ -1739,7 +1870,8 @@ function TutorialController._setCardShown(self, shown: boolean)
 	local was = self._cardOn
 	self._cardOn = shown
 	if self._card then
-		self._card.Visible = shown
+		--- Held down through the buyer's walk-up shot (`_buyerCinematic`), which puts it back after.
+		self._card.Visible = shown and not self._cinematic
 	end
 	if not shown then
 		self:_showMeter(nil)

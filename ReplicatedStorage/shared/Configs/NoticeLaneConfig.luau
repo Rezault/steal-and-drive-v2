@@ -50,7 +50,11 @@ NoticeLaneConfig.MaxVisibleCompact = 1
 NoticeLaneConfig.Order = {
 	OfflineLabel = 1,
 	CarryHint = 2,
+	--- The first-upgrade nudge (`UpgradeNudgeController`, 2026-10-20). Never up with the carry hint.
+	UpgradeNudge = 2.5,
 	ShowroomSummary = 3,
+	--- How far down the road to the next world this run got (`WorldProgressController`, 2026-10-20).
+	WorldProgress = 3.5,
 	Discovery = 4,
 }
 

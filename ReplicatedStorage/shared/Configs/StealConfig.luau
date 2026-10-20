@@ -130,7 +130,9 @@ StealConfig.Launch = {
 
 		FIXED ACROSS PROGRESSION. Jump upgrades enlarge control and capture tolerance instead, so
 		buying a level never changes the timing learned on the previous one. ]]
-	Up = 92,
+	--- 2026-10-20: WAS 92. The hang (`Flight.Hang`) carries the arc higher on its own, so the throw
+	--- is lowered to keep the apex where players know it (~26 studs).
+	Up = 80,
 
 	--[[ Fraction of the car's along-road speed the avatar carries into the arc.
 
@@ -195,7 +197,9 @@ StealConfig.Flight = {
 		also quietly shifts the tier balance — hang time is how long the glide gets to close on
 		traffic — though at this size the effect is a couple of studs either way, well inside the
 		~35-stud Tier 1 / ~6 Tier 5 spread the header describes. ]]
-	Float = { Speed = 16, Falloff = 1.6 },
+	--- 2026-10-20: WAS 16 / 1.6. A slower, flatter descent, the second half of the glide (`Hang`).
+	--- 9 stays above the ~8 floor this note gives for the touchdown still reading as a landing.
+	Float = { Speed = 9, Falloff = 0.8 },
 
 	--[[ HISTORICAL AIR-BRAKE DERIVATION. FROM THE APEX ON, along-road speed eases from whatever
 		you bailed at toward `Speed` — a shade above the pace of mid-tier traffic.
@@ -258,13 +262,130 @@ StealConfig.Flight = {
 		one-lane correction inside the shorter flight without allowing a road-wide teleport. `Accel`
 		eases it so a tap doesn't teleport you sideways. `Reach` caps total drift from where you
 		bailed: past about one lane either side the jump stops being a read and becomes a search. ]]
-	SteerSpeed = 38,
-	SteerAccel = 14,
-	Reach = 20,
+	--- 2026-10-20 ("allow the player to move significantly while in the air"): WAS 38. A lane (15 studs)
+	--- in about a quarter of a second of full input, the whole `Reach` in well under a second.
+	--- ...then 55 to 95 the same day ("still make the movement faster, about 1.5x or double ... quick,
+	--- responsive"). The whole `Reach` in about a third of a second.
+	SteerSpeed = 70, -- and 95 back to 70 ("a bit too fast now"): ~1.3x the 55 it was before the speed-up
+	--- 2026-10-20: WAS 14 ("switch directions + speed quickly"). 24 reaches ~90% of a new sideways
+	--- speed in under a tenth of a second, so a reversal reads as instant without a teleport.
+	SteerAccel = 36, -- then 24 to 36 with it: a reversal is ~90% done in ~0.06s
+	--- 2026-10-20: WAS 20, about one lane. The longer glide (`Hang`) only buys options if there is
+	--- somewhere else to go, so 30 reaches the lane two over (lanes are 15 apart). Not more: it is capped at
+	--- `HalfWidth` by the assert at the bottom of this file (34 tripped it and the steal stopped loading).
+	Reach = 30,
 
 	-- Keep the avatar inside the drivable corridor. Same half-width DriveConfig.LaneHalfWidth uses,
 	-- so you can't fly somewhere the car could never have driven.
 	HalfWidth = 30,
+
+	--[[ THE HANG AT THE TOP (2026-10-20, playtest: the jump "feels too fast / unpredictable", other
+		games let you "kind of glide for a little bit to properly choose"). While vertical speed is
+		inside `Window` studs/s of zero, gravity is scaled down: `RiseScale` on the way up, `FallScale`
+		on the way down. So the throw still snaps and the landing still settles, and the top of the arc
+		becomes a float. At 20 / 0.35 / 0.5 the stretch either side of the apex inside `Window` takes
+		0.6s instead of 0.27s, a third of a second more hang, and the apex sits about a stud higher. Time is not slowed (`SlowMo` was tried, and read
+		as the game slowing down): the traffic keeps its pace and the player hangs over it.
+		IN `_advance`, SO THE MARKER KNOWS: the prediction runs the same integrator, so the circle and
+		the landing still agree. It costs a little reach-down-the-road (the extra hang is flown at
+		glide pace, so a couple of studs). `Window = 0` switches it off. ]]
+	--- 2026-10-20 (second pass, "still not enough glide ... options instead of quickly having to guess"):
+	--- WAS 20 / 0.35 / 0.5, which only added ~0.2s. With `Float` 9/0.8 and `Launch.Up` 80 the flight runs
+	--- 2.6s (was 1.5s), ~2.1s of it slow and near level, apex about where it was (26 studs). Measured by
+	--- stepping this integrator, not estimated.
+	--[[ ...and `Hold` (2026-10-20: "the player should start falling down a bit later, to allow for a bit
+		of movement", now that they can fly by hand): from the apex, `Hold` seconds at `HoldScale` of the
+		gravity, a near-level glide before the fall. 0.8s moves the start of the fall from ~0.7s to ~1.5s
+		into the jump and the whole jump from ~2.5s to ~3.3s (~4.2s with the jump upgrade maxed), stepped
+		on this integrator. `Hold = 0`: the fall starts at the apex, as before. ]]
+	Hang = { Window = 30, RiseScale = 0.2, FallScale = 0.2, Hold = 0.8, HoldScale = 0.05 },
+}
+
+--[[ THE TARGET LOCK (2026-10-20, "maybe have the target lock onto a car? then if you move to another car
+	it locks to the other one ... we need to experiment"). Three switches, each its own A/B:
+
+	  `Enabled`  the ground circle leaves the road and sits ON THE ROOF of the car the arc will take
+	             (the same car the green outline names), sliding between cars at `Slide` per second.
+	             No car in reach: back under the avatar, as before.
+	  `Stick`    the lock keeps the car it has unless another is better by this many studs, so two
+	             cars side by side do not trade the lock back and forth every frame.
+	  `Assist`   with the stick centred (inside `DeadZone`), the flight eases across toward the locked
+	             car's lane so it lands on the roof rather than beside it, at `AssistGain`. It never
+	             picks a car you have not already earned (the lock only exists inside the real reach),
+	             and any steering of your own switches it off for that frame. ]]
+StealConfig.Lock = {
+	Enabled = true,
+	--[[ THE ONE TARGET (2026-10-20 rework: "jumping initially doesn't show ANY car", "it steals a
+		different car than the highlighted one", "prioritise cars IN FRONT and closest ... then diagonal
+		or side"). With this on, `StealController._pickLock` names ONE car from the first frame of the
+		jump, the circle and outline show it, and E takes that car or nothing (a roof you land on
+		becomes the target). The window it picks in, in studs from the player along the road frame:
+		`Ahead` up the road, `Behind` back, `Side` either way. `FrontFrom`: a car this far up the road
+		counts as IN FRONT, and in-front cars always win. `SideWeight` makes a stud sideways count for
+		more than a stud ahead when ranking by nearness. `AimColor`: the circle and outline while the
+		target is not in E's reach yet; green (`Marker.Hit`) once it is. ]]
+	--- 2026-10-20, second pass ("she wanted the car in front of her but ... it prioritised some car on
+	--- the side"): `SideWeight` WAS 1.6, so a car one lane over 20 studs up beat her own lane's car 35
+	--- up; at 3 the own-lane car wins unless it is much further. `Ahead` WAS 90: a fast car covers it
+	--- in under two seconds.
+	--- ...and 120 THEN 75 (same day, "the distance feels like a lot"): the lock reaches the nearer cars,
+	--- not one far up the road the homing then has to dash to.
+	Ahead = 75,
+	Behind = 20,
+	Side = 42,
+	FrontFrom = 6,
+	SideWeight = 3,
+	--- Seconds of the player's sideways drift added to where they are when ranking cars, so steering
+	--- toward a car counts before you are over it.
+	AimLead = 0.4,
+	AimColor = Color3.fromRGB(255, 214, 64),
+	--[[ HOMING ALONG THE ROAD (`StealController._stepAir`): with a car locked, the jump's along speed
+		eases (`HomeEase` per second) to that car's speed plus `HomeGain` x the gap, at most `HomeMax`
+		studs/s either way. This is what stops a fast car's jump overshooting the target ("got
+		launched"): you glide in over the car you picked and come down on it. `Home = false`: the arc
+		keeps its own pace, as before. ]]
+	Home = true,
+	--[[ FORWARD AND BACK IN THE AIR (2026-10-20: "allow players, while they're gliding, to move up and
+		back as well ... how will we handle that on mobile?"). The car's own throttle: W/S on a keyboard,
+		the on-screen gas and brake pedals on a phone or tablet, the triggers on a pad, all one value
+		(`DriveController.getThrottleInput`). Full gas leans the glide `AlongSpeed` studs/s ahead of the
+		target's pace (brake: behind), and leans where the lock looks by `AimAlong` studs, so holding it
+		moves the lock to the next car up (or down) the road. `AlongSteer = false`: along stays automatic. ]]
+	AlongSteer = true,
+	--- 2026-10-20 ("move significantly while in the air"): WAS 16, and the homing pulled it back.
+	--- With input the helpers stand down (`ManualHold`), so this is the real lean: 40 studs/s faster
+	--- or slower than the car under you, eased in at `ManualEase` per second.
+	AlongSpeed = 52, -- then 40 to 70, then 52 ("a bit too fast now")
+	--- ...and back (2026-10-20: "let players move backwards too rather than merely stop in the air"):
+	--- the car under you does ~30-45 studs/s, so 40 back only parked you; 75 flies you back down the
+	--- road at ~30-45 studs/s, the same pace as the forward lean.
+	AlongBack = 100, -- then 75 to 130, then 100: back down the road at ~55-70 studs/s
+	--- WAS 6 ("really responsive, switch directions + speed quickly"): 12 is ~90% of a change in 0.2s.
+	ManualEase = 18, -- then 12 to 18: ~90% of a change in ~0.13s
+	--- Seconds after the last input before the homing and the assist take over again.
+	ManualHold = 0.5,
+	AimAlong = 30,
+	--[[ THE HIGHLIGHTED CAR, TAKEN WITHOUT THE PRESS (2026-10-20: "we don't want them to wreck just cause
+		they didn't click E"). With `Prompt.AutoSteal` the jump ending takes the car in reach on every
+		device; a landing up to `LandReach` studs from the highlighted car (flat, road plane, scaled by
+		the jump upgrade) still takes that one. Only coming down with no car near is a wreck now. ]]
+	LandReach = 30,
+	HomeGain = 0.9,
+	--- 2026-10-20: WAS 30. A gentler catch-up, so closing on the target reads as gliding, not a dash.
+	HomeMax = 18,
+	HomeEase = 3,
+	Slide = 14,
+	--[[ HOW LOUD THE LOCKED CIRCLE IS (2026-10-20, "make the indicator more visible"). On a car it is
+		drawn over the bodywork (`OnTop`, or the roof hides half of it), at full strength, a little
+		bigger (`Grow`), and breathing: `Pulse` of its size either way, `PulseRate` times a second. ]]
+	OnTop = true,
+	Grow = 1.15,
+	Pulse = 0.08,
+	PulseRate = 2.5,
+	Stick = 4,
+	Assist = true,
+	AssistGain = 0.6,
+	DeadZone = 0.15,
 }
 
 -- === Landing ================================================================
@@ -355,6 +476,12 @@ StealConfig.Prompt = {
 		takes it, on the roof or in the grace window after, without the press. A tap in the air still
 		steals early, exactly as before. Keyboard and gamepad keep the press. `false`: press-only. ]]
 	TouchAutoSteal = true,
+	--- ...and on EVERY device since 2026-10-20 (`Lock.LandReach` has the why): a missed press is never a
+	--- wreck. E in the air still steals early, as before. `false`: touch only, as above.
+	AutoSteal = true,
+	--- Seconds after a touch JUMP in which the same button's STEAL is ignored (`StealController.bail`):
+	--- the jump's own tap, landing twice, was stealing the first car the lock named (2026-10-20).
+	BailGuard = 0.35,
 
 	--[[ Studs from the car's PADDED volume — its bodywork plus `Landing.Pad`, in every direction
 		including up — inside which the prompt lights and E works.
@@ -423,7 +550,10 @@ StealConfig.Prompt = {
 		Glyph = "rbxassetid://78505096430486",
 		--- Tapping the pill is the same call `_onSteal` makes for E, guards and all. Off = the art
 		--- still changes but only the HUD button presses, which is the safe half of this feature.
-		Pressable = true,
+		--- 2026-10-20: OFF. With the thumbstick back for flying (`DrivingHudController.setFlying`), a thumb
+		--- landing on the pill to start a drag stole the car mid-glide ("it automatically puts me in the
+		--- car I'm over"). The landing takes the car anyway (`AutoSteal`) and the HUD button still presses.
+		Pressable = false,
 	},
 
 	--[[ === IT IS MADE OF THE KIT NOW — 2026-08-25 =============================================
@@ -893,7 +1023,10 @@ StealConfig.BailedCar = {
 
 		Set this to 0 to get the old hold-station behaviour back, which is the A/B for whether the
 		recede is what sold the distance. ]]
-	Drift = 22,
+	--- 2026-10-20: WAS 22. Over the 2.6s glide (`Flight.Hang`) 22 opened ~68 studs, right at `MaxLag`, and
+	--- every leap looked half as far again ("we're jumping too far"). 10 ends it ~43 back, where the
+	--- 1.5s jump used to.
+	Drift = 10,
 
 	-- Hard ceiling on the whole gap, studs. Nothing normal reaches it — a full flight lands ~55 — so
 	-- like `Flight.MaxTime` this is a fail-safe against a stuck state, not a tuning dial. It is the
@@ -1144,10 +1277,12 @@ StealConfig.Marker = {
 		`_findCandidate` asks, so a car off to one side that E will still take is lit before the
 		player presses anything, which is the half of the playtester's complaint that was about
 		information rather than about size. ]]
+	--- 2026-10-20: WAS 0.9 / 0.12 ("make the indicator more visible"): a real green wash on the car
+	--- and a solid outline, so the car E will take reads from the corner of the eye.
 	TargetHighlight = {
 		Enabled = true,
-		FillTransparency = 0.9,
-		OutlineTransparency = 0.12,
+		FillTransparency = 0.6,
+		OutlineTransparency = 0,
 	},
 
 	Neutral = Color3.fromRGB(236, 240, 246), -- over tarmac, nothing under you
@@ -1228,6 +1363,10 @@ end
 	is the failure mode — the plan's suggestion is to scale the depth with the tier being chased, so
 	a Tier 1 grab barely dips and a Tier 5 at full stretch gets the full treatment. `Scale` below is
 	the flat version; build that first, then make it a function of the target. ]]
+--[[ TRIED ON 2026-10-20 at 0.7 for "the jump feels too fast", and turned back off the same day: slowing
+	the whole world read as the game slowing down, not as the player gliding ("I want it to still be a
+	smooth jump, I just want the player to glide at the top a little more"). The glide is
+	`Flight.Hang` now. ]]
 StealConfig.SlowMo = {
 	Enabled = false,
 	Scale = 0.4,

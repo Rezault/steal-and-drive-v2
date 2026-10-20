@@ -511,7 +511,9 @@ CameraConfig.FirstPerson = {
 		fractions, its centre) if a HUD piece lands there later. `Height` is a share of the screen.
 		A ROUND ICON since 2026-10-14 (the owner: "like the boost/jump buttons"): `Icon` on a dark disc
 		with the boost button's blue rim. It WAS the kit's green pill reading VIEW. ]]
-	TouchButton = { Enabled = true, Icon = 9266631437, Position = Vector2.new(0.93, 0.24), Height = 0.1 },
+	--- 2026-10-20: Y WAS 0.24, where a phone's top-bar offset put it on the GETAWAY card (`GetawayConfig.Hud.Card`,
+	--- 0.35..0.45); up in the corner now, clear of it.
+	TouchButton = { Enabled = true, Icon = 9266631437, Position = Vector2.new(0.93, 0.12), Height = 0.1 },
 
 	-- Where the eye sits, in the SEAT's frame: studs over the seat pad (which is where the hips are),
 	-- studs ahead of it, studs to its right. Every rig's driver's seat is the VehicleSeat, so 0 right

@@ -738,7 +738,9 @@ GarageConfig.Picker = {
 		opaque, and at 22 it came up over the car while you were still stepping back to look at it.
 		The podiums measure 13.8 to 14.9 studs from centre to far corner, so 16 still reaches from
 		anywhere along a podium's edge. ]]
-	PromptMaxDistance = 16,
+	--- 2026-10-20: WAS 16 ("increase the prompts at the bays ... by a little"). Not measured against the gap
+	--- between neighbouring podiums: if two bays' prompts light from one spot, bring this back down.
+	PromptMaxDistance = 20,
 
 	--- E at an EMPTY bay, where it opens the picker to choose what goes there.
 	EmptyActionText = "Park a Car",

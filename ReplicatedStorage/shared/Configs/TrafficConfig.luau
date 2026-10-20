@@ -1353,7 +1353,9 @@ TrafficConfig.LuckProgress = {
 	Enabled = true,
 	Steps = 6, -- One visible milestone every two tiles; maximum odds at tile 12.
 	Hold = 3, -- Long enough to read while driving; a later milestone replaces the card.
-	Position = UDim2.fromOffset(16, 76), -- Top-left, below the Roblox controls (2026-10-12).
+	-- Top-left, below the Roblox controls. 2026-10-20: measured below the top bar now (the gui keeps the
+	-- inset), WAS 76 from the screen top, which a phone's taller top bar covered.
+	Position = UDim2.fromOffset(16, 12),
 }
 TrafficConfig.World1OddsRampTiles = TrafficConfig.OddsRampTiles
 -- Preserve each later world's starting rarity-band mass while splitting ten bodies.

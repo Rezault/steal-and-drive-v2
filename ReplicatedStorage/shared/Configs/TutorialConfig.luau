@@ -1042,6 +1042,28 @@ TutorialConfig.Look = {
 	StopOnInput = true,
 }
 
+--[[ ...OR AS A SHOT (2026-10-20: "a nice camera transition that shows them walking up to the car, then
+	it fades back to the player camera"). With this on, the same moment `Look` waits for (the buyer
+	walking onto the lot, once per beat) plays `TutorialController._buyerCinematic` instead of turning
+	the player's camera: a dip to black, a fixed camera `Ahead` studs up the buyer's path and `Side`
+	studs off it, `Rise` up, panning after them (`PanRate`, per second) as they walk up and past it to
+	the car, then a dip back to the player's own camera behind them. Controls and the card are off for
+	it. It ends `Linger` after the buyer stands at the car, or at `MaxSeconds`. `Fade` is each dip.
+	`Enabled = false`: the camera turn above, as the tutorial had it before. ]]
+TutorialConfig.Cinematic = {
+	--- 2026-10-20: off for a demo; the camera turn (`Look`) is the one shown. True brings the shot back.
+	Enabled = false,
+	Ahead = 14,
+	Side = 9,
+	Rise = 4,
+	PanRate = 4,
+	Linger = 0.8,
+	MaxSeconds = 8,
+	Fade = 0.25,
+	--- Over the card and the HUD, under the race fade (1000).
+	DisplayOrder = 990,
+}
+
 --[[ THE STAGE AFTER THE LAST BEAT (2026-10-19). Roblox's onboarding funnel counts players REACHING a
 	stage (`TutorialService._funnel`), so finishing the last beat has no stage of its own unless one is
 	reported for it. The last beat is AGAIN, which a race entry finishes, so this stage reads "started

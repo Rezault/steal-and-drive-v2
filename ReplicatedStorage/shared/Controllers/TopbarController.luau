@@ -471,7 +471,7 @@ end
 --- The feedback button (`InterfaceConfig.FeedbackIcon`): one click opens Roblox's feedback prompt.
 function TopbarController._buildFeedback(self)
 	local cfg = InterfaceConfig.FeedbackIcon
-	local icon = Icon.new():setName(cfg.Name):setOrder(cfg.Order):setLeft():setLabel(cfg.Label):setCaption(cfg.Caption):oneClick(true)
+	local icon = Icon.new():setName(cfg.Name):setOrder(cfg.Order):setRight():setLabel(cfg.Label):setCaption(cfg.Caption):oneClick(true)
 	icon:bindEvent("selected", function()
 		--- Async and yielding, and absent on an engine that predates it: so spawned and guarded.
 		task.spawn(function()

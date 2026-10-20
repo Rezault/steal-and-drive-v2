@@ -127,13 +127,17 @@ SpeedTrapConfig.Gantry = {
 
 SpeedTrapConfig.Ui = {
 	Enabled = true,
-	WarnPosition = Vector2.new(0.5, 0.155),
-	WarnSize = Vector2.new(0.26, 0.03),
+	--- 2026-10-20 ("move the speed trap text over to the right side ... smaller, it's not that important"):
+	--- WAS centred at 0.155 and 0.26 x 0.03; now on the right over its own result (`ResultPosition`), smaller.
+	WarnPosition = Vector2.new(0.76, 0.16),
+	WarnSize = Vector2.new(0.18, 0.022),
 	--- On TOUCH (2026-10-13, punch list M4): clear of Roblox's top bar (to y ~0.15 on a phone), between
 	--- the streak meter (`NearMissConfig.Flow.TouchPosition`, 0.2) and the steal nudge (0.295), and big
 	--- enough to read (0.03 of a 390px screen was 12px).
-	WarnTouchPosition = Vector2.new(0.5, 0.255),
-	WarnTouchSize = Vector2.new(0.34, 0.045),
+	--- 2026-10-20: WAS 0.255; swapped with the police chase bar on a phone (`PoliceConfig.Hud.Bar.TouchCentreY`),
+	--- which took this spot so it sits higher, under the FLOW meter.
+	WarnTouchPosition = Vector2.new(0.74, 0.24), -- ...and on a phone, right side too, left of the camera button
+	WarnTouchSize = Vector2.new(0.22, 0.032),
 	WarnColor = Color3.fromRGB(255, 90, 90),
 	-- Mirrored against the near-miss toast, leaving the centre of the road unobstructed.
 	ResultPosition = Vector2.new(0.76, 0.22),

@@ -665,10 +665,27 @@ end
 	The distance test is FLAT. The aisle floor is not perfectly level (measured: 1.24 to 1.84 local Y
 	across one showroom) and a 3D distance to a point on the ground never closes for somebody whose
 	root is three studs above it. ]]
-function CustomerService._step(self, customer: Customer, position: Vector3, timeout: number): boolean
+function CustomerService._step(self, customer: Customer, position: Vector3, timeout: number, passing: boolean?): boolean
 	local cfg = CustomerConfig.Walk
 	local deadline = os.clock() + timeout
 	local reissue = 0
+	--[[ SMOOTH WALKING (2026-10-20: the first buyer "looks staggered"). Two causes, both fixed here.
+
+		  • THE SERVER KEEPS THE PHYSICS. Left to itself Roblox hands an unanchored rig's physics to the
+		    nearest player, and a humanoid the server is steering then stutters on that player's
+		    screen, which is exactly the one watching. Set every leg: it is a property write, and an
+		    anchored root (a buyer who has stood) refuses it, so a once-only flag could miss the walk off.
+		  • A WAYPOINT IT IS ONLY PASSING (`passing`) counts as reached one poll's worth of travel early,
+		    so the next leg is issued before it gets there. It used to arrive, stand until the next
+		    `PollSeconds` check, then set off again: stop-go at every waypoint, worse the faster it walks.
+		    One poll and no more, so a corner beside a podium is not cut into it. ]]
+	pcall(function()
+		customer.root:SetNetworkOwner(nil)
+	end)
+	local radius = cfg.ArriveRadius
+	if passing then
+		radius += customer.humanoid.WalkSpeed * cfg.PollSeconds
+	end
 
 	while customer.live and customer.root.Parent do
 		if os.clock() > customer.expires then
@@ -676,7 +693,7 @@ function CustomerService._step(self, customer: Customer, position: Vector3, time
 		end
 
 		local delta = position - customer.root.Position
-		if Vector3.new(delta.X, 0, delta.Z).Magnitude <= cfg.ArriveRadius then
+		if Vector3.new(delta.X, 0, delta.Z).Magnitude <= radius then
 			return true
 		end
 		if os.clock() >= deadline then
@@ -731,7 +748,7 @@ function CustomerService._walkTo(self, customer: Customer, position: Vector3, st
 		-- From 2: the first waypoint is the point they are already standing on.
 		for i = 2, #waypoints do
 			local to = waypoints[i].Position
-			if not self:_step(customer, to, timeoutFor(from, to)) then
+			if not self:_step(customer, to, timeoutFor(from, to), i < #waypoints) then
 				return false
 			end
 			from = to
@@ -1404,12 +1421,47 @@ function CustomerService._react(self, crowd: Crowd, customer: Customer, bayIndex
  end
  local passes = Shard.get("PassService")
  local vip = if passes and passes:owns(crowd.player, "VIP") then CustomerConfig.VIP.TipMultiplier else 1
+ local emoji = CustomerConfig.Reactions.Emoji
+ self:_emote(customer, if kind.Outfit then emoji.Loved else emoji.Liked)
+ --[[ PAID AS THEY REACT (`CustomerConfig.Visit.PayOnLike`, 2026-10-20: "an NPC can look at a car and say
+  'Take my money!' but not actually tip anything until they leave", and the checkout bubble was up for
+  half a second). The first car they like pays its tip with the line; a later, better car pays only the
+  DIFFERENCE. One jitter per customer (rolled on their first like) makes the tip rise with the car's
+  value, so the visit's total is exactly the approved one, the tip for the best car they liked, the
+  same thing the checkout below used to pay in one go. A profile not loaded yet keeps the top-up for
+  the checkout, which is the old path and still the only one with the flag off. ]]
+ if visit.PayOnLike then
+  local variance = CustomerConfig.Tip.Variance
+  customer.tipJitter = customer.tipJitter or (1 + self._rng:NextNumber(-variance, variance))
+  local base = if basis > 0 then math.max(CustomerConfig.Tip.Minimum, math.floor(CustomerConfig.perLook(basis) * customer.tipJitter)) else 0
+  local tip = math.round(base * (kind.Tip or 1) * vip * Garage:incomeMultiplier(crowd.player))
+  local owed = 0
+  if tip > 0 and basis > (customer.tipBasis or -math.huge) then
+   owed = math.max(0, tip - (customer.tipPaid or 0))
+   customer.tipBasis = basis
+  end
+  if owed > 0 then
+   customer.tipPaid = (customer.tipPaid or 0) + owed
+   if Garage:isProfileReady(crowd.player) then
+    Garage:addCash(crowd.player, owed)
+    self:_tallyTip(crowd.player, owed)
+    self:getSignal("CustomerPaid"):Fire(crowd.player, owed, bayIndex, car.Body)
+    if CustomerConfig.Reactions.Burst.Enabled then
+     Garage:burstCash(crowd.player, owed, customer.root.Position)
+    end
+   else
+    local held = customer.pendingTip
+    customer.pendingTip = { basis = basis, amount = (if held then held.amount else 0) + owed, bay = bayIndex, body = car.Body }
+   end
+  end
+  self:_say(customer, CustomerConfig.lineFor(CustomerConfig.Lines.Liked, self._rng, car.Body), if owed > 0 then owed else nil)
+  self:_dwell(customer, visit.ReactSeconds)
+  return
+ end
  local tip = math.round(CustomerConfig.tipFor(basis, self._rng) * (kind.Tip or 1) * vip * Garage:incomeMultiplier(crowd.player))
  if tip > 0 and (not customer.pendingTip or basis > customer.pendingTip.basis) then
   customer.pendingTip = { basis = basis, amount = tip, bay = bayIndex, body = car.Body }
  end
- local emoji = CustomerConfig.Reactions.Emoji
- self:_emote(customer, if kind.Outfit then emoji.Loved else emoji.Liked)
  self:_say(customer, CustomerConfig.lineFor(CustomerConfig.Lines.Liked, self._rng, car.Body), nil)
  self:_dwell(customer, visit.ReactSeconds)
 end
@@ -1433,7 +1485,7 @@ function CustomerService._bindAnimation(self, customer: Customer)
 
 	local function apply(speed: number)
 		if speed > 0.1 then
-			anim:setSpeed(CustomerConfig.Animations.WalkPlaybackSpeed)
+			anim:setSpeed(CustomerConfig.Animations.WalkPlaybackSpeed * ((customer :: any).walkScale or 1))
 			anim:play("Walk", 0.15)
 		else
 			anim:setSpeed(1)
@@ -1931,8 +1983,11 @@ end
 	`walkIn` (2026-09-28, `BuyerConfig.Stand.WalkIn`): true for a buyer whose offer was only just made,
 	who starts on the forecourt and walks to the car; false or nil for one rebuilt from the save, who
 	is simply stood in place. The name comes back straight away either way — the rig exists from the
-	first frame, it is only its position that is still moving. ]]
-function CustomerService.placeBuyer(self, player: Player, bayIndex: number, carId: string, offer: { Amount: number, ExpiresAt: number, Kind: string? }, walkIn: boolean?): string?
+	first frame, it is only its position that is still moving.
+
+	`walkSpeed` (2026-10-20): a walk-in at this pace instead of the browsing one, its stride sped to
+	match. The tutorial's buyer (`BuyerConfig.Tutorial.WalkSpeed`); nil for everyone else. ]]
+function CustomerService.placeBuyer(self, player: Player, bayIndex: number, carId: string, offer: { Amount: number, ExpiresAt: number, Kind: string? }, walkIn: boolean?, walkSpeed: number?): string?
 	local crowd = self._crowds[player]
 	if not (crowd and crowd.live) then
 		return nil
@@ -2018,7 +2073,12 @@ function CustomerService.placeBuyer(self, player: Player, bayIndex: number, carI
 		trove = trove,
 		live = true,
 		expires = os.clock() + CustomerConfig.Visit.MaxSeconds,
+		--- The stride's share of the browsing one, so a faster walker's feet keep up (`_bindAnimation`).
+		walkScale = if walking and walkSpeed then walkSpeed / CustomerConfig.Walk.Speed else nil,
 	}
+	if walking and walkSpeed then
+		humanoid.WalkSpeed = walkSpeed
+	end
 
 	--[[ ONE PROMPT, OWNER-ONLY BY CHECK. Anybody walking the lot can read the sign; only the owner can
 		answer it, and that is enforced here rather than by hiding the prompt — `Enabled` is a property

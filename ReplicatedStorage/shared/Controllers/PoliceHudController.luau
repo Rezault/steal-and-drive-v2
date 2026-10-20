@@ -199,7 +199,9 @@ function PoliceHudController._buildHeat(self)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "HeatHud"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
+	--- Measured from BELOW the Roblox top bar (2026-10-20: on a phone the bar is taller than `HudY`
+	--- reached and the stars sat under the Roblox button), the way the weather chip above it is.
+	gui.IgnoreGuiInset = false
 	gui.DisplayOrder = DISPLAY_ORDER
 	gui.Enabled = false
 	local stars = Instance.new("TextLabel")
@@ -260,10 +262,20 @@ function PoliceHudController._stepHeat(self, heat, now: number)
 		Both are measured in `AbsolutePosition`, one shared space whatever either gui's inset. ]]
 	local luck = Shard.get("LuckProgressController")
 	local bottom = luck and luck:bottom()
+	--- ...and the weather event chip, which is the top of the same stack (`WeatherController.chipBottom`):
+	--- the readout goes under whichever of the two reaches lower.
+	local weather = Shard.get("WeatherController")
+	local chip = weather and weather.chipBottom and weather:chipBottom()
+	if chip and (not bottom or chip > bottom) then
+		bottom = chip
+	end
 	local drop = self._heatDrop or 0
 	local want = 0
 	if bottom then
-		want = math.max(0, bottom + HEAT_LUCK_GAP - (self._heatStars.AbsolutePosition.Y - drop))
+		--- The readout's RESTING top from its layout, not measured off it: a moving label's
+		--- `AbsolutePosition` lags the `Position` just written by a frame, and chasing that shook it.
+		local restTop = gui.AbsolutePosition.Y + PoliceConfig.Heat.HudY * gui.AbsoluteSize.Y
+		want = math.max(0, bottom + HEAT_LUCK_GAP - restTop)
 	end
 	local dt = math.clamp(now - (self._heatAt or now), 0, 0.1)
 	self._heatAt = now
@@ -304,6 +316,9 @@ function PoliceHudController._build(self)
 	gui.Name = "PoliceHud"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
+	--- Edge to edge, safe area ignored (2026-10-20): the red border was laid out inside a phone's notch
+	--- insets and stopped short of the screen, leaving red bands. The alert and bar are centred, clear of them.
+	gui.ScreenInsets = Enum.ScreenInsets.None
 	gui.DisplayOrder = DISPLAY_ORDER
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Enabled = false
@@ -460,11 +475,26 @@ function PoliceHudController._fit(self)
 		local viewport = workspace.CurrentCamera.ViewportSize
 		local x = if viewport.X < 700 and viewport.Y <= viewport.X then 0.35 else 0.5
 		-- The old 1.9%-high caption was seven pixels on a landscape phone (2026-10-12).
-		self._track.Position = UDim2.new(x, 0, 0, 94)
-		self._track.Size = UDim2.fromOffset(180, 10)
-		self._label.Position = UDim2.new(x, 0, 0, 85)
-		self._label.Size = UDim2.fromOffset(180, 18)
+		--[[ 2026-10-20: WAS 94 px from the top, which is the band the FLOW streak meter
+			(`NearMissConfig.Flow.TouchPosition`, 0.2) and the speed trap warning (0.255) take on a phone,
+			so the three drew over each other. Under both now, at `TouchCentreY` of the screen. ]]
+		local y = bar.TouchCentreY or 0.34
+		--- 2026-10-20: WAS 180 x 10 with an 18 px caption, a quarter of a landscape phone's width
+		--- ("covers a lot of the top of the screen"). Two thirds of that; the caption still reads.
+		self._track.Position = UDim2.new(x, 0, y, 0)
+		self._track.Size = UDim2.fromOffset(120, 7)
+		self._label.Position = UDim2.new(x, 0, y, -6)
+		self._label.Size = UDim2.fromOffset(120, 13)
+		--- ...and the POLICE ALERT under it rather than on it (`Hud.Alert.TouchCentreY`, 2026-10-20): the bar
+		--- moved up into the band the alert's centred spot (0.265) covers on a phone.
+		local alert = PoliceConfig.Hud.Alert
+		local alertY = alert.TouchCentreY or alert.CentreY
+		self._alert.Position = UDim2.fromScale(0.5, alertY)
+		self._sub.Position = UDim2.fromScale(0.5, alertY + alert.Height * 0.55)
 	else
+		local alert = PoliceConfig.Hud.Alert
+		self._alert.Position = UDim2.fromScale(0.5, alert.CentreY)
+		self._sub.Position = UDim2.fromScale(0.5, alert.CentreY + alert.Height * 0.55)
 		self._track.Position = UDim2.fromScale(0.5, bar.CentreY)
 		self._track.Size = UDim2.fromScale(bar.Size.X, bar.Size.Y)
 		self._label.Position = UDim2.fromScale(0.5, bar.CentreY - bar.Size.Y * 0.5 - bar.LabelGap)

@@ -1102,11 +1102,94 @@ function DrivingHudController._applyTouchOnly(self)
 	local visible = mobile or gui:GetAttribute("TouchOnly") == false
 	self:_layoutReadouts(mobile)
 	self:_layoutSteering(mobile)
+	self:_syncArrows()
 	if controls.Visible ~= visible then
 		controls.Visible = visible
 		if not visible then
 			self:_clear() -- a hidden button can never fire its own InputEnded
 		end
+	end
+	self:_syncStockControls()
+end
+
+--[[ PUBLIC (StealController): the player is in the air, or not (2026-10-20: "hide the left/right arrows
+	and brake/accelerate while flying, and re-enable the joystick so the player can fly around ... full
+	control of their flight"). On a thumb device only: the arrows and pedals hide, and Roblox's own
+	thumbstick comes back (`_syncStockControls`), which `StealController._flightStick` reads for the
+	flight across and along the road. The car is suspended for the whole flight, so the stick cannot
+	steer it meanwhile, which was the only reason it was off. Off again: the arrows and pedals return
+	and the stick goes. Nitro and the steal button stay up throughout. ]]
+--- The arrows HIDE (the stick does their job); the pedals only DIM (2026-10-20: "don't fully hide
+--- brake/accelerate, just darken them") and stay live, so gas and brake still glide you forward and back.
+local FLIGHT_HIDES = { "SteerLeft", "SteerRight" }
+
+--- Does the stick steer the car on this device (`DriveConfig.TouchJoystick`)? A thumb device only.
+function DrivingHudController._joystickSteers(self): boolean
+	return DriveConfig.TouchJoystick == true and self:_wantsThumbControls()
+end
+
+--- The arrows: up on a thumb device unless the stick steers there, and never in the air.
+function DrivingHudController._syncArrows(self)
+	local controls = self._controls
+	if not controls then
+		return
+	end
+	local shown = not (self._flying == true or self:_joystickSteers())
+	for _, name in FLIGHT_HIDES do
+		local button = controls:FindFirstChild(name, true)
+		if button and button:IsA("GuiObject") and button.Visible ~= shown then
+			button.Visible = shown
+			if not shown then
+				self._leftHeld, self._rightHeld = false, false
+				self:_publish()
+			end
+		end
+	end
+end
+local FLIGHT_DIMS = { "Gas", "Brake" }
+local FLIGHT_DIM = 0.55 -- how far toward black the pedals' art is taken
+function DrivingHudController.setFlying(self, on: boolean)
+	on = on == true and self:_wantsThumbControls()
+	if (self._flying == true) == on then
+		return
+	end
+	self._flying = on
+	local controls = self._controls
+	self:_syncArrows()
+	if controls then
+		--- Every image in the pedal darkened, its own colour remembered and put back after.
+		self._flightDimmed = self._flightDimmed or {}
+		for _, name in FLIGHT_DIMS do
+			local pedal = controls:FindFirstChild(name, true)
+			if pedal then
+				for _, inst in pedal:GetDescendants() do
+					if inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
+						if on then
+							self._flightDimmed[inst] = inst.ImageColor3
+							inst.ImageColor3 = inst.ImageColor3:Lerp(Color3.new(0, 0, 0), FLIGHT_DIM)
+						elseif self._flightDimmed[inst] then
+							inst.ImageColor3 = self._flightDimmed[inst]
+						end
+					end
+				end
+				if pedal:IsA("ImageLabel") or pedal:IsA("ImageButton") then
+					if on then
+						self._flightDimmed[pedal] = pedal.ImageColor3
+						pedal.ImageColor3 = pedal.ImageColor3:Lerp(Color3.new(0, 0, 0), FLIGHT_DIM)
+					elseif self._flightDimmed[pedal] then
+						pedal.ImageColor3 = self._flightDimmed[pedal]
+					end
+				end
+			end
+		end
+		if not on then
+			table.clear(self._flightDimmed)
+		end
+	end
+	if on then
+		--- Only the arrows' holds: they are hidden and can never fire their own InputEnded.
+		self._leftHeld, self._rightHeld = false, false
+		self:_publish()
 	end
 	self:_syncStockControls()
 end
@@ -1152,7 +1235,9 @@ function DrivingHudController._syncStockControls(self)
 	-- fall out of step the first time this is called with the module already where we want it.
 	self:_claimStockTouch(suppressed)
 
-	local wanted = not suppressed
+	--- Back on in the air on a thumb device (`setFlying`): the stick is how a flight is steered there.
+	--- The claimed jump and pedal buttons stay hidden by `_claimStockTouch` either way.
+	local wanted = not suppressed or self._flying == true or self:_joystickSteers()
 	if self._stockControls == wanted then
 		return
 	end

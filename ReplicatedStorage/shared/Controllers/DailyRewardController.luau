@@ -22,6 +22,7 @@ local Shard = require(ReplicatedStorage.Packages.Shard)
 local DailyRewardConfig = require(ReplicatedStorage.shared.Configs.DailyRewardConfig)
 local GamepadConfig = require(ReplicatedStorage.shared.Configs.GamepadConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
+local CarryConfig = require(ReplicatedStorage.shared.Configs.CarryConfig)
 
 local DailyRewardController = Shard.new("DailyRewardController")
 
@@ -129,7 +130,9 @@ function DailyRewardController._openWhenFree(self, maxWait: number, anyway: bool
 		local modal = playerGui:GetAttribute(GamepadConfig.ModalAttribute) == true
 		local showcase = Shard.get("ShowcaseController")
 		local staged = showcase ~= nil and showcase:busy()
-		if not (self._racing or inTutorial or pageOpen or modal or staged) then
+		--- Holding a car: the CUSTOMIZE IT carry card is up in the left lane, under where this page opens.
+		local carrying = (player:GetAttribute(CarryConfig.Attribute) or "") ~= ""
+		if not (self._racing or inTutorial or pageOpen or modal or staged or carrying) then
 			if self._state and (anyway or self._state.claimable) then
 				self:open()
 			end
@@ -139,6 +142,7 @@ function DailyRewardController._openWhenFree(self, maxWait: number, anyway: bool
 			elseif inTutorial then "in the tutorial"
 			elseif pageOpen then "page " .. tostring(UIController.currentPage)
 			elseif modal then "a modal"
+			elseif carrying then "still holding a car"
 			else "the NEW BEST stage"
 		task.wait(1)
 	end
@@ -166,11 +170,19 @@ function DailyRewardController._afterRun(self)
 	self._afterTutorialArmed = false
 	self._afterTutorialDone = true
 	self._autoOpened = true -- this is the session's one open
+	self._afterTutorialOpening = true
 	task.spawn(function()
 		task.wait(cfg.Delay)
 		--- Even with nothing to claim: the point is that they learn the screen exists.
 		self:_openWhenFree(cfg.MaxWait, true)
+		self._afterTutorialOpening = false
 	end)
+end
+
+--- Public (`UpgradeNudgeController`): is the after-tutorial open still to come, or on its way? The
+--- upgrade nudge waits behind it, so a new player meets the daily screen first and the nudge after.
+function DailyRewardController.afterTutorialPending(self): boolean
+	return self._afterTutorialArmed == true or self._afterTutorialOpening == true
 end
 
 DailyRewardController:withRemoteEvents({

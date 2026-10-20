@@ -325,7 +325,11 @@ function UpgradeService._wireMachine(self, plot: Model)
 	anchor.Name = "UpgradesPromptAnchor"
 	anchor.Parent = part
 	if machine:IsA("Model") then
-		anchor.WorldPosition = machine:GetBoundingBox().Position
+		--- `PromptHeight` of the way up the cabinet's box rather than its middle (2026-10-20: "move the
+		--- upgrades prompt further lower down, it feels pretty high"). 0.5 is the old centre.
+		local frame, size = machine:GetBoundingBox()
+		local share = cfg.PromptHeight or 0.5
+		anchor.WorldPosition = frame.Position - frame.UpVector * (size.Y * (0.5 - share))
 	end
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "UpgradesPrompt"

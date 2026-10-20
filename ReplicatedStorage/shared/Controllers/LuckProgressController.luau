@@ -21,6 +21,9 @@ local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local ArcadeKit = require(ReplicatedStorage.shared.Modules.ArcadeKit)
+--- The phone test (`NoticeLane.compact`), and the event chip's size the card takes there.
+local NoticeLane = require(ReplicatedStorage.shared.Modules.NoticeLane)
+local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 
 local LuckProgressController = Shard.new("LuckProgressController")
 
@@ -38,7 +41,8 @@ function LuckProgressController._build(self)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "RoadLuckProgress"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
+	--- Below the Roblox top bar, which is taller on a phone (`TrafficConfig.LuckProgress.Position`).
+	gui.IgnoreGuiInset = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = 905
 	gui.Enabled = false
@@ -51,6 +55,21 @@ function LuckProgressController._build(self)
 	local bounds = Instance.new("UISizeConstraint")
 	bounds.MinSize = Vector2.new(240, 74)
 	bounds.MaxSize = Vector2.new(340, 92)
+	--[[ 2026-10-20 ("it looks huge on mobile ... make the luck card on phones like the size of the event
+		card"): the 240 x 74 floor was a third of a landscape phone's width. On a phone the card takes
+		the weather event chip's own box instead, `WeatherConfig.Chip.Height` of the screen tall at the
+		chip's 5:1 (`WeatherController`'s `CHIP_ASPECT`), and both guis measure below the top bar, so
+		the two stacked cards are one size. The art inside is all scale and follows the box. ]]
+	if NoticeLane.compact() then
+		local chipHeight = WeatherConfig.Chip.Height
+		holder.Size = UDim2.fromScale(chipHeight * 5, chipHeight)
+		bounds.MinSize = Vector2.zero
+		bounds.MaxSize = Vector2.new(math.huge, math.huge)
+		local aspect = Instance.new("UIAspectRatioConstraint")
+		aspect.AspectRatio = 5
+		aspect.DominantAxis = Enum.DominantAxis.Height
+		aspect.Parent = holder
+	end
 	bounds.Parent = holder
 	local group = Instance.new("CanvasGroup")
 	group.Position = SHOWN
@@ -83,7 +102,7 @@ function LuckProgressController._build(self)
 	pips.Parent = face
 	self._pips = pips
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-	self._gui, self._group = gui, group
+	self._gui, self._group, self._holder = gui, group, holder
 end
 
 function LuckProgressController._hide(self)
@@ -136,6 +155,39 @@ function LuckProgressController.bottom(self): number?
 		return nil
 	end
 	return self._group.AbsolutePosition.Y + self._group.AbsoluteSize.Y
+end
+
+--[[ THE TOP-LEFT STACK (2026-10-20): the weather event chip, this card, then the heat stars, each under
+	the one above when it is up, rather than drawn over it. This card slides down under the chip
+	(`WeatherController.chipBottom`) by however far the chip reaches past the card's own top, eased,
+	and back up when the chip goes. Per frame, but a write only when the slide moves. ]]
+local STACK_GAP, STACK_RATE = 6, 14
+function LuckProgressController._stepStack(self, dt: number)
+	local holder = self._holder
+	if not holder then
+		return
+	end
+	local weather = Shard.get("WeatherController")
+	local chip = weather and weather.chipBottom and weather:chipBottom()
+	local drop = self._stackDrop or 0
+	local want = 0
+	if chip then
+		--[[ The card's RESTING top, worked out from its layout rather than measured off the card. A moving
+			GuiObject's `AbsolutePosition` is a frame behind the `Position` just written, so "measured top
+			minus the drop" aimed somewhere new every frame and the card shook (2026-10-20). ]]
+		local gui = self._gui
+		local at = TrafficConfig.LuckProgress.Position
+		local restTop = gui.AbsolutePosition.Y + at.Y.Offset + at.Y.Scale * gui.AbsoluteSize.Y
+		want = math.max(0, chip + STACK_GAP - restTop)
+	end
+	drop += (want - drop) * (1 - math.exp(-STACK_RATE * math.min(dt, 0.1)))
+	if math.abs(want - drop) < 0.5 then
+		drop = want
+	end
+	if drop ~= self._stackDrop then
+		self._stackDrop = drop
+		holder.Position = TrafficConfig.LuckProgress.Position + UDim2.fromOffset(0, math.round(drop))
+	end
 end
 
 -- Reversing or a revive must not celebrate a tile twice.
@@ -205,6 +257,7 @@ LuckProgressController:withLifecycle({
 		-- Five checks per second over the small live tile ring, never a workspace scan.
 		local elapsed = 0
 		self._conn = RunService.Heartbeat:Connect(function(dt)
+			self:_stepStack(dt)
 			elapsed += dt
 			if elapsed < 0.2 then return end
 			elapsed = 0

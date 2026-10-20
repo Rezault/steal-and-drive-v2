@@ -141,7 +141,8 @@ local TEXT = {
 	Racing = "In a race",
 	Owned = "Owned",
 	Here = "You are here",
-	Needs = "Finish %s: %s",
+	--- WAS "Finish %s: %s", which did not say finishing means driving to the end (2026-10-20).
+	Needs = "Drive to end of %s: %s",
 	NeedsPart = "%s: %s / %s",
 }
 

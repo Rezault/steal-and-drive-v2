@@ -960,6 +960,9 @@ end
 
 -- Approved economy balance, 2026-10-04.
 CustomerConfig.Visit.LikeChance = 0.60
+--- 2026-10-20: tips are paid as the customer reacts, a better car later paying the difference, the
+--- visit's total unchanged (`CustomerService._react`). False: one tip at checkout, as before.
+CustomerConfig.Visit.PayOnLike = true
 CustomerConfig.Tip.ValueFraction = 0.16
 --[[ RAISED (2026-10-08, the owner: "make the offline earnings earn more"). WAS 0.25% of the live
 	rate in world 1 falling to 0.1% in world 5 — which the HUD showed side by side as "$25/hr offline"

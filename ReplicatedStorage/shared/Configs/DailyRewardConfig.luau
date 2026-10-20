@@ -91,7 +91,9 @@ DailyRewardConfig.AutoOpen = { Enabled = true, Delay = 3, MaxWait = 30 }
 	for the results and any NEW BEST stage to clear. Once a session, claimable or not: the lesson is
 	that the screen exists, and a countdown to the next day teaches that too.
 	`Enabled = false`: a first-timer finds it on the topbar or on their next visit. ]]
-DailyRewardConfig.AfterTutorialRun = { Enabled = true, Delay = 1.5, MaxWait = 60 }
+--- 2026-10-20: also waits for the car in their hands to be put down (its CUSTOMIZE IT card shared the
+--- spot), so `MaxWait` went from 60 to 180: carrying a car home and parking it can take a while.
+DailyRewardConfig.AfterTutorialRun = { Enabled = true, Delay = 1.5, MaxWait = 180 }
 
 --- The topbar button: TopbarPlus order (after Settings 2 and Shop 3) and its caption.
 --- `Icon`: the topbar button's glyph; nil is the shop's bare gift (`UIAssets.GiftGlyph`). It was

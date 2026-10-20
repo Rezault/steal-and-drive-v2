@@ -490,6 +490,13 @@ DriveConfig.LaneEdgeFade = 10
 	(where the stock touch slider is the only other option and shares the problem). Clicking the
 	arrows with a mouse therefore gets you the mobile feel in Studio, which is the honest A/B — see
 	DriveController._touchSteering. ]]
+--[[ STEERING ON A THUMB DEVICE IS THE STICK (2026-10-20: "instead of having left and right arrows lets use
+	just joystick so that when we jump there's no context switching"). Roblox's own thumbstick stays on
+	for the whole race (`DrivingHudController._syncStockControls`) and the left/right arrows are hidden;
+	the car's driver already steers from the stick's X, and the same stick flies the jump. Gas, brake,
+	nitro and the steal button are unchanged. `false`: the arrows, and the stick off in races, as before. ]]
+DriveConfig.TouchJoystick = true
+
 DriveConfig.Touch = {
 	--[[ How much faster the sideways speed eases in AND out. This is the responsiveness half, and
 		it's the one that was actually missing.

@@ -103,7 +103,12 @@ BuyerConfig.CheckSeconds = 2
 BuyerConfig.Tutorial = {
 	Enabled = true,
 	Beat = "sell",
-	Delay = 1.5,
+	--- 2026-10-20: WAS 1.5. The walk-up is shown as a shot now (`TutorialConfig.Cinematic`), so there
+	--- is nothing for the player to look for meanwhile and no reason to make them wait for it.
+	Delay = 0.5,
+	--- ...and walks in at this, not the customers' browsing 9 (`CustomerConfig.Walk.Speed`), so the shot
+	--- is short. 16 is Roblox's own default pace, a brisk walk rather than a run.
+	WalkSpeed = 16,
 	--- Long enough to sit out a NEW BEST stage nobody has clicked through yet (the buyer would walk
 	--- in unseen behind it); the client's ping is what normally sends them.
 	Fallback = 30,

@@ -340,8 +340,11 @@ PoliceConfig.Heat = {
 		(`RaceConfig.HideRailDuringRace`). WAS centred at 0.16 (2026-10-19), inside the band the speed
 		trap warning and the chase bar's caption share (`Hud.Alert`'s measured survey), and the three
 		drew over each other. ]]
-	HudX = 0.02,
-	HudY = 0.11,
+	--- 2026-10-20: now measured below the Roblox top bar (`HeatHud` keeps the inset), so the weather
+	--- chip's own corner: 0.015 in, 0.02 down. WAS 0.02 / 0.11 from the screen's top, which a phone's
+	--- taller top bar covered.
+	HudX = 0.015,
+	HudY = 0.02,
 	HudHeight = 0.04,
 	Star = "★",
 	EmptyStar = "☆",
@@ -356,7 +359,7 @@ PoliceConfig.Heat = {
 		run has no police, as before. ]]
 	Tutorial = {
 		Enabled = true,
-		Duration = { 12, 14 }, -- 2026-10-20: was 7..9, then 9..11; Aleafo: "felt too short"
+		Duration = { 18, 22 }, -- 2026-10-20: was 7..9, 9..11, then 12..14; still "needs to be longer"
 	},
 }
 
@@ -1551,6 +1554,8 @@ PoliceConfig.Hud = {
 		--- 2026-10-19: WAS 0.4, over the car. Now the STOLEN! toast's spot (0.24), nudged down to clear
 		--- the chase bar that comes up with it (caption+bar end at ~0.224): the alert takes over the toast.
 		CentreY = 0.265,
+		--- On a phone, below the chase bar (`Hud.Bar.TouchCentreY` 0.255) instead of across it (2026-10-20).
+		TouchCentreY = 0.29, -- then 0.37 to 0.29 ("a little too low"): its top just under the bar
 		--- 2026-10-19: WAS 0.085, and the word covered the road ahead ("too big when it starts, I can
 		--- barely see in front of me"). About 40% smaller: still the loudest thing on screen.
 		Height = 0.05,
@@ -1623,6 +1628,11 @@ PoliceConfig.Hud = {
 			for about a second at a time and overlapped the two older positions just as squarely. If that
 			ever reads badly, move the TOAST, which is transient, rather than the gauge, which is not. ]]
 		CentreY = 0.215,
+		--- On a phone (`NoticeLane.compact`), under the FLOW meter (0.2) and the speed trap warning
+		--- (0.255) that share the top centre there (2026-10-20). `PoliceHudController._fit`.
+		--- ...and 0.34 to 0.255 the same day ("move the bar further up ... swap positions with the speed trap"):
+		--- the speed trap warning's old phone spot, the warning taking this one (`SpeedTrapConfig.Ui`).
+		TouchCentreY = 0.255,
 		Size = Vector2.new(0.22, 0.017),
 		CornerRadius = 0.5, -- a fraction of the bar's SHORTER side, so 0.5 is a full pill at any viewport
 		StrokeColor = Color3.fromRGB(12, 18, 34),

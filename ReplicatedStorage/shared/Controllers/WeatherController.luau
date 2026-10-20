@@ -1375,7 +1375,17 @@ function WeatherController._buildChip(self)
 	local line = text(0.44, 0.25, ArcadeKit.White)
 	local clock = text(0.7, 0.22, ArcadeKit.Gold)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-	self._chip = { gui = gui, icon = icon, title = title, line = line, clock = clock, shownSecond = -1 }
+	self._chip = { gui = gui, holder = holder, icon = icon, title = title, line = line, clock = clock, shownSecond = -1 }
+end
+
+--- Public (the top-left stack: `LuckProgressController`, `PoliceHudController`): the event chip's bottom
+--- edge in `AbsolutePosition` space while it is up, else nil, so the cards under it can sit below it.
+function WeatherController.chipBottom(self): number?
+	local chip = self._chip
+	if not (chip and chip.gui.Enabled and chip.holder.AbsoluteSize.Y > 0) then
+		return nil
+	end
+	return chip.holder.AbsolutePosition.Y + chip.holder.AbsoluteSize.Y
 end
 
 --[[ Point the chip at the event now on the road, or hide it (`key` nil). Called from `_switch`, the

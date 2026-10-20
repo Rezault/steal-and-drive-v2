@@ -146,7 +146,25 @@ UpgradeConfig.Machine = {
 	HoldDuration = 0,
 	--- Studs. WAS 10 (the cabinet's footprint plus a step), which made you walk right up to it; 18
 	--- (2026-10-14, the owner: "make the distance more") lights it from the edge of its pad.
-	MaxDistance = 18,
+	--- ...and 18 to 28 (2026-10-20, "I still need to get really close to it"): measured from the part the
+	--- prompt sits on, the cabinet's middle, so 18 only reached a few steps off its front.
+	MaxDistance = 28,
+	--- Where the prompt hangs, as a share of the cabinet's height from its base (`UpgradeService._wireMachine`).
+	--- 2026-10-20: WAS its centre (0.5), "pretty high" on a tall cabinet. Distance is measured from here too.
+	PromptHeight = 0.3,
+}
+
+--[[ THE FIRST-UPGRADE NUDGE (2026-10-20, Aleafo: "after a player earns 5k ... show players hey go to
+	upgrades and spend ur money (if they haven't gone to upgrades yet)"). `UpgradeNudgeController`: a
+	card in the notice lane and the guide line to the player's own cabinet, once the tutorial is done,
+	they hold `Cash` and they have never bought a level; gone when the Upgrades page opens (for the
+	session) or anything is bought (for good). `Text`'s `%s` is `Cash`, formatted.
+	`Enabled = false`: no nudge. ]]
+UpgradeConfig.Nudge = {
+	Enabled = true,
+	Cash = 5000,
+	Title = "UPGRADE TIME!",
+	Text = "You have %s! Follow the line to the Upgrades machine and spend it",
 }
 
 UpgradeConfig.Board = {
@@ -784,6 +802,14 @@ UpgradeConfig.Upgrades = {
 		-- Per-level scale applied to prompt reach and lateral control, not to the ballistic arc. Keeping
 		-- airtime and forward pace fixed means an upgrade never invalidates learned jump timing.
 		Step = 0.06,
+		--[[ 2026-10-20 ("increase the range, and also make it get more air time ... for more decision
+			freedom"), so the arc DOES change with level now, on purpose and only at the top of it:
+			`HangStep` softens `StealConfig.Flight.Hang`'s gravity per level (8% less a level, x0.60 maxed:
+			the flight 2.6s to 3.5s, the throw unchanged), and `RangeStep` lengthens how far up the road
+			the target lock looks (`StealConfig.Lock.Ahead`, 75 to 112 studs maxed). The timing you learn
+			on the way up is the same at every level; the time you get at the top is what you buy. ]]
+		HangStep = 0.08,
+		RangeStep = 0.1,
 		Headline = function(level: number): string
 			return string.format("+%d%%", math.round(level * 6))
 		end,
@@ -1125,6 +1151,17 @@ function UpgradeConfig.jumpForgivenessFactor(upgrades: unknown): number
 	return 1 + UpgradeConfig.levelOf(upgrades, "Jump") * UpgradeConfig.Upgrades.Jump.Step
 end
 
+--- The jump upgrade's air time: a multiplier on `StealConfig.Flight.Hang`'s gravity scales. 1 unbought,
+--- lower is floatier; floored so no level can stall the arc (`Jump.HangStep`).
+function UpgradeConfig.jumpHangFactor(upgrades: unknown): number
+	return math.max(0.3, 1 - UpgradeConfig.levelOf(upgrades, "Jump") * UpgradeConfig.Upgrades.Jump.HangStep)
+end
+
+--- ...and its lock range: a multiplier on `StealConfig.Lock.Ahead` (`Jump.RangeStep`).
+function UpgradeConfig.jumpRangeFactor(upgrades: unknown): number
+	return 1 + UpgradeConfig.levelOf(upgrades, "Jump") * UpgradeConfig.Upgrades.Jump.RangeStep
+end
+
 -- === Asking about a bay's level =============================================
 --[[ The same sanitising contract as the four above — anything in, a real level out — and the same
 	reason for it. The extra wrinkle here is that the floor is 1 rather than 0 (see `Bay.ProfileKey`),
@@ -1236,7 +1273,8 @@ for key, prices in Balance.UpgradePrices do
  UpgradeConfig.Upgrades[key].RequiredWorlds = Balance.UpgradeWorlds[key]
  UpgradeConfig.Upgrades[key].BaseCost = prices[1]
 end
-UpgradeConfig.Upgrades.Jump.Detail = "More forgiving landings"
+--- 2026-10-20: the jump now also buys air time and lock range (`jumpHangFactor`, `jumpRangeFactor`).
+UpgradeConfig.Upgrades.Jump.Detail = "More air time and lock range"
 function UpgradeConfig.requiredWorldOf(key: string, level: number): number
  local spec = UpgradeConfig.Upgrades[key]
  return if spec and spec.RequiredWorlds then spec.RequiredWorlds[level + 1] or 1 else 1

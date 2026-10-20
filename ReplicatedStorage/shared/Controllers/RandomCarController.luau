@@ -427,6 +427,35 @@ end
 	a panel round it and is wrong without one: light clipped to a rounded rectangle over the lobby
 	reads as a panel again. On the card, which does not clip, it spills out on every side the way the
 	shipping card's always did. ]]
+--[[ Keep a 9-slice face drawable at any size (2026-10-20: on a phone the ODDS pill "is missing the blue
+	background" it has on a PC). The button is the kit's small round `?` stretched into a pill
+	(`BuildRandomCarV2`), and its slice corners are a fixed number of pixels: once the button is shorter
+	than two corners, which the phone's smaller card makes it, the engine stops drawing the image. Each
+	sliced image's `SliceScale` is held at what fits, never above what the art shipped with. ]]
+local function fitSlices(root: GuiObject)
+	local images = {}
+	for _, inst in { root, table.unpack(root:GetDescendants()) } do
+		if (inst:IsA("ImageLabel") or inst:IsA("ImageButton")) and inst.ScaleType == Enum.ScaleType.Slice then
+			table.insert(images, { image = inst, authored = inst.SliceScale })
+		end
+	end
+	if #images == 0 then
+		return
+	end
+	local function fit()
+		for _, entry in images do
+			local image = entry.image
+			local corner = math.max(image.SliceCenter.Min.X, image.SliceCenter.Min.Y)
+			local short = math.min(image.AbsoluteSize.X, image.AbsoluteSize.Y)
+			if corner > 0 and short > 0 then
+				image.SliceScale = math.min(entry.authored, short / (2 * corner))
+			end
+		end
+	end
+	root:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	fit()
+end
+
 local function compactCard(root: GuiObject, card: GuiObject, slot: GuiObject, constraint: UIAspectRatioConstraint)
 	local layout = RandomCarConfig.Card.Compact
 	root.Size = UDim2.fromScale(root.Size.X.Scale, layout.Height)
@@ -765,6 +794,7 @@ function RandomCarController._buildCardV2(self, template: GuiObject): boolean
 		end
 		--- The onboarding's press gate must never shut it while the card can be bought (`ButtonPress`).
 		oddsBtn:SetAttribute("TutorialExempt", true)
+		fitSlices(oddsBtn)
 	else
 		if oddsBtn then
 			warn("RandomCarController: the offer's OddsBtn does not open the odds page. Run BuildRandomCarV2 (RebuildOdds).")

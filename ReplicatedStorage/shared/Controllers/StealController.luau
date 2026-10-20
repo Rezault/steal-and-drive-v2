@@ -102,6 +102,8 @@ local DriveConfig = require(ReplicatedStorage.shared.Configs.DriveConfig)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 -- A config-only dependency: the boarding attribute gates bail without a controller start cycle.
 local GetawayConfig = require(ReplicatedStorage.shared.Configs.GetawayConfig)
+--- Which mutations take no Highlight, so the locked car is boxed instead (`_updateMarker`).
+local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 local RewardConfig = require(ReplicatedStorage.shared.Configs.RewardConfig)
 local StealConfig = require(ReplicatedStorage.shared.Configs.StealConfig)
 --- The steal's sounds, punches and toast — feedback only; the mechanics stay `StealConfig`'s.
@@ -857,7 +859,25 @@ function StealController._advance(self, f, dt: number, want: number, deckY: numb
 
 	f.crossVel += (want - f.crossVel) * (1 - math.exp(-dt * cfg.SteerAccel))
 
-	f.yVel -= (if f.yVel > 0 then cfg.RiseGravity else cfg.FallGravity) * dt
+	local gravity = if f.yVel > 0 then cfg.RiseGravity else cfg.FallGravity
+	--- The hang at the top (`Flight.Hang`): softer gravity while the arc is nearly level.
+	local hang = cfg.Hang
+	if hang and math.abs(f.yVel) < hang.Window then
+		--- Floatier with the jump upgrade (`UpgradeConfig.jumpHangFactor`), in the prediction too: same self.
+		gravity *= (if f.yVel > 0 then hang.RiseScale else hang.FallScale) * (self._jumpHang or 1)
+	end
+	--- ...and the GLIDE at the top (`Flight.Hang.Hold`): from the apex, `Hold` seconds nearly level before
+	--- the fall begins. Counted on the arc's own fields, so a predicted copy of it agrees (`_predict`).
+	if hang and (hang.Hold or 0) > 0 then
+		if f.yVel <= 0 then
+			f.apexed = true
+		end
+		if f.apexed and (f.held or 0) < hang.Hold then
+			f.held = (f.held or 0) + dt
+			gravity *= hang.HoldScale
+		end
+	end
+	f.yVel -= gravity * dt
 	if f.yVel < 0 then
 		local cap = cfg.Float.Speed + cfg.Float.Falloff * math.max(f.y - deckY, 0)
 		f.yVel = math.max(f.yVel, -cap)
@@ -870,7 +890,8 @@ function StealController._advance(self, f, dt: number, want: number, deckY: numb
 		the raised glide must still not be sped up by it. ]]
 	local glide = self:_glideSpeed()
 
-	if f.yVel <= 0 and cfg.Glide.Ease > 0 and f.alongVel > glide then
+	--- Not while homing on a locked car (`StealConfig.Lock.Home`): that sets the along speed itself.
+	if not f.homing and f.yVel <= 0 and cfg.Glide.Ease > 0 and f.alongVel > glide then
 		f.alongVel += (glide - f.alongVel) * (1 - math.exp(-dt * cfg.Glide.Ease))
 	end
 
@@ -1009,6 +1030,9 @@ function StealController._predict(self): (number, number, number)
 		crossVel = f.crossVel,
 		yVel = f.yVel,
 		startCross = f.startCross,
+		--- The glide's progress (`Flight.Hang.Hold`), so the prediction does not re-run a hold already flown.
+		apexed = f.apexed,
+		held = f.held,
 	}, self._info.deckY)
 end
 
@@ -1055,13 +1079,15 @@ end
 	circle and the press can never name different cars. Approximated in the ROAD's frame rather than
 	each car's, which is exact while a car is running straight and off by its lean while it is
 	changing lane, a fraction of a stud against a 4-stud pad. ]]
-function StealController._predictedTarget(self, along: number, cross: number, t: number)
+function StealController._predictedTarget(self, along: number, cross: number, t: number, prefer: any?)
 	local traffic = self._traffic
 	if not traffic then
 		return nil
 	end
 	local reach = self:_reach()
 	local best, bestSurface, bestBox
+	--- `prefer` (`StealConfig.Lock.Stick`): the car the lock already holds, and its surface distance.
+	local preferSurface: number? = nil
 	for _, rec in traffic:getCars() do
 		if not rec.physical and rec.hit and rec.hit.Parent then
 			-- A lane change that was already visibly underway is allowed to finish during the flight.
@@ -1071,6 +1097,9 @@ function StealController._predictedTarget(self, along: number, cross: number, t:
 			local across = cross - predictedCross
 			local gap = along - (rec.along + rec.speed * t)
 			local surface = self:_roadSurfaceDistance(across, gap, rec.hit.Size)
+			if rec == prefer and surface <= reach then
+				preferSurface = surface
+			end
 			if surface <= reach then
 				local box = self:_boxDistance(across, gap, rec.hit.Size)
 				local better = if not best
@@ -1083,6 +1112,11 @@ function StealController._predictedTarget(self, along: number, cross: number, t:
 				end
 			end
 		end
+	end
+	--- Sticky (`StealConfig.Lock.Stick`): the held car stays held unless the new best beats it clearly.
+	if prefer and preferSurface and best ~= prefer and StealConfig.Lock.Enabled
+		and preferSurface - (bestSurface or math.huge) < StealConfig.Lock.Stick then
+		best = prefer
 	end
 	return best
 end
@@ -1110,7 +1144,29 @@ function StealController._updateMarker(self, dt: number)
 	local cfg = StealConfig.Marker
 
 	local along, cross, t = self:_predict()
-	local rec = self:_predictedTarget(along, cross, t)
+	local lock = StealConfig.Lock
+	--[[ WITH THE LOCK ON, THE LOCK IS THE ONE TARGET (2026-10-20: "the indicator shows on a car, then I
+		press E and it steals a completely different car", and "it doesn't show ANY car until the
+		descent"). `_pickLock` names one car from the first frame of the jump; the circle and outline
+		show it, `_findCandidate` offers E nothing else, and the assist steers for it. `ready` is
+		whether E would take it NOW: green when it would, `Lock.AimColor` while it is still out of
+		reach (on the way up, or a car length short). Lock off: the old prediction, as it was. ]]
+	local rec, ready
+	if lock.Enabled then
+		if self._state == "launch" then -- the air re-picks in `_stepAir`; a perch holds its roof
+			self._lockRec = self:_pickLock(self._flight)
+		end
+		rec = self._lockRec
+		ready = rec ~= nil and self._candidate == rec
+		if rec then
+			local lateralStep = TrafficConfig.LaneChangeSpeed * t
+			self._lockCross = rec.cross + math.clamp(rec.targetCross - rec.cross, -lateralStep, lateralStep)
+			self._lockT = t
+		end
+	else
+		rec = self:_predictedTarget(along, cross, t)
+		ready = rec ~= nil
+	end
 
 	--[[ ONE CIRCLE, AND `Lead` DECIDES WHICH QUESTION IT ANSWERS. At 0 it rides under the avatar and
 		says where you are, coloured by where you are going; at 1 it sits on the solved touchdown and
@@ -1128,7 +1184,7 @@ function StealController._updateMarker(self, dt: number)
 		-- The solved touchdown point. The highlight names the moving car the steal will be able to
 		-- reach from there, so neither the circle nor the target identification has to lie.
 		pos = self:_worldPos(along, cross, self._info.deckY)
-		color = cfg.Hit
+		color = if ready then cfg.Hit else lock.AimColor
 	else
 		pos = self:_worldPos(along, cross, self._info.deckY)
 		-- Neutral early, red once there's not much flight left to fix it with. Shouting about a
@@ -1137,13 +1193,33 @@ function StealController._updateMarker(self, dt: number)
 		color = if f.t / total >= cfg.CommitAt then cfg.Miss else cfg.Neutral
 	end
 	pos = herePos:Lerp(pos, math.clamp(cfg.Lead, 0, 1))
+	--- Locked: on the car's roof instead, where it is now, so the circle is ON the car it names.
+	if lock.Enabled and rec and rec.hit and rec.hit.Parent then
+		pos = rec.hit.Position + Vector3.yAxis * (rec.hit.Size.Y * 0.5)
+	end
+	--- ...sliding there rather than jumping (and between cars as the lock moves), snapped on the
+	--- first frame of a flight so it does not fly in from the last one.
+	local shown = self._markerAt
+	if lock.Enabled and shown then
+		pos = shown:Lerp(pos, 1 - math.exp(-lock.Slide * dt))
+	end
+	self._markerAt = pos
 
 	--- Sized here rather than at build time, because `Marker.MatchReach` can make the width a bought
 	--- number. It cannot change inside a flight and this runs every frame of one, so the write is
 	--- guarded on the value having actually moved.
 	local diameter = self:_ringDiameter()
+	--- Locked on a car: bigger, breathing, over the bodywork and at full strength (`Lock.OnTop`).
+	local locked = lock.Enabled and rec ~= nil
+	if locked then
+		diameter *= lock.Grow * (1 + lock.Pulse * math.sin(os.clock() * math.pi * 2 * lock.PulseRate))
+	end
 	if math.abs(marker.Size.X - diameter) > 1e-3 then
 		marker.Size = Vector3.new(diameter, cfg.Thickness, diameter)
+	end
+	local face = marker:FindFirstChild("Face")
+	if face and face:IsA("SurfaceGui") then
+		face.AlwaysOnTop = locked and lock.OnTop
 	end
 
 	--- No rotation on the CFrame any more. The old cylinder needed a 90-degree roll to stand its
@@ -1151,12 +1227,33 @@ function StealController._updateMarker(self, dt: number)
 	--- does is done in the image below rather than in the world.
 	marker.CFrame = CFrame.new(pos + Vector3.yAxis * cfg.Lift)
 	image.ImageColor3 = color
-	image.ImageTransparency = cfg.Transparency
+	image.ImageTransparency = if locked then 0 else cfg.Transparency
 
+	--[[ A car whose mutation takes no Highlight (the Ghost's ForceField skin: "a transparent material
+		takes no Highlight at all", `WeatherConfig`) gets a box round its body instead (2026-10-20, a
+		tester: "it wasn't letting me hover on the ghost car"; it was locked, and nothing showed it). ]]
+	local mutation = rec and rec.mutation and WeatherConfig.mutationOf(rec.mutation)
+	local boxed = mutation ~= nil and mutation.Highlight == false
 	local highlight = self._predictedHighlight
 	if highlight then
-		highlight.Adornee = if rec and cfg.TargetHighlight.Enabled then rec.model else nil
+		highlight.Adornee = if rec and cfg.TargetHighlight.Enabled and not boxed then rec.model else nil
 		highlight.Enabled = highlight.Adornee ~= nil
+		--- The outline wears the circle's colour: aiming until E would take it, green once it would.
+		highlight.FillColor, highlight.OutlineColor = color, color
+	end
+	if boxed and not self._targetBox then
+		local box = Instance.new("SelectionBox")
+		box.Name = "PredictedStealTargetBox"
+		box.LineThickness = 0.18
+		box.SurfaceTransparency = 0.85
+		box.Parent = self._folder
+		self._targetBox = box
+	end
+	local box = self._targetBox
+	if box then
+		box.Adornee = if boxed and rec and rec.hit then rec.hit else nil
+		box.Visible = box.Adornee ~= nil
+		box.Color3, box.SurfaceColor3 = color, color
 	end
 
 	--- Off flight `dt`, so it slows with everything else if `SlowMo` is ever switched on. Wrapped
@@ -1179,6 +1276,103 @@ function StealController._hideMarker(self)
 		self._predictedHighlight.Enabled = false
 		self._predictedHighlight.Adornee = nil
 	end
+	if self._targetBox then
+		self._targetBox.Visible = false
+		self._targetBox.Adornee = nil
+	end
+	--- The circle's slide restarts with it. The LOCK is not cleared here: a perch hides the marker and
+	--- must keep the car E is offering. It is cleared with the flight (`_clearLock`).
+	self._markerAt = nil
+end
+
+--- The highlighted car, if the jump came down within `Lock.LandReach` studs of it (flat, road plane), so
+--- a landing a little short of E's reach still takes the car the player was shown. nil otherwise.
+function StealController._lockNearby(self)
+	local rec, f = self._lockRec, self._flight
+	if not (StealConfig.Lock.Enabled and rec and f and not rec.physical and rec.hit and rec.hit.Parent) then
+		return nil
+	end
+	local surface = self:_roadSurfaceDistance(f.cross - rec.cross, f.along - rec.along, rec.hit.Size)
+	return if surface <= StealConfig.Lock.LandReach * (self._jumpForgiveness or 1) then rec else nil
+end
+
+--- Forget the lock (`StealConfig.Lock`): a new jump, or the jump over.
+function StealController._clearLock(self)
+	self._lockRec, self._lockCross, self._lockT, self._markerAt = nil, nil, nil, nil
+	--- Flight time restarts at 0 each jump, so a hold left from the last one would read as still live.
+	self._manualUntil = nil
+end
+
+--[[ THE TARGET LOCK'S PICK (`StealConfig.Lock`): one car, from the first frame of the jump.
+
+	CARS IN FRONT FIRST, NEAREST FIRST. "In front" is a car whose middle is at least `FrontFrom` studs
+	up the road from the player. Only with none of those in the window does it look beside and behind
+	(`Behind` studs back). Nearest is measured with the sideways gap weighted by `SideWeight`, so the car
+	in your own lane beats one the same distance off in the next. The window is `Ahead` studs up the
+	road and `Side` studs either way, which is about everything the glide and the steering can reach.
+
+	STICKY: the car already locked stays locked unless the new best is in a better group or nearer by
+	`Stick` studs, so steering toward another car moves the lock and drifting between two does not.
+	Behind comes last of all: with nothing in front or beside, a car behind is still a target.
+	Road frame throughout, the same `along`/`cross` the flight and the traffic records are kept in. ]]
+function StealController._pickLock(self, f, steering: boolean?)
+	local traffic = self._traffic
+	if not (traffic and f) then
+		return nil
+	end
+	local cfg = StealConfig.Lock
+	--- Where the player is heading across the road: now, plus `AimLead` seconds of their sideways drift.
+	local aimCross = f.cross + (f.crossVel or 0) * cfg.AimLead
+	--- ...and along it: the throttle's lean (`AlongSteer`), `AimAlong` studs at full gas or brake.
+	local aimAlong = f.along + (f.push or 0) * (cfg.AimAlong or 0)
+	local best, bestGroup, bestDist
+	local held, heldDist
+	for _, rec in traffic:getCars() do
+		if not rec.physical and rec.hit and rec.hit.Parent then
+			local ahead = rec.along - f.along
+			local side = rec.cross - aimCross
+			if ahead >= -cfg.Behind and ahead <= cfg.Ahead * (self._jumpRange or 1) and math.abs(side) <= cfg.Side then
+				--- 1 in front, 2 beside or diagonal (within `FrontFrom` either way), 3 behind.
+				local group = if ahead >= cfg.FrontFrom then 1 elseif ahead > -cfg.FrontFrom then 2 else 3
+				--- Nearness from the AIM (the throttle's lean along, the drift across), the window and
+				--- the groups from where the player actually is.
+				local toAim = rec.along - aimAlong
+				local dist = math.sqrt(toAim * toAim + (side * cfg.SideWeight) ^ 2)
+				if rec == self._lockRec then
+					held, heldDist = rec, dist
+				end
+				if not best or group < bestGroup or (group == bestGroup and dist < bestDist) then
+					best, bestGroup, bestDist = rec, group, dist
+				end
+			end
+		end
+	end
+	--[[ ONCE LOCKED, IT STAYS LOCKED UNTIL THE PLAYER STEERS (2026-10-20: it kept "prioritising a car
+		JUST in front of the one she wanted"). Catching up to the locked car takes it out of "in front"
+		as you arrive over it, and the group rule then handed the lock to the next car up the road.
+		So the groups only make the FIRST pick. After that the held car is kept, and steering moves the
+		lock only to a car clearly nearer where you are steering (`Stick` studs), groups ignored. ]]
+	if held then
+		if not steering then
+			return held
+		end
+		local nearest, nearestDist = held, heldDist
+		for _, rec in traffic:getCars() do
+			if rec ~= held and not rec.physical and rec.hit and rec.hit.Parent then
+				local ahead = rec.along - f.along
+				local side = rec.cross - aimCross
+				if ahead >= -cfg.Behind and ahead <= cfg.Ahead * (self._jumpRange or 1) and math.abs(side) <= cfg.Side then
+					local toAim = rec.along - aimAlong
+					local dist = math.sqrt(toAim * toAim + (side * cfg.SideWeight) ^ 2)
+					if dist < nearestDist - cfg.Stick then
+						nearest, nearestDist = rec, dist
+					end
+				end
+			end
+		end
+		return nearest
+	end
+	return best
 end
 
 -- === The prompt =============================================================
@@ -1620,6 +1814,21 @@ end
 
 function StealController._findCandidate(self, pos: Vector3)
 	local traffic = self._traffic
+	--[[ With the lock on, E offers the locked car and nothing else (`StealConfig.Lock`, `_pickLock`),
+		and its reach is measured FLAT, in the road plane, height ignored (2026-10-20: "even though
+		you're on top of the car you want it's still yellow because your character is so far up"). So
+		over the car is in reach, on the way up as much as on the way down, and the lunge covers the
+		drop. Before the arc's apex check below, which the lock does not use. ]]
+	if StealConfig.Lock.Enabled then
+		local locked, f = self._lockRec, self._flight
+		if traffic and f and locked and not locked.physical and locked.hit and locked.hit.Parent then
+			local surface = self:_roadSurfaceDistance(f.cross - locked.cross, f.along - locked.along, locked.hit.Size)
+			if surface <= self:_reach() then
+				return locked, surface
+			end
+		end
+		return nil, math.huge
+	end
 	if not (traffic and self._flight and self._flight.yVel <= 0) then
 		return nil, math.huge
 	end
@@ -1644,6 +1853,15 @@ function StealController._findCandidate(self, pos: Vector3)
 					best, bestSurface, bestBox = rec, surface, box
 				end
 			end
+		end
+	end
+	--- Sticky like the lock (`StealConfig.Lock.Stick`): the car E would already take keeps the offer
+	--- unless another is clearly nearer, so two cars side by side do not trade it back and forth.
+	local held = self._candidate
+	if StealConfig.Lock.Enabled and held and held ~= best and held.hit and held.hit.Parent and not held.physical then
+		local heldSurface = self:_surfaceDistance(pos, held.hit)
+		if heldSurface <= range and heldSurface - (bestSurface or math.huge) < StealConfig.Lock.Stick then
+			best, bestSurface = held, heldSurface
 		end
 	end
 	-- The distance comes back with the car, because the tutorial's freeze needs to know when the arc
@@ -1830,6 +2048,8 @@ function StealController._onBail(self)
 	-- The throw belongs to the avatar, not to the chassis handed back after a successful steal.
 	-- Remember the normalized road momentum here so landing cannot become a hidden 1.5x speed boost.
 	self._bailAlongVel = alongVel / StealConfig.Launch.SpeedWindow.ThrowScale
+	--- A new jump, a new lock (`StealConfig.Lock`).
+	self:_clearLock()
 	self._flight = {
 		along = along,
 		cross = cross,
@@ -1886,6 +2106,17 @@ function StealController._onBail(self)
 
 		The whiff is the one outcome that puts the car away again; see `_whiff` for why. ]]
 	local character = Players.LocalPlayer.Character
+	--[[ A RESTORE STILL WAITING FROM THE LAST STEAL GOES FIRST (2026-10-20, a tester: "after stealing a car
+		my body disappeared"). The handoff puts the rider back a few frames after the mount
+		(`Handoff.SettleFrames`); a bail inside those frames hid a body that was still hidden, so it
+		recorded "invisible" as how it looked, and every later restore put it back invisible. The race's
+		own leg fix-up then left only the legs showing. Claimed here, as the note at the restore says a
+		second flight should, so this hide records the body as it really is. ]]
+	local waiting = self._pendingRestore
+	if waiting then
+		self._pendingRestore = nil
+		self:_restoreRider(waiting, false)
+	end
 	self._riderHidden = if character then hideTree(character) else nil
 
 	--[[ Posed by CFrame rather than by the servo, because the freeze above anchored the door too.
@@ -2022,13 +2253,97 @@ function StealController._stepAir(self, dt: number)
 	local f = self._flight
 	local cfg = StealConfig.Flight
 
-	local want = self._drive
-		and self._drive:getSteerInput() * STEER_LEFT * cfg.SteerSpeed * (self._jumpForgiveness or 1)
-		or 0
+	local input = if self._drive then self._drive:getSteerInput() else 0
+	--[[ FORWARD AND BACK IN THE AIR (`StealConfig.Lock.AlongSteer`, 2026-10-20): the throttle the car was
+		driven with, W/S or the on-screen gas and brake pedals (`DriveController.getThrottleInput`, kept
+		live through the suspend). It leans where the lock looks (`_pickLock`'s aim), so holding gas
+		moves the target to the car ahead and brake to the one behind, and it shifts the glide's pace
+		the same way below. ]]
+	local push = if self._drive and StealConfig.Lock.AlongSteer then self._drive:getThrottleInput() else 0
+	--- On a thumb device the stick flies it too (`_flightStick`): across is steer (+1 = LEFT, the
+	--- drive's convention, so the stick's right is negative), up the screen is forward.
+	local stick = self:_flightStick()
+	input = math.clamp(input - stick.X * STEER_LEFT, -1, 1)
+	if StealConfig.Lock.AlongSteer then
+		push = math.clamp(push - stick.Z, -1, 1)
+	end
+	--[[ ...AND THE KEYS, READ HERE DIRECTLY (2026-10-20: "unable to move around on keyboard with wasd").
+		The drive's stashed steer and throttle are what the car was being driven with, and in the air
+		that hand-off is the one link in the chain that can go quiet; a held key is not a guess. A key
+		held wins over the stash, either axis on its own. ]]
+	local keyAcross = (if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then 1 else 0)
+		- (if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then 1 else 0)
+	if keyAcross ~= 0 then
+		input = keyAcross * STEER_LEFT -- +1 = LEFT in the drive's convention, whatever `PositiveSteerIsLeft` says
+	end
+	local keyAlong = (if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then 1 else 0)
+		- (if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then 1 else 0)
+	if keyAlong ~= 0 and StealConfig.Lock.AlongSteer then
+		push = keyAlong
+	end
+	--- A diagonal is one direction, not two at full strength (2026-10-20: "holding W and D at the same
+	--- time ... makes you fly super super quick"): the pair is capped at length 1, as a stick is.
+	local strength = math.sqrt(input * input + push * push)
+	if strength > 1 then
+		input, push = input / strength, push / strength
+	end
+	f.push = push
+	--- The lock, re-picked every frame of the air (`_pickLock`); the marker draws what this names.
+	if StealConfig.Lock.Enabled then
+		local dead = StealConfig.Lock.DeadZone
+		self._lockRec = self:_pickLock(f, math.abs(input) >= dead or math.abs(push) >= dead)
+	end
+	--[[ HOMING ALONG THE ROAD (`StealConfig.Lock.Home`, 2026-10-20: in faster cars "either got launched"
+		past the car she wanted). The jump carries the bailed car's own pace, and a fast car's cruise
+		is well over traffic's, so the arc overtook the target. With a car locked, the along speed eases
+		to THAT car's speed plus enough to close the gap (`HomeGain` per second, capped at `HomeMax`),
+		so you come down over the car you chose whatever you were driving. Along is never the player's
+		to steer, so this runs whether or not they are steering; the glide brake in `_advance` stands
+		down while it does (`f.homing`). ]]
+	local home = StealConfig.Lock
+	--[[ THE PLAYER'S INPUT WINS (2026-10-20: "I still can't move ... the movement should be very visible").
+		The homing and the assist were pulling every input straight back onto the locked car, so a held
+		key barely showed. Now any input switches both off, and they stay off `ManualHold` seconds after
+		the last of it, so the player flies exactly where they steer; only hands-off do the helpers take
+		over, onto whatever car the lock now names (`_pickLock` re-aims as they move). ]]
+	local dead = home.DeadZone
+	if math.abs(input) >= dead or math.abs(push) >= dead then
+		self._manualUntil = f.t + (home.ManualHold or 0)
+	end
+	local handsOff = f.t >= (self._manualUntil or 0)
+	local homeTo = if home.Enabled and home.Home and handsOff then self._lockRec else nil
+	f.homing = homeTo ~= nil or not handsOff
+	if homeTo then
+		local close = math.clamp((homeTo.along - f.along) * home.HomeGain, -home.HomeMax, home.HomeMax)
+		f.alongVel += (homeTo.speed + close - f.alongVel) * (1 - math.exp(-dt * home.HomeEase))
+	elseif not handsOff then
+		--- Flying by hand: the pace of the car you are over (or the glide's), plus the lean, quickly.
+		local base = if self._lockRec then self._lockRec.speed else self:_glideSpeed()
+		--- Back has its own, bigger number (`AlongBack`): past the road's pace, so brake flies you
+		--- BACKWARDS down the road rather than just parking you in the air over it.
+		local want = base + push * (if push >= 0 then home.AlongSpeed or 0 else home.AlongBack or home.AlongSpeed or 0)
+		f.alongVel += (want - f.alongVel) * (1 - math.exp(-dt * (home.ManualEase or home.HomeEase)))
+	end
+	local want = input * STEER_LEFT * cfg.SteerSpeed * (self._jumpForgiveness or 1)
+	--[[ THE ASSIST (`StealConfig.Lock.Assist`): hands off the stick and a car locked, ease across toward
+		the cross that car's lane will be at touchdown, so you come down on its roof rather than beside
+		it. A share (`AssistGain`) of the speed that would get there exactly, re-asked every frame, so
+		it converges without snapping; capped at the player's own steering speed. ]]
+	local lock = StealConfig.Lock
+	if lock.Enabled and lock.Assist and handsOff and self._lockRec and self._lockCross then
+		local need = (self._lockCross - f.cross) / math.max(self._lockT or 0, 0.25)
+		local top = cfg.SteerSpeed * (self._jumpForgiveness or 1)
+		want = math.clamp(need * lock.AssistGain, -top, top)
+	end
 	self:_advance(f, dt, want, self._info.deckY)
 
 	local pos = self:_worldPos(f.along, f.cross, f.y)
 	local target = self:_landingTarget(pos)
+	--- Came down on a roof: that car is the target now, whatever was locked, so the car under your
+	--- feet is the one E (and a touch screen's auto-steal) takes.
+	if target and StealConfig.Lock.Enabled then
+		self._lockRec = target
+	end
 	local grounded = f.y <= self._info.deckY + StealConfig.Landing.DeckGrace or f.t >= cfg.MaxTime
 
 	if not StealConfig.Prompt.Enabled then
@@ -2052,7 +2367,8 @@ function StealController._stepAir(self, dt: number)
 		end
 		self:_perch(target) -- came down on a roof: stand on it, prompt still up
 	elseif grounded then
-		if self:_autoSteal(self._candidate) then
+		--- No car in E's reach, but the highlighted one close by: that one (`StealConfig.Lock.LandReach`).
+		if self:_autoSteal(self._candidate or self:_lockNearby()) then
 			return
 		end
 		-- Down on the road. Still a perch if anything is in reach, because "I mistimed the press" and
@@ -2124,6 +2440,10 @@ function StealController._stepPerch(self, dt: number)
 		f.along += f.alongVel * dt
 	end
 
+	--- Standing on a roof, that car is the lock; on the tarmac the lock stays the car it was.
+	if rec and StealConfig.Lock.Enabled then
+		self._lockRec = rec
+	end
 	self._candidate, self._candidateAt = self:_findCandidate(self:_worldPos(f.along, f.cross, f.y))
 	self:_updatePrompt(dt)
 	if self:_consumeBufferedSteal() or self:_autoSteal(self._candidate) then
@@ -2190,7 +2510,51 @@ function StealController._stepMount(self, dt: number)
 	end
 end
 
+--[[ THE THUMB DEVICE'S FLIGHT CONTROLS (`DrivingHudController.setFlying`, 2026-10-20): up from the launch
+	to the end of the perch, so a phone flies on Roblox's own stick; down for the mount and once idle.
+	Told on a change only. ]]
+function StealController._syncFlightHud(self)
+	local flying = self._state == "launch" or self._state == "air" or self._state == "perch"
+	if flying == (self._hudFlying == true) then
+		return
+	end
+	self._hudFlying = flying
+	local hud = Shard.get("DrivingHudController")
+	if hud and hud.setFlying then
+		hud:setFlying(flying)
+	end
+end
+
+--[[ The stick's move vector while the thumb flight controls are up (`_syncFlightHud`), else zero.
+	Camera-relative as Roblox gives it, and the flight camera looks down the road, so X is across
+	(right positive) and -Z is up the road. Never yields: a missing PlayerModule is simply no stick. ]]
+function StealController._flightStick(self): Vector3
+	--- Only where the HUD really switched to the stick (a thumb device). On a keyboard the same move
+	--- vector is WASD, already read above, and reading it twice is how the two came to fight.
+	local hud = Shard.get("DrivingHudController")
+	if not (self._hudFlying and hud and hud._flying == true) then
+		return Vector3.zero
+	end
+	if self._stockControls == nil then
+		local scripts = Players.LocalPlayer:FindFirstChild("PlayerScripts")
+		local module = scripts and scripts:FindFirstChild("PlayerModule")
+		local ok, controls = pcall(function()
+			return (require(module :: any) :: any):GetControls()
+		end)
+		self._stockControls = if ok and controls then controls else false
+	end
+	local controls = self._stockControls
+	if not controls then
+		return Vector3.zero
+	end
+	local ok, move = pcall(function()
+		return controls:GetMoveVector()
+	end)
+	return if ok and typeof(move) == "Vector3" then move else Vector3.zero
+end
+
 function StealController._step(self, realDt: number)
+	self:_syncFlightHud()
 	if self._state == "idle" then
 		return
 	end
@@ -2235,7 +2599,9 @@ function StealController._step(self, realDt: number)
 	end
 	self:_flyCar(dt)
 
-	if self._state == "air" then
+	--- With the lock on, the marker is up from the launch to the end of the perch: the target is named
+	--- the moment you leave the car and stays named until E takes it (`StealConfig.Lock`).
+	if self._state == "air" or (StealConfig.Lock.Enabled and (self._state == "launch" or self._state == "perch")) then
 		self:_updateMarker(dt)
 	else
 		self:_hideMarker()
@@ -3617,10 +3983,12 @@ end
 	before you have left the seat, and the mount is after you have already taken something. A press
 	with no candidate is a press with nothing to do rather than something to fail at: no sound, no
 	shake, no "you missed". The prompt not being on screen has already said it. ]]
---- A touch player whose jump is ending with a car in reach takes it (`Prompt.TouchAutoSteal`).
+--- A player whose jump is ending with a car in reach takes it without the press: on touch
+--- (`Prompt.TouchAutoSteal`), and since 2026-10-20 on every device (`Prompt.AutoSteal`).
 --- Same checks as a press (`_onSteal`): a car that went physical or was recycled is not taken.
 function StealController._autoSteal(self, rec): boolean
-	if not (StealConfig.Prompt.TouchAutoSteal and UserInputService.PreferredInput == Enum.PreferredInput.Touch) then
+	local prompt = StealConfig.Prompt
+	if not (prompt.AutoSteal or (prompt.TouchAutoSteal and UserInputService.PreferredInput == Enum.PreferredInput.Touch)) then
 		return false
 	end
 	if not (rec and not rec.physical and rec.hit and rec.hit.Parent) then
@@ -3687,6 +4055,13 @@ function StealController.bail(self)
 	-- The touch HUD has one physical button for both verbs. Before a candidate is close enough to
 	-- change its face to STEAL, a second tap during flight is still valid buffered steal intent.
 	if self._state == "launch" or self._state == "air" or self._state == "perch" then
+		--- Not in the launch beat, nor `Prompt.BailGuard` seconds in: that is the jump's own tap (or its
+		--- bounce) landing a second time, and with the lock offering a car from the first frame, it was
+		--- buffered into a steal the player never asked for (2026-10-20).
+		local f = self._flight
+		if self._state == "launch" or (f and f.t < (StealConfig.Prompt.BailGuard or 0)) then
+			return
+		end
 		self:_onSteal()
 	else
 		self:_onBail()
@@ -3917,6 +4292,9 @@ function StealController._onRaceStart(self)
 		factors answer 1, which is exactly the arc this had before the upgrade existed. ]]
 	local upgrades = UpgradeConfig.decode(Players.LocalPlayer:GetAttribute(UpgradeConfig.Attribute))
 	self._jumpForgiveness = UpgradeConfig.jumpForgivenessFactor(upgrades)
+	--- ...and, since 2026-10-20, air time at the top of the arc and lock range (`UpgradeConfig.Upgrades.Jump`).
+	self._jumpHang = UpgradeConfig.jumpHangFactor(upgrades)
+	self._jumpRange = UpgradeConfig.jumpRangeFactor(upgrades)
 
 	self._active = true
 	self._wrecked = false
@@ -3979,6 +4357,15 @@ function StealController._onRevived(self)
 end
 
 function StealController._teardown(self)
+	--- The race is going away with or without a flight up: the thumb flight controls go with it
+	--- (`_syncFlightHud`), since `_step` will not run again to take them down.
+	if self._hudFlying then
+		self._hudFlying = false
+		local hud = Shard.get("DrivingHudController")
+		if hud and hud.setFlying then
+			hud:setFlying(false)
+		end
+	end
 	CarBody.discardPrepared(self._preparedBody)
 	self._preparedBody = nil
 	self._active = false
@@ -4091,6 +4478,8 @@ StealController:withLifecycle({
 		-- is the value here rather than nil so an arc stepped before a race ever started is the old one
 		-- rather than an error.
 		self._jumpForgiveness = 1
+		self._jumpHang = 1
+		self._jumpRange = 1
 		self._stealBufferedUntil = 0
 		self._pendingRestore = nil -- a rider unhide waiting on the handoff's settle frames
 		self._downed = false -- a whiffed bail is lying on the road; the camera is looking at it

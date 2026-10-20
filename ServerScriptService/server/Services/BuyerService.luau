@@ -547,7 +547,9 @@ function BuyerService.forceOffer(self, player: Player, bandKey: unknown, prefer:
 	--- made them walks in (`_tick`'s `fresh`); left to `_tick` they would appear already standing.
 	local _, bay = Garage:locationOf(player, carId)
 	if Customers and bay then
-		local name = Customers:placeBuyer(player, bay, carId, offer, true)
+		--- The tutorial's buyer walks in brisker (`BuyerConfig.Tutorial.WalkSpeed`); the shot is waiting on them.
+		local pace = if source == "Tutorial" then BuyerConfig.Tutorial.WalkSpeed else nil
+		local name = Customers:placeBuyer(player, bay, carId, offer, true, pace)
 		if name and name ~= "" then
 			offer.Name = name
 			self:_write(player, offers)
