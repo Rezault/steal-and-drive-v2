@@ -1,6 +1,6 @@
 -- Approved balance constants. Currency uses base values, before condition and parts.
 local BalanceConfig = {
-	["Version"] = 10,
+	["Version"] = 11,
 	-- Driving pays 30% of the previous rate; garage income and car values are independent.
 	--[[ CUT AGAIN 2026-10-13 (punch list E1, Aleafo: "the earning you get from drives is screwing up
 		the balancing"). WAS 4000 / 400. Worked out on the punch list: a 1-minute World 1 drive paid
@@ -15,7 +15,7 @@ local BalanceConfig = {
 	-- World 3 rarity premiums widened Oct 16; rare finds can outvalue early World 4 cars.
 	["Values"] = { { 600, 6000, 9000, 12000, 16000, 20000, 25000, 30000, 35000, 40000 }, { 45000, 52500, 60000, 75000, 93750, 112500, 150000, 175000, 250000, 325000 }, { 220000, 250000, 290000, 330000, 400000, 480000, 600000, 750000, 1200000, 1600000 }, { 650000, 750000, 850000, 1050000, 1350000, 1600000, 2150000, 2700000, 3500000, 4300000 }, { 6000000, 7000000, 8000000, 10000000, 12500000, 15000000, 20000000, 25000000, 32500000, 40000000 } },
 	-- Approved Oct 16: World 2 reduced from 100k to 85k for a slightly quicker first unlock.
-	["WorldCosts"] = { 0, 85000, 6000000, 35000000, 200000000 },
+	["WorldCosts"] = { 0, 85000, 6000000, 45000000, 250000000 },
 	["WorldWeightsByAge"] = { 1, 0.4, 0.15, 0.05, 0.02 },
 	-- Rebased 2026-10-16: prices follow earning power; later levels remain more expensive.
 	-- Upgrade effects and world requirements are retained.
