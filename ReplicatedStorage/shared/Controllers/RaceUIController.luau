@@ -303,6 +303,18 @@ local DOUBLE = {
 	end,
 }
 
+--- The heat bonus's stamp on the payout row (`_stampHeat`, `PoliceConfig.Heat`). `%s` is the multiplier.
+local HEAT_PILL = {
+	text = "★" .. NBSP .. "HEAT" .. NBSP .. "x%s",
+	colour = Color3.fromRGB(235, 60, 60),
+	ink = Color3.fromRGB(70, 0, 0),
+	rotation = -8,
+	from = 2.6, -- the stamp's size before it lands, as a scale of its resting size
+	stampTime = 0.16,
+	delay = 0.25, -- after the first count, before the stamp
+	countTime = 0.6, -- the climb from the run's figure to the banked one
+}
+
 --- ...and the same treatment as a function, for the lines that are written somewhere else (the
 --- loading copy below, a world's name) rather than assembled here.
 local function oneLine(text: string): string
@@ -4329,6 +4341,13 @@ function RaceUIController._paintPanel(self, summary, leveled): boolean
 			then { figure = cash(summary.cash), caption = "Payout" .. suffix .. (if doubled then DOT .. DOUBLE.text else ""), count = summary.cash }
 			else { figure = "No" .. NBSP .. "payout", caption = "Payout" .. suffix }
 		plan.doubled = doubled
+		--[[ THE HEAT BONUS, shown happening (2026-10-19): the count lands on what the run paid before
+			it, the HEAT pill stamps onto the row, and the figure climbs to what was banked
+			(`_playPanel`). `cash` already includes it, so the run's own figure is worked back out. ]]
+		if plan.cash.count and summary.banked and summary.heat > 1 then
+			plan.cash.base = math.round(summary.cash / summary.heat)
+			plan.cash.heat = summary.heat
+		end
 
 		local distance = RewardConfig.formatDistance(summary.studs)
 		if distance then
@@ -4364,6 +4383,9 @@ function RaceUIController._paintPanel(self, summary, leveled): boolean
 		shown = true
 	end
 	self:_paintDoubleBadge(rows.cash, plan.doubled == true)
+	if self._heatPill then
+		self._heatPill.Visible = false -- stamped by `_playPanel` when this run has one
+	end
 
 	if summary then
 		self._ladder = self:_planLadder(summary.studs)
@@ -4372,6 +4394,58 @@ function RaceUIController._paintPanel(self, summary, leveled): boolean
 
 	self._plan = plan
 	return shown
+end
+
+--[[ The HEAT pill (`HEAT_PILL`), stamped onto the payout row: big and clear, then down onto the row's
+	top edge with a jolt of the row, the way a rubber stamp lands. Built once, inside the row. ]]
+function RaceUIController._stampHeat(self, row, heat: number, token: number)
+	if not (row and row.row) then
+		return
+	end
+	local pill = self._heatPill
+	if not pill or pill.Parent ~= row.row then
+		if pill then
+			pill:Destroy()
+		end
+		pill = Instance.new("TextLabel")
+		pill.Name = "HeatPill"
+		pill.AnchorPoint = Vector2.new(1, 0.5)
+		pill.Position = UDim2.fromScale(1.02, 0.02)
+		pill.Size = UDim2.fromScale(0.36, 0.5)
+		pill.Rotation = HEAT_PILL.rotation
+		pill.BackgroundColor3 = HEAT_PILL.colour
+		pill.Font = Enum.Font.FredokaOne
+		pill.TextScaled = true
+		pill.TextColor3 = Color3.new(1, 1, 1)
+		pill.ZIndex = (row.figure and row.figure.ZIndex or 1) + 2
+		local round = Instance.new("UICorner")
+		round.CornerRadius = UDim.new(0.5, 0)
+		round.Parent = pill
+		local rim = Instance.new("UIStroke")
+		rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		rim.Color = HEAT_PILL.ink
+		rim.Thickness = 2
+		rim.Parent = pill
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0.08, 0)
+		pad.PaddingRight = UDim.new(0.08, 0)
+		pad.Parent = pill
+		local scale = Instance.new("UIScale")
+		scale.Parent = pill
+		pill.Parent = row.row
+		self._heatPill = pill
+	end
+	local text = string.format("%.2f", heat):gsub("0+$", ""):gsub("%.$", "")
+	pill.Text = string.format(HEAT_PILL.text, text)
+	pill.Visible = true
+	local scale = pill:FindFirstChildOfClass("UIScale") :: UIScale
+	scale.Scale = HEAT_PILL.from
+	local land = self:_tween(scale, HEAT_PILL.stampTime, { Scale = 1 }, Enum.EasingStyle.Quad)
+	land.Completed:Once(function()
+		if self._token == token then
+			self:_punchRow("cash", token)
+		end
+	end)
 end
 
 --[[ The gold 2x CASH badge on the payout row (header note at `DOUBLE.text`). Built once, on first
@@ -4566,7 +4640,19 @@ function RaceUIController._playPanel(self, token: number)
 		end
 		pop("cash", ROW_POP_TIME)
 		self:_playSound(PAYOUT_SOUND_ID)
-		if entry.count then
+		if entry.base then
+			--[[ Two counts with the stamp between. The second is started off a TIMER, not the first
+				count's finish: that finish runs on RenderStepped, and a renderer that never ticks must
+				still end on the paid figure (`_countUp`'s note), which the second count writes first. ]]
+			self:_countPanel(rows.cash.figure, 0, entry.base, COUNT_TIME, token, "_countConn")
+			beat(COUNT_TIME + HEAT_PILL.delay, function()
+				self:_stampHeat(rows.cash, entry.heat, token)
+				self:_playSound(PAYOUT_SOUND_ID)
+				self:_countPanel(rows.cash.figure, entry.base, entry.count, HEAT_PILL.countTime, token, "_countConn", function()
+					self:_punchRow("cash", token)
+				end)
+			end)
+		elseif entry.count then
 			self:_countPanel(rows.cash.figure, 0, entry.count, COUNT_TIME, token, "_countConn", function()
 				self:_punchRow("cash", token)
 			end)
@@ -5233,7 +5319,8 @@ RaceUIController:withRemoteEvents({
 			misses: number,
 			rubs: number,
 			bonusEarned: number,
-			mutation: string?
+			mutation: string?,
+			heat: number?
 		)
 			RaceUIController._summary = {
 				cash = if type(cash) == "number" then cash else 0,
@@ -5254,6 +5341,8 @@ RaceUIController:withRemoteEvents({
 					unknown key becomes nil, so a client one deploy behind a server draws an ordinary
 					payout rather than naming a mutation it has never heard of. ]]
 				mutation = WeatherConfig.sanitize(mutation),
+				--- The heat multiplier the bank paid (`PoliceConfig.Heat`), already inside `cash`; 1 for none.
+				heat = if type(heat) == "number" and heat >= 1 and heat < 100 then heat else 1,
 			}
 			RaceUIController:_queueResultsPreparation()
 		end,

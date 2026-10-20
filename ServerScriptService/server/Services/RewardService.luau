@@ -535,7 +535,7 @@ function RewardService.settleRun(self, player: Player, banked: boolean, mutation
 		argument to a signal four services unpack by position is a cost with no buyer. When one of
 		them wants it, it should go on as a named field rather than as argument nine. ]]
 	self:getRemoteEvent("RunSettled")
-		:Fire(player, cash, math.floor(studs), banked, bonusPaid, state.misses, state.paint, bonusEarned, mutation)
+		:Fire(player, cash, math.floor(studs), banked, bonusPaid, state.misses, state.paint, bonusEarned, mutation, heatMultiplier)
 	self:getSignal("RunSettled"):Fire(player, cash, studs, banked, bonusPaid, state.misses, state.paint, bonusEarned)
 	self.log:info(string.format(
 		"%s drove %d studs and %s%s — paid %d%s.",
@@ -553,6 +553,8 @@ function RewardService.settleRun(self, player: Player, banked: boolean, mutation
 			)
 			else ""
 	))
+	--- The heat that went into it (`PoliceConfig.Heat`), so a missing results stamp can be traced here.
+	self.log:info(string.format("%s's heat: %d star(s), arm %s, paid x%.2f.", player.Name, state.heat, tostring(PoliceConfig.heatOn(player)), heatMultiplier))
 	return cash
 end
 
@@ -674,11 +676,38 @@ RewardService:withLifecycle({
 				if not state or state.settled then
 					return
 				end
-				if TutorialConfig.isTutorialRun(player:GetAttribute(TutorialConfig.StepAttribute)) then
+				local tutorial = TutorialConfig.isTutorialRun(player:GetAttribute(TutorialConfig.StepAttribute))
+				if (tutorial and not PoliceConfig.Heat.Tutorial.Enabled) or not PoliceConfig.heatOn(player) then
 					return
 				end
 				state.heat = math.min(PoliceConfig.Heat.Max, state.heat + PoliceConfig.heatOfSteal(tier))
 			end)
+		end
+
+		--[[ THE A/B ARM (`PoliceConfig.Heat.Remote`): each player's Gamebeast value, stamped on them so
+			the client's police and this file's payout read the same thing. Only a boolean is written;
+			until one arrives `heatOn` answers with the fallback, on both sides alike. ]]
+		local remote = PoliceConfig.Heat.Remote
+		if remote.Enabled then
+			local function observe(player: Player)
+				task.spawn(function()
+					local ok, err = pcall(function()
+						local Gamebeast = require(ReplicatedStorage:WaitForChild("Gamebeast"))
+						Gamebeast:GetService("Configs"):ObserveForPlayer(player, remote.Path, function(value)
+							if type(value) == "boolean" and player.Parent then
+								player:SetAttribute(remote.Attribute, value)
+							end
+						end)
+					end)
+					if not ok then
+						self.log:warn("Gamebeast config unavailable, heat uses its fallback: " .. tostring(err))
+					end
+				end)
+			end
+			Players.PlayerAdded:Connect(observe)
+			for _, player in Players:GetPlayers() do
+				observe(player)
+			end
 		end
 	end,
 })

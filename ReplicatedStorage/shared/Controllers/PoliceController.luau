@@ -495,13 +495,16 @@ function PoliceController.reportSteal(self, tier: number?)
 	--[[ HEAT (`PoliceConfig.Heat`, 2026-10-19): EVERY steal is answered, not only a top-rung one. The
 		stars rise either way; a chase already live is extended rather than restarted, so a steal made
 		to get away is a steal that makes getting away harder. ]]
-	local added = if self._active and not self._tutorialRun then PoliceConfig.heatOfSteal(tier) else 0
+	local added = if self._active and (not self._tutorialRun or self:_tutorialHeat()) and PoliceConfig.heatOn(Players.LocalPlayer)
+		then PoliceConfig.heatOfSteal(tier)
+		else 0
 	if added > 0 then
 		local max = PoliceConfig.Heat.Max
 		self._heat = math.min(max, self._heat + added)
 		self._heatEarned = math.min(max, self._heatEarned + added)
 		if self._state == "live" then
 			self._endsAt += PoliceConfig.Heat.ExtendOnSteal
+			self:_escalate()
 		else
 			self._stealArmAt = now + PoliceConfig.StealHeat.Delay
 		end
@@ -517,7 +520,7 @@ end
 	`multiplier` that, priced (`PoliceConfig.heatMultiplier`). The server pays its own count of the
 	same rule; this one is for drawing. ]]
 function PoliceController.getHeat(self)
-	if not (self._active and PoliceConfig.Enabled and PoliceConfig.Heat.Enabled) or self._tutorialRun then
+	if not (self._active and PoliceConfig.heatOn(Players.LocalPlayer)) or (self._tutorialRun and not self:_tutorialHeat()) then
 		return nil
 	end
 	return { stars = self._heat, earned = self._heatEarned, multiplier = PoliceConfig.heatMultiplier(self._heatEarned) }
@@ -1046,7 +1049,7 @@ function PoliceController._callDue(self, now: number): boolean
 	end
 	--- With heat on, a steal is always answered: the consequence has to be the same every time or it
 	--- is not a rule (`PoliceConfig.Heat`). The road's cooldown is still the road's.
-	local heatOn = PoliceConfig.Heat.Enabled and self._heat > 0
+	local heatOn = PoliceConfig.heatOn(Players.LocalPlayer) and self._heat > 0
 	return PoliceConfig.StealHeat.IgnoreCooldown or heatOn or now >= self._cooldownUntil
 end
 
@@ -1069,6 +1072,33 @@ end
 --- Start one. Everything that decides how a chase goes is stamped here and nothing reads a config
 --- roll twice, so the duration a chase is going to run for is fixed the moment it starts rather
 --- than being re-rolled on whatever frame it is next asked about.
+--- Does this tutorial run get its steal chase (`PoliceConfig.Heat.Tutorial`, heat arm only)?
+function PoliceController._tutorialHeat(self): boolean
+	return PoliceConfig.Heat.Tutorial.Enabled and PoliceConfig.heatOn(Players.LocalPlayer)
+end
+
+--- Stars that rose MID-CHASE bring the units they now call for (`Heat.SecondCruiserAt`, `HeliAt`),
+--- which `_arm` only counted at the start.
+function PoliceController._escalate(self)
+	local heat = PoliceConfig.Heat
+	local cars, helis = 0, 0
+	for _, rec in self._pursuers do
+		if rec.kind == "car" then
+			cars += 1
+		else
+			helis += 1
+		end
+	end
+	if self._heat >= heat.SecondCruiserAt then
+		for index = cars + 1, PoliceConfig.Cruisers.Count do
+			self:_spawnPursuer("car", index, if index % 2 == 0 then 1 else -1)
+		end
+	end
+	if PoliceConfig.Helicopter.Enabled and helis == 0 and self._heat >= heat.HeliAt then
+		self:_spawnPursuer("heli", 1, 1)
+	end
+end
+
 function PoliceController._arm(self, reason: string?)
 	local now = os.clock()
 	self._state = "live"
@@ -1093,11 +1123,16 @@ function PoliceController._arm(self, reason: string?)
 	--[[ HOW HOT (`PoliceConfig.Heat`): a steal's chase is as big as the stars behind it; a road chase is
 		the full one it always was (`RoadStars`). With heat off, every chase is the full one. ]]
 	local heat = PoliceConfig.Heat
-	local stars = if not heat.Enabled then heat.Max
+	local heatOn = PoliceConfig.heatOn(Players.LocalPlayer)
+	local stars = if not heatOn then heat.Max
 		elseif self._armReason == "steal" then math.max(self._heat, 1)
 		else math.max(self._heat, heat.RoadStars)
-	self._endsAt = now + self._rng:NextNumber(PoliceConfig.Duration[1], PoliceConfig.Duration[2])
-		+ (if heat.Enabled then (stars - 1) * heat.DurationPerStar else 0)
+	--- The tutorial's chase is the short one (`Heat.Tutorial.Duration`), whatever the stars.
+	local duration = if self._tutorialRun then heat.Tutorial.Duration
+		elseif heatOn then heat.Duration
+		else PoliceConfig.Duration
+	self._endsAt = now + self._rng:NextNumber(duration[1], duration[2])
+		+ (if heatOn and not self._tutorialRun then (stars - 1) * heat.DurationPerStar else 0)
 	--- What nitro has taken off `_endsAt` so far, against `PoliceConfig.Nitro.MaxCut`. Per chase.
 	self._nitroCut = 0
 	self._armedAt = now
@@ -1109,12 +1144,12 @@ function PoliceController._arm(self, reason: string?)
 	self._stealArmAt = 0
 
 	self:_spawnPursuer("car", 1, -1)
-	if PoliceConfig.Cruisers.Count > 1 and (not heat.Enabled or stars >= heat.SecondCruiserAt) then
+	if PoliceConfig.Cruisers.Count > 1 and (not heatOn or stars >= heat.SecondCruiserAt) then
 		for index = 2, PoliceConfig.Cruisers.Count do
 			self:_spawnPursuer("car", index, if index % 2 == 0 then 1 else -1)
 		end
 	end
-	if PoliceConfig.Helicopter.Enabled and (not heat.Enabled or stars >= heat.HeliAt) then
+	if PoliceConfig.Helicopter.Enabled and (not heatOn or stars >= heat.HeliAt) then
 		self:_spawnPursuer("heli", 1, 1)
 	end
 
@@ -1148,8 +1183,8 @@ function PoliceController._lose(self)
 	self._state = "leaving"
 	self._leaveAt = os.clock() + PoliceConfig.PullAway.Time
 	self._cooldownUntil = self._leaveAt + PoliceConfig.Cooldown
-	--- Lost them: the live heat clears (`PoliceConfig.Heat`); what this run earned stays for the bank.
-	self._heat = 0
+	--- Lost them. The heat does NOT clear (2026-10-19): it is the run's, the stars on screen are the
+	--- bank's multiplier, and the next steal's chase starts as hot as the run is (`PoliceConfig.Heat`).
 	self:_reportChase(false)
 	for _, rec in self._pursuers do
 		if rec.siren then
@@ -1569,8 +1604,9 @@ function PoliceController._loop(self, dt: number)
 	local now = os.clock()
 
 	if self._state == "off" then
-		-- No chases on the tutorial's run (`TutorialConfig.isTutorialRun`), latched at race start.
-		if self._tutorialRun then
+		-- No chases on the tutorial's run (`TutorialConfig.isTutorialRun`), latched at race start,
+		-- except the heat arm's steal call (`PoliceConfig.Heat.Tutorial`).
+		if self._tutorialRun and not self:_tutorialHeat() then
 			return
 		end
 		--- Not with the getaway truck in reach (`PoliceConfig.TruckClearance`). Before `_callDue`, so a
@@ -1583,7 +1619,7 @@ function PoliceController._loop(self, dt: number)
 		--- chase the player earned and print the wrong line over it.
 		if self:_callDue(now) then
 			self:_arm("steal")
-		elseif now >= self._cooldownUntil and (self:_sectionAhead() or self:_repeatDue()) then
+		elseif not self._tutorialRun and now >= self._cooldownUntil and (self:_sectionAhead() or self:_repeatDue()) then
 			self:_arm()
 		end
 		return

@@ -137,6 +137,7 @@ local GameIds = require(ReplicatedStorage.shared.GameIds)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 --- For `Remote` and `Style`, the guide trail A/B the first-car markers are tagged with.
 local GuideTrailConfig = require(ReplicatedStorage.shared.Configs.GuideTrailConfig)
+local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local Trove = require(ReplicatedStorage.Packages.Trove)
@@ -964,7 +965,8 @@ function AnalyticsService._watchRuns(self)
 			--- What `RunEnded` reports beyond the payout (header, the 2026-10-15 pass). Filled by the
 			--- wreck, revive, steal and speed-trap subscriptions below.
 			self._run[player.UserId] = { car = car, wrecks = 0, revives = 0, steals = 0, traps = 0, trapCash = 0 }
-			self:Marker(player, "RunStarted", { world = world, runNumber = runs, car = car })
+			--- `heat`: the player's A/B arm (`PoliceConfig.Heat.Remote`), so the run funnel splits by it.
+			self:Marker(player, "RunStarted", { world = world, runNumber = runs, car = car, heat = PoliceConfig.heatOn(player) })
 		end))
 
 		--[[ WHAT ENDED IT. Every wreck is counted, revived or not, and the last one's cause is the
@@ -1024,6 +1026,7 @@ function AnalyticsService._watchRuns(self)
 						distance = distance,
 						cash = toAmount(cash) or 0,
 						runNumber = self._runs[player.UserId] or 0,
+						heat = PoliceConfig.heatOn(player),
 						--- The 2026-10-15 fields. `cause` "quit" is a run that neither banked nor
 						--- wrecked: a leave, a death in the seat, an entry that fell over.
 						car = run.car or "Unknown",

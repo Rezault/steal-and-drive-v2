@@ -1524,10 +1524,21 @@ function TutorialController._face(self, step)
 	--[[ ...and the thing the beat is waiting for has turned up. One beat has this — BANK, when the
 		getaway truck spawns — and it is asked of the truck itself rather than of a remote, so the
 		words and the road cannot disagree. ]]
+	--- A chase outranks the truck: none can come until it is over (`step.Chased`, BANK only).
+	if step.Chased and self:_chased() then
+		return step.Chased
+	end
 	if step.Arrived and self:_arrived(step) then
 		return step.Arrived
 	end
 	return step
+end
+
+--- Are the police on this run right now (live, or the arrest)? Asked of the police, like the truck.
+function TutorialController._chased(self): boolean
+	local police = Shard.get("PoliceController")
+	local chase = police and police:getChase()
+	return chase ~= nil and (chase.state == "live" or chase.state == "pit")
 end
 
 --[[ Has the thing this beat waits for turned up? BANK's is the getaway truck; SELL's

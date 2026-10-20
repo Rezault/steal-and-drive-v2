@@ -721,6 +721,16 @@ TutorialConfig.Steps = {
 				of the road the player was steering down. See `TutorialController._chipHeight`. ]]
 			Target = { Kind = "World", What = "Truck", Above = true },
 		},
+		--[[ ...AND WHILE THE POLICE ARE ON THEM (2026-10-19), which only the heat arm's tutorial has
+			(`PoliceConfig.Heat.Tutorial`). The truck's wait is held through a chase
+			(`GetawayConfig.PoliceLock`), so "catch the truck" over a frozen countdown read as broken.
+			This face says the one thing that is true and comes before the truck. No pointer and no
+			meter: the police HUD's bar is the gauge. A steal made meanwhile only stretches the chase;
+			nothing here asks for one (Aleafo). `TutorialController._chased` decides it. ]]
+		Chased = {
+			Title = "LOSE THE COPS!",
+			Hint = "Don't crash, don't stop. The truck comes once they give up",
+		},
 	},
 
 	--[[ ---------------------------------------------------------------- 8. PLACE

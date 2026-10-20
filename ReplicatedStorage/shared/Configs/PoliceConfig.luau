@@ -77,6 +77,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 --[[ For the ladder a stolen car sits on, and for nothing else. `StealHeat` below is a RUNG test,
 	and a rung only means something against the world the car belongs to. `WorldConfig` requires
@@ -293,12 +294,38 @@ PoliceConfig.StealHeat = {
 	run gets no heat at all, the same exemption `StealHeat` makes for it.
 
 	`Enabled = false`: a steal calls the police only for a top-rung car, no stars, no bonus, exactly as
-	before. This is the switch an A/B test flips. ]]
+	before, for everybody. It is the kill switch; the A/B is `Remote` below.
+
+	=== THE A/B: EACH PLAYER'S HEAT COMES FROM GAMEBEAST (2026-10-19) =========================
+
+	Aleafo: "AB test, funnels and playtime and all that stats different for each one". The Gamebeast
+	remote configuration "live" holds `Heat.Enabled` (a boolean), and an experiment sets it per player.
+	The SERVER reads each player's value (`RewardService`, `Configs:ObserveForPlayer`) and stamps it on
+	them as the `Remote.Attribute` attribute; the police, the HUD and the payout all ask
+	`PoliceConfig.heatOn(player)`, which reads that one attribute, so client and server cannot disagree
+	about which arm a player is in. `RunStarted` and `RunEnded` carry it as `heat`, so the run funnel
+	can be split by arm.
+
+	No value yet (configs not loaded, Gamebeast unreachable, or Studio, whose "studio" environment has
+	no "live"): `Remote.Fallback`, which should match the base configuration's value, or
+	`Remote.StudioFallback` in Studio so playtests keep the heat. SHIPPING THE WINNER: end the
+	experiment, set "live" `Heat.Enabled` to it, and set `Fallback` to match. ]]
 PoliceConfig.Heat = {
 	Enabled = true,
+	Remote = {
+		Enabled = true,
+		Path = { "live", "Heat", "Enabled" },
+		Attribute = "HeatOn",
+		Fallback = false,
+		StudioFallback = true,
+	},
 	Max = 5,
 	PerSteal = 1,
 	HighValueBonus = 1,
+	--[[ The heat arm's chase, in seconds, in place of `PoliceConfig.Duration` (30..38), which the
+		no-heat arm keeps so the A/B is against the old game (2026-10-19, Aleafo: "default should prob be
+		like 20s too, since its always"). ]]
+	Duration = { 24, 28 }, -- 2026-10-19: 18..22, then "a little longer"
 	--- Seconds added to the rolled `Duration` per star past the first.
 	DurationPerStar = 5,
 	ExtendOnSteal = 8,
@@ -319,8 +346,36 @@ PoliceConfig.Heat = {
 	Star = "★",
 	EmptyStar = "☆",
 	BonusFormat = "x%s CASH",
-	LostSubText = "Heat cleared. Bank it for x%s",
+	--- 2026-10-19: WAS "Heat cleared. ...". The stars now stay for the whole run (escaping ends the
+	--- chase, not the heat), so the stars on screen are always the multiplier's.
+	LostSubText = "Bank it for x%s",
+	--[[ THE TUTORIAL'S RUN, heat arm only (2026-10-19: "the tutorial for the heat on version should
+		include police chase too"). Its first steal calls one short 1-star chase, so a new player
+		meets the rule on the run that teaches everything else. No road chases. A bust is harmless:
+		the tutorial rescues any wreck (`TutorialConfig.Unlosable`). `Enabled = false`: the tutorial
+		run has no police, as before. ]]
+	Tutorial = {
+		Enabled = true,
+		Duration = { 9, 11 }, -- 2026-10-19: 7..9, then "a little longer"
+	},
 }
+
+--- Is heat on for this player (`Heat.Remote`, the A/B)? The kill switch, then their arm.
+function PoliceConfig.heatOn(player: Player?): boolean
+	local heat = PoliceConfig.Heat
+	if not (PoliceConfig.Enabled and heat.Enabled) then
+		return false
+	end
+	local remote = heat.Remote
+	if not remote.Enabled then
+		return true
+	end
+	local value = if player then player:GetAttribute(remote.Attribute) else nil
+	if type(value) == "boolean" then
+		return value
+	end
+	return if RunService:IsStudio() then remote.StudioFallback else remote.Fallback
+end
 
 --- Stars one steal adds (`Heat`). 0 with heat off. Shared, so the HUD and the payout count alike.
 function PoliceConfig.heatOfSteal(tier: unknown): number

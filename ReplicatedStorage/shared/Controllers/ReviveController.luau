@@ -435,6 +435,17 @@ local KIT_NO_STAKE = "Back" .. NBSP .. "on" .. NBSP .. "the" .. NBSP .. "road" .
 local WRECK_TEMPLATE = "WreckRevive"
 local WRECK_HEADLINE = "WRECKED"
 local DOT = NBSP .. NBSP .. "·" .. NBSP .. NBSP
+--- The heat bonus's stamp on the getaway's payout line (`_stampHeat`). `%s` is the multiplier.
+local HEAT_STAMP = {
+	text = "★" .. NBSP .. "HEAT" .. NBSP .. "x%s",
+	colour = Color3.fromRGB(235, 60, 60),
+	ink = Color3.fromRGB(70, 0, 0),
+	rotation = -8,
+	from = 2.6, -- its size before it lands, as a scale of its resting size
+	stampTime = 0.16,
+	delay = 0.3, -- after the first count lands, before the stamp
+	countTime = 0.6, -- the climb from the run's figure to the paid one
+}
 --- The countdown line, by what running out will do. `%d` is whole seconds left, never below 1.
 local COUNT_REPLAY = "Racing" .. NBSP .. "again" .. NBSP .. "in" .. NBSP .. "%d"
 local COUNT_HOME = "Heading" .. NBSP .. "home" .. NBSP .. "in" .. NBSP .. "%d"
@@ -1407,6 +1418,17 @@ function ReviveController._paintRun(self, offer)
 	end
 	self._cashTo = cash
 	self._cashTail = kept
+	--[[ THE HEAT BONUS (`PoliceConfig.Heat`, 2026-10-19). The figure counts to what the run made before
+		it, the HEAT pill stamps onto the line, then it climbs to what was paid (`_stepRun`). `cash` is
+		already the paid one (`RaceUIController`'s summary carries the multiplier), so the run's own
+		figure is worked back out. ]]
+	local heat = if banked and cash > 0 and type(run.heat) == "number" and run.heat > 1 then run.heat else nil
+	self._heatMult = heat
+	self._cashBase = if heat then math.round(cash / heat) else nil
+	self._heatStamped = false
+	if self._heatPill then
+		self._heatPill.Visible = false
+	end
 	rows.cash.Text = if cash > 0 then "+" .. GarageConfig.formatCash(0) .. kept else "No" .. NBSP .. "payout" .. kept
 
 	--[[ The tally, with the bonus it kept in gold. A run with none of either gets the offer's own
@@ -1479,11 +1501,69 @@ function ReviveController._stepRun(self, now: number)
 		rows.marker.Position = UDim2.fromScale(at, rows.marker.Position.Y.Scale)
 	end
 	if (self._cashTo or 0) > 0 then
-		rows.cash.Text = "+" .. GarageConfig.formatCash(math.round(self._cashTo * eased)) .. self._cashTail
+		local shown = self._cashTo * eased
+		if self._heatMult then
+			--- First to the run's own figure, then the stamp, then up to the paid one (`_paintRun`).
+			local since = now - (self._runShownAt or now) - LADDER_DELAY - LADDER_TIME - HEAT_STAMP.delay
+			if since < 0 then
+				shown = self._cashBase * eased
+			else
+				if not self._heatStamped then
+					self._heatStamped = true
+					self:_stampHeat(self._heatMult)
+				end
+				local climb = 1 - (1 - math.clamp(since / HEAT_STAMP.countTime, 0, 1)) ^ 3
+				shown = self._cashBase + (self._cashTo - self._cashBase) * climb
+			end
+		end
+		rows.cash.Text = "+" .. GarageConfig.formatCash(math.round(shown)) .. self._cashTail
 	end
 	if self._shot then
 		self._shot.step(now - (self._runShownAt or now))
 	end
+end
+
+--[[ The HEAT pill, stamped beside the headline (STOLEN!): big, then down with a tilt, the way a
+	rubber stamp lands. Built once, inside the headline, and placed off the text's measured width.
+	2026-10-19: WAS on the payout line's right end, where it covered "2x CASH". ]]
+function ReviveController._stampHeat(self, heat: number)
+	local line = self._wreck.headline
+	local pill = self._heatPill
+	if not pill then
+		pill = Instance.new("TextLabel")
+		pill.Name = "HeatPill"
+		pill.AnchorPoint = Vector2.new(0, 0.5)
+		pill.Size = UDim2.fromScale(0.26, 0.75)
+		pill.Rotation = HEAT_STAMP.rotation
+		pill.BackgroundColor3 = HEAT_STAMP.colour
+		pill.Font = Enum.Font.FredokaOne
+		pill.TextScaled = true
+		pill.TextColor3 = WHITE
+		pill.ZIndex = line.ZIndex + 2
+		local round = Instance.new("UICorner")
+		round.CornerRadius = UDim.new(0.5, 0)
+		round.Parent = pill
+		local rim = Instance.new("UIStroke")
+		rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		rim.Color = HEAT_STAMP.ink
+		rim.Thickness = 2
+		rim.Parent = pill
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0.08, 0)
+		pad.PaddingRight = UDim.new(0.08, 0)
+		pad.Parent = pill
+		Instance.new("UIScale").Parent = pill
+		pill.Parent = line
+		self._heatPill = pill
+	end
+	local multiplier = string.format("%.2f", heat):gsub("0+$", ""):gsub("%.$", "")
+	pill.Text = string.format(HEAT_STAMP.text, multiplier)
+	--- Just right of the centred word, wherever it ends.
+	pill.Position = UDim2.new(0.5, line.TextBounds.X * 0.5 + 12, 0.5, 0)
+	pill.Visible = true
+	local scale = pill:FindFirstChildOfClass("UIScale") :: UIScale
+	scale.Scale = HEAT_STAMP.from
+	TweenService:Create(scale, TweenInfo.new(HEAT_STAMP.stampTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 1 }):Play()
 end
 
 function ReviveController._dropShot(self)
