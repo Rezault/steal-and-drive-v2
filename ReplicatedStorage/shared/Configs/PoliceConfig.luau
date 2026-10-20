@@ -356,7 +356,7 @@ PoliceConfig.Heat = {
 		run has no police, as before. ]]
 	Tutorial = {
 		Enabled = true,
-		Duration = { 9, 11 }, -- 2026-10-19: 7..9, then "a little longer"
+		Duration = { 12, 14 }, -- 2026-10-20: was 7..9, then 9..11; Aleafo: "felt too short"
 	},
 }
 

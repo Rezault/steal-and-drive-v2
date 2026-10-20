@@ -146,6 +146,8 @@ local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local ScreenConfetti = require(ReplicatedStorage.shared.Modules.ScreenConfetti)
 local ShowcaseConfig = require(ReplicatedStorage.shared.Configs.ShowcaseConfig)
 local UIRoot = require(ReplicatedStorage.shared.Modules.UIRoot)
+--- Turns the camera toward the tutorial's buyer as they walk in. See `_stepLook`.
+local CameraFacing = require(ReplicatedStorage.shared.Modules.CameraFacing)
 
 local TutorialController = Shard.new("TutorialController")
 
@@ -183,6 +185,10 @@ local CARD_LEFT = TutorialConfig.CardSide ~= "Right"
 	live, whatever the arrow currently sticks out by. The arrow is much bigger than the ring it
 	replaced, so a fixed gap that cleared the old pointer lands the card inside the new one. ]]
 local CARD_GAP = 0.018
+--- Seconds a NEW target is given to finish opening before the card picks a spot by it, and the share of the
+--- way to that spot the card moves each frame (`_place`, 2026-10-20).
+local PLACE_SETTLE = 0.3 -- a page scales open over about 0.25s
+local PLACE_GLIDE = 0.22
 
 --[[ How far down THIS GUI'S OWN SPACE Roblox's bar reaches, in pixels.
 
@@ -351,8 +357,14 @@ local CHIP_PILL_HEIGHT = (CHIP_SIZE.X.Offset / (UIAssets.Size.Pill.X / UIAssets.
 local BUYER_TAG = "Buyer"
 local BUYER_OWNER = "BuyerOwner"
 local BUYER_SIGN = "BuyerSign"
+--- True once the buyer is standing at the car (`CustomerService`'s `BUYER_ATTRIBUTES.Arrived`).
+local BUYER_ARRIVED = "BuyerArrived"
 --- The kit's PLAY gold, the colour the bay glow wears for "this is the thing to go to".
 local BUYER_GLOW = Color3.fromRGB(255, 198, 0)
+--[[ The outline's fill breathes between these two transparencies on `TutorialConfig.Pulse.Period`
+	(2026-10-19, Dylan: "highlight the npc so they open the offer"): a still outline in a lot full of
+	cars read as part of the scene. The outline itself stays solid. ]]
+local BUYER_GLOW_FILL = { 0.85, 0.5 }
 
 --[[ One name for every hold this feature places on the world, whichever beat placed it. Beats abut
 	— AIRBORNE arms while BAIL's hold is still coming off — and a name per beat would leave two
@@ -1564,6 +1576,95 @@ function TutorialController._buyer(self): BasePart?
 	return nil
 end
 
+--[[ A `Watched` beat (SELL): tell the server, once per arrival of the beat, that its card is up with
+	nothing over it, which is when the tutorial's buyer is sent (`BuyerConfig.Tutorial`). "Nothing over
+	it" is the card drawn (`_open` is already true here, so no modal and no race transition) and no NEW
+	BEST stage up or waiting, which holds every screen off while it plays (`ShowcaseController.busy`). ]]
+function TutorialController._stepWatched(self, step)
+	if not step.Watched or self._pinged == step.Id or not self._cardOn then
+		return
+	end
+	local showcase = Shard.get("ShowcaseController")
+	if showcase and showcase:busy() then
+		return
+	end
+	self._pinged = step.Id
+	self:getRemoteEvent("TutorialWatching"):Fire(step.Id)
+end
+
+--[[ A face with `Look` (SELL's, once the buyer is on the lot): turn the camera to the buyer while they
+	walk to the car, then let go `TutorialConfig.Look.Linger` after they are standing there. Once per
+	arrival of the beat; a buyer already standing when the face comes up (a rejoin) is not watched,
+	since there is no walk to see. Stopped early by `_hide` and by the next state. ]]
+function TutorialController._stepLook(self, step)
+	local cfg = TutorialConfig.Look
+	if not cfg.Enabled or self._looked == step.Id then
+		return
+	end
+	local face = self:_face(step)
+	if not (face and face.Look) then
+		return
+	end
+	local head = self:_buyer()
+	local model = head and head.Parent
+	if not (head and model) then
+		return
+	end
+	self._looked = step.Id
+	if model:GetAttribute(BUYER_ARRIVED) == true then
+		return
+	end
+	local stoodAt: number? = nil
+	self:_stopLook()
+	self._lookStop = CameraFacing.watch(function(): Vector3?
+		if not (head.Parent and model.Parent) then
+			return nil
+		end
+		if model:GetAttribute(BUYER_ARRIVED) == true then
+			stoodAt = stoodAt or os.clock()
+			if os.clock() - stoodAt >= cfg.Linger then
+				return nil
+			end
+		end
+		return head.Position
+	end, cfg)
+end
+
+--- Hand the camera back if `_stepLook` has it. Idempotent.
+function TutorialController._stopLook(self)
+	local stop = self._lookStop
+	self._lookStop = nil
+	if stop then
+		stop()
+	end
+end
+
+--[[ A face with `Guide` (SELL's, once the buyer is on the lot): the green guide line from the player
+	to the buyer, from the moment they are standing at the car (their See Offer prompt only exists
+	from then, `CustomerService` adds it on arrival) until the card goes. `GuideTrailController` draws
+	it; `GuideTrailConfig.Person` has its numbers. Asked every frame, and a buyer sent away and
+	replaced is simply pointed at again. ]]
+function TutorialController._stepGuide(self, step)
+	local face = self:_face(step)
+	local head = if face and face.Guide then self:_buyer() else nil
+	local model = head and head.Parent
+	local root = model and model:FindFirstChild("HumanoidRootPart")
+	local standing = model ~= nil and model:GetAttribute(BUYER_ARRIVED) == true
+	self:_pointGuide(if standing and root and root:IsA("BasePart") then root else nil)
+end
+
+--- Hand `part` to the guide line, or nil to take it back. Only tells it when the answer moved.
+function TutorialController._pointGuide(self, part: BasePart?)
+	if part == self._guided then
+		return
+	end
+	self._guided = part
+	local guide = Shard.get("GuideTrailController")
+	if guide then
+		guide:pointAt(part)
+	end
+end
+
 --- The getaway truck, when there is one on the road. nil at every other moment, including while one
 --- is armed but not yet spawned — see `GetawayController.getTruck`.
 function TutorialController._truck(self): BasePart?
@@ -1837,6 +1938,13 @@ function TutorialController._sync(self)
 		if pending then
 			pending()
 		end
+		--- ...and a `Celebrate` beat's confetti, once, on the card's first moment on screen.
+		if self._celebrate and self._celebrate == self._token and self._step and self._step.Celebrate then
+			self._celebrate = nil
+			GameplayFeedback.play("TutorialComplete")
+			self:_punch(self._titleScale, 1.12)
+			self:_confetti()
+		end
 	else
 		self:_hide()
 	end
@@ -1897,6 +2005,10 @@ function TutorialController._hide(self)
 		ship. Both of these are idempotent, so calling them on every hide costs nothing. ]]
 	self:_freeze(false)
 	self:_setGate(nil)
+	--- ...and the camera, which the buyer's walk-in may have (`_stepLook`): the offer screen opening
+	--- over it is the end of that walk. The guide line to them goes with it (`_stepGuide`).
+	self:_stopLook()
+	self:_pointGuide(nil)
 
 	last.Completed:Once(function()
 		-- Fenced on the token: nothing should be switched off by the tail of a card that has already
@@ -2358,6 +2470,21 @@ function TutorialController._place(self, box: GuiObject?)
 
 	local x, y = restX, restY
 	if box then
+		--[[ WAIT FOR THE BOX TO SETTLE (2026-10-20: the card "goes to the right side, goes to the
+			bottom and kinda clips back up" as the WORLDS page opened and closed). A page scales open
+			over a quarter of a second, and scoring every frame of that against a box that keeps
+			growing picked a different winner almost every frame. So a NEW box holds the card where it
+			is for `PLACE_SETTLE` seconds, past the page's opening. By the box changing only, never its
+			size: the PLAY button pulses for ever while it is the target (the beckon), and a size test
+			never settled, which left the finish card stuck off its spot above PLAY. ]]
+		local now = os.clock()
+		if box ~= self._settleBox then
+			self._settleBox, self._settleSince = box, now
+			return
+		end
+		if now - self._settleSince < PLACE_SETTLE then
+			return
+		end
 		local at = box.AbsolutePosition - origin
 		local boxSize = box.AbsoluteSize
 		--[[ Clear the ARROW as well as the box. It is drawn in this gui rather than parented to the
@@ -2400,20 +2527,36 @@ function TutorialController._place(self, box: GuiObject?)
 
 		local rects = self:_obstacles(box)
 		local best = math.huge
+		--- ...and STAY PUT while the spot it is in is still clean, rather than hopping to an earlier one.
+		local kept = self._placeSpot
+		if kept and box == self._placeSpotBox and covered(kept.X, kept.Y, size, rects) <= 0 then
+			best, x, y = 0, kept.X, kept.Y
+		end
 		for _, candidate in candidates do
+			if best <= 0 then
+				break
+			end
 			local tryX = math.clamp(candidate[1], margin, maxX)
 			local tryY = math.clamp(candidate[2], guard, maxY)
 			local score = covered(tryX, tryY, size, rects)
 			if score < best then
 				best, x, y = score, tryX, tryY
-				if score <= 0 then
-					break
-				end
 			end
 		end
+		self._placeSpot, self._placeSpotBox = Vector2.new(x, y), box
 	end
 
-	self._card.Position = UDim2.fromOffset(math.round(x), math.round(y))
+	--- Glides to the spot rather than teleporting (`PLACE_GLIDE` of the way per frame). Only by a box,
+	--- which the per-frame loop re-places; the resting corner is placed once, so it snaps, and so does
+	--- a card within a couple of pixels, so a resting card is exactly on its pixel.
+	local current = self._card.Position
+	local fromX, fromY = current.X.Offset, current.Y.Offset
+	local dx, dy = x - fromX, y - fromY
+	if not box or math.abs(dx) + math.abs(dy) < 2 then
+		self._card.Position = UDim2.fromOffset(math.round(x), math.round(y))
+	else
+		self._card.Position = UDim2.fromOffset(math.round(fromX + dx * PLACE_GLIDE), math.round(fromY + dy * PLACE_GLIDE))
+	end
 end
 
 function TutorialController._clearArrow(self)
@@ -2608,7 +2751,7 @@ function TutorialController._chip(self, part: BasePart, above: boolean?, overSig
 		glow.Adornee = model
 		glow.FillColor = BUYER_GLOW
 		glow.OutlineColor = BUYER_GLOW
-		glow.FillTransparency = 0.8
+		glow.FillTransparency = BUYER_GLOW_FILL[1]
 		glow.OutlineTransparency = 0
 		glow.DepthMode = Enum.HighlightDepthMode.Occluded
 		glow.Parent = model
@@ -2796,6 +2939,13 @@ function TutorialController._ensureLoop(self)
 				found at, so a hover the component is running underneath this still shows. ]]
 			local phase = (math.sin(elapsed * math.pi * 2 / TutorialConfig.Pulse.Period) + 1) * 0.5
 			pulse.Scale = (self._pulseBase or 1) * (1 + (TutorialConfig.Pulse.Scale - 1) * phase)
+		end
+
+		--- The buyer's outline breathes on the same clock. See `BUYER_GLOW_FILL`.
+		local glow = self._chipGlow
+		if glow and glow.Parent then
+			local phase = (math.sin(elapsed * math.pi * 2 / TutorialConfig.Pulse.Period) + 1) * 0.5
+			glow.FillTransparency = BUYER_GLOW_FILL[1] + (BUYER_GLOW_FILL[2] - BUYER_GLOW_FILL[1]) * phase
 		end
 
 		local chip = self._chip_
@@ -3141,6 +3291,12 @@ function TutorialController._armBeat(self, step)
 	--- whether that minimum has been passed. See `_watchFreeze`.
 	self._airNear = nil
 	self._airHold = false
+	--- SELL's once-per-arrival latches (`_stepWatched`, `_stepLook`), any camera turn still going,
+	--- and the guide line to its buyer (`_stepGuide`).
+	self._pinged = nil
+	self._looked = nil
+	self:_stopLook()
+	self:_pointGuide(nil)
 
 	--[[ A beat needs watching if this client has to CLOSE it or has to FREEZE for it, and those are
 		not the same set. AIRBORNE is closed by the server (the steal is ratified there) and still
@@ -3192,6 +3348,11 @@ function TutorialController._watchBeat(self, dt: number)
 	if self:_face(step) ~= self._drawnFace then
 		self:_refresh()
 	end
+	--- SELL's jobs on this side (2026-10-19): say when its card is up, turn to its buyer, and draw
+	--- the line to them once they stand.
+	self:_stepWatched(step)
+	self:_stepLook(step)
+	self:_stepGuide(step)
 
 	local grace = step.Grace or 0
 	if self._beatTime < grace then
@@ -3503,6 +3664,18 @@ function TutorialController._onState(self, state)
 		was a card to stamp, on its own when there was not; a skip has no `completed` and takes the
 		card straight down. ]]
 	if not step then
+		--[[ A last beat that already celebrated as it landed (`Celebrate`: AGAIN, since 2026-10-19)
+			ends quietly. It is finished by entering a race, so the card has said its last word and
+			the road is the send-off; a finish card here would wait out the whole run and pop up
+			after it. ]]
+		local last = state.completed and TutorialConfig.stepOf(state.completed)
+		if state.finished and last and last.Celebrate then
+			self._step = nil
+			self._celebrate = nil
+			self:_clearPointer()
+			self:_hide()
+			return
+		end
 		if state.completed and state.finished then
 			-- 2026-10-12: Completion outlives its objective. Modal-close syncs after Decline must
 			-- still allow this card once finish() clears _step, until its own hold ends.
@@ -3572,6 +3745,9 @@ function TutorialController._onState(self, state)
 			return
 		end
 		self._step = step
+		--- A `Celebrate` beat reached by finishing the one before it plays the confetti the first time
+		--- its card is actually on screen (`_sync`), which is after the offer screen has gone.
+		self._celebrate = if step.Celebrate and state.completed then token else nil
 		self:_armBeat(step)
 		self:_paint(step)
 		self:_sync()
@@ -3724,6 +3900,8 @@ TutorialController:withRemoteEvents({
 	"TutorialSkip",
 	"TutorialReady",
 	"TutorialBeat",
+	--- A `Watched` beat's card is up with nothing over it. See `_stepWatched`.
+	"TutorialWatching",
 })
 
 TutorialController:withLifecycle({
@@ -3769,6 +3947,14 @@ TutorialController:withLifecycle({
 		self._beatTime = 0
 		self._holdTime = 0
 		self._steerSeen = {}
+		--- SELL's latches and the camera turn's stop (`_stepWatched`, `_stepLook`), and the token of a
+		--- `Celebrate` beat whose confetti is still to play (`_sync`).
+		self._pinged = nil
+		self._looked = nil
+		self._lookStop = nil :: (() -> ())?
+		--- The buyer's root the guide line is on, or nil. See `_stepGuide`.
+		self._guided = nil :: BasePart?
+		self._celebrate = nil :: number?
 	end,
 
 	start = function(self)
@@ -3859,6 +4045,8 @@ TutorialController:withCleanup(function()
 	TutorialController:_freeze(false)
 	TutorialController:_setGate(nil)
 	TutorialController:_disarmBeat()
+	TutorialController:_stopLook()
+	TutorialController:_pointGuide(nil)
 end)
 
 return TutorialController

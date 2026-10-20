@@ -82,12 +82,35 @@ BuyerConfig.CheckSeconds = 2
 	`Band` is a `Bands` key. "Good" (1.05 to 1.2x value) so that accepting beats the sell lot without
 	the first sale setting an expectation the market rarely meets. Leaf may want "Great".
 
+	=== SENT WHEN THEY ARE WATCHING, AND THE ONLY ONE THERE — 2026-10-19 ======================
+
+	The first car now parks itself at the bank (`TutorialConfig.AutoPark`), so `Beat` starts while
+	the player is still on the road, and a buyer sent `Delay` after that had walked in and stood
+	before they were home. Now the clock starts when the player's client says the beat's card is up
+	with nothing over it (`TutorialService.watchingSince`): home, past the results screen and any NEW
+	BEST stage. `Fallback` seconds after they are home the buyer is sent anyway, for a client that
+	never says so. `Delay` went from 3 to 1.5 at the same time (Aleafo: the first buyer should come
+	faster).
+
+	  `SoleNpc`        no tipping customers on a player's lot until `Beat` is answered
+	                   (`CustomerService._wantedFloor`), so the buyer is the one person who walks up.
+	  `OpenOnArrival`  the offer screen opens by itself `OpenDelay` seconds after the buyer reaches
+	                   the car, so the sign is seen first and nobody has to find the prompt. OFF
+	                   since the same day: the tutorial draws the guide line to the buyer instead and
+	                   the player opens the offer at their prompt (`TutorialConfig` SELL, `Guide`).
+
 	`Enabled = false`: the tutorial gets no buyer of its own and random arrivals run as normal. ]]
 BuyerConfig.Tutorial = {
 	Enabled = true,
 	Beat = "sell",
-	Delay = 3,
+	Delay = 1.5,
+	--- Long enough to sit out a NEW BEST stage nobody has clicked through yet (the buyer would walk
+	--- in unseen behind it); the client's ping is what normally sends them.
+	Fallback = 30,
 	Band = "Good",
+	SoleNpc = true,
+	OpenOnArrival = false,
+	OpenDelay = 1.2,
 }
 
 -- === What they offer ========================================================

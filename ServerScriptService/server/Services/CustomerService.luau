@@ -79,6 +79,8 @@ local Trove = require(ReplicatedStorage.Packages.Trove)
 local BuyerConfig = require(ReplicatedStorage.shared.Configs.BuyerConfig)
 local CustomerConfig = require(ReplicatedStorage.shared.Configs.CustomerConfig)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
+--- For `_heldForTutorial`: which beat a player is on. Requires only configs, so it cannot cycle.
+local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local PlotConfig = require(ReplicatedStorage.shared.Configs.PlotConfig)
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local CrowdCollision = require(ReplicatedStorage.shared.Modules.CrowdCollision)
@@ -1621,6 +1623,21 @@ end
 
 -- === The crowd ==============================================================
 
+--[[ Is this player's lot kept empty of customers for the tutorial? Yes from their first beat until
+	they answer the tutorial buyer (`BuyerConfig.Tutorial.Beat`), so the one person who walks up to
+	their first car is the buyer (Dylan: "we just have one npc come up and that is the offer npc").
+	Customers come back with the beat after it. A customer already on the lot is left to finish their
+	visit; this only stops new ones. Off the step attribute, so no service dependency. ]]
+function CustomerService._heldForTutorial(self, player: Player?): boolean
+	local tutorial = BuyerConfig.Tutorial
+	if not (player and tutorial.Enabled and tutorial.SoleNpc and TutorialConfig.isOn()) then
+		return false
+	end
+	local index = TutorialConfig.indexOf(player:GetAttribute(TutorialConfig.StepAttribute))
+	local until_ = TutorialConfig.indexOf(tutorial.Beat)
+	return index ~= nil and until_ ~= nil and index <= until_
+end
+
 --[[ How many customers this lot should have right now.
 
 	NONE UNTIL THERE IS SOMETHING TO LOOK AT. A lot with no cars gets no customers, which is
@@ -1633,10 +1650,14 @@ end
 	two taking turns at the same podium.
 
 	Zero while the profile is still loading: everything below is derived from it, and a crowd built
-	against an empty profile would be a crowd built against an empty lot. ]]
+	against an empty profile would be a crowd built against an empty lot.
+
+	ZERO THROUGH THE TUTORIAL'S OFFER, too (`BuyerConfig.Tutorial.SoleNpc`, 2026-10-19): see
+	`_heldForTutorial`. ]]
 function CustomerService._wantedFloor(self, crowd: Crowd, floor: number): number
  local Garage = Shard.get("GarageService")
  if not Garage or not Garage:isProfileReady(crowd.player) then return 0 end
+ if self:_heldForTutorial(crowd.player) then return 0 end
  local occupied = 0
  for _, entry in self:_occupied(crowd) do
   if CustomerConfig.floorForBay(entry.bay.index) == floor then occupied += 1 end

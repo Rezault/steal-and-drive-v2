@@ -84,6 +84,15 @@ DailyRewardConfig.StateEvent = "DailyRewardState"
 	button opens it. ]]
 DailyRewardConfig.AutoOpen = { Enabled = true, Delay = 3, MaxWait = 30 }
 
+--[[ ...AND AFTER THE FIRST RUN PAST THE TUTORIAL (2026-10-19: "most players wouldn't even know it's
+	there"). The open above never fires for a first-timer, who is in the tutorial all of their first
+	visit. So the run the tutorial's last beat sends them on (AGAIN, finished by entering it) ends with
+	this screen, `Delay` seconds after they are home with no other screen up, waiting up to `MaxWait`
+	for the results and any NEW BEST stage to clear. Once a session, claimable or not: the lesson is
+	that the screen exists, and a countdown to the next day teaches that too.
+	`Enabled = false`: a first-timer finds it on the topbar or on their next visit. ]]
+DailyRewardConfig.AfterTutorialRun = { Enabled = true, Delay = 1.5, MaxWait = 60 }
+
 --- The topbar button: TopbarPlus order (after Settings 2 and Shop 3) and its caption.
 --- `Icon`: the topbar button's glyph; nil is the shop's bare gift (`UIAssets.GiftGlyph`). It was
 --- 112124572844666 for a day (2026-10-14, the owner's pick) and is the gift again since 2026-10-15,

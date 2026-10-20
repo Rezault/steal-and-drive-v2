@@ -49,6 +49,8 @@ local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 --- For one flag: the dead-prompt trace (`GarageConfig.Picker.DebugPrompts`).
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
+--- Which tutorial beat this player is on, for the beats that quiet the podiums (`QuietBays`).
+local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 
 local PAGE_NAME = "Dealership"
 
@@ -214,15 +216,30 @@ DealershipController:withLifecycle({
 			nothing is the worse experience. Local only: `Enabled` written here never replicates, and
 			the server never writes it after it makes the prompt. ]]
 		local picker = GarageConfig.Picker
+		local player = Players.LocalPlayer
+		--[[ ...AND THIS PLAYER'S OWN, WHILE A TUTORIAL BEAT SAYS `QuietBays` (2026-10-19). SELL's buyer
+			stands beside the parked car, and walking up to them the car's own Pick Up (16 studs) showed
+			before their See Offer (12): one E there lifted the car and withdrew the offer. Put back as
+			the beat moves on. Same local-only write as above, so the server's copy is untouched. ]]
+		local function quiet(): boolean
+			local index = TutorialConfig.indexOf(player:GetAttribute(TutorialConfig.StepAttribute))
+			local step = index and TutorialConfig.Steps[index]
+			return step ~= nil and step.QuietBays == true
+		end
 		local function claim(prompt: Instance)
-			if prompt:IsA("ProximityPrompt") and prompt:GetAttribute(picker.OwnerAttribute) ~= Players.LocalPlayer.UserId then
-				prompt.Enabled = false
+			if prompt:IsA("ProximityPrompt") then
+				prompt.Enabled = prompt:GetAttribute(picker.OwnerAttribute) == player.UserId and not quiet()
 			end
 		end
 		for _, prompt in CollectionService:GetTagged(picker.PromptTag) do
 			claim(prompt)
 		end
 		CollectionService:GetInstanceAddedSignal(picker.PromptTag):Connect(claim)
+		player:GetAttributeChangedSignal(TutorialConfig.StepAttribute):Connect(function()
+			for _, prompt in CollectionService:GetTagged(picker.PromptTag) do
+				claim(prompt)
+			end
+		end)
 
 		--[[ EVERY PODIUM PRESS, with where this client has the character (2026-09-30). Not a
 			diagnostic: the server needs the client's side of a press its frozen copy never received,

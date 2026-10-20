@@ -133,6 +133,20 @@ InterfaceConfig.RestoreIcon = {
 	Order = 0,
 }
 
+--[[ THE FEEDBACK BUTTON (2026-10-20, Aleafo: "add a feedback button with the roblox API thing on the
+	hotbar"). A one-click label on the topbar, lobby only like the other doors, that opens Roblox's own
+	feedback prompt (`SocialService:PromptFeedbackSubmissionAsync`). Roblox draws the whole thing and
+	decides who may send (it says so itself for an owner, or a player inside its cooldown), so this file
+	only asks. IT DOES NOTHING IN STUDIO: the prompt only works in a published game played in the app.
+	`Enabled = false`: no button. ]]
+InterfaceConfig.FeedbackIcon = {
+	Enabled = true,
+	Name = "Feedback",
+	Order = 6,
+	Label = "Feedback",
+	Caption = "Tell us what you think",
+}
+
 --[[ The keyboard's way back. H for hide, which is the one this kind of control is always on, and
 	free in this game: every other letter binding is taken (`E` to mount, `S`, `Q`, `W`, `N`, `O`).
 

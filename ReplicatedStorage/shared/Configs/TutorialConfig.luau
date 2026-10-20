@@ -255,6 +255,11 @@ TutorialConfig.NitroHint = {
 	    Staged    the director deals this beat's road, and the damage floor is on; see `Rig.Stage`
 	    Arrived   a second face, shown once the thing the beat is waiting for turns up; see `bank`
 	    Meter     the live feedback hung under the card, and what closes some beats; see `Meters`
+	    Watched   the client tells the server once this beat's card is up with nothing over it; see `sell`
+	    Look      on a face: turn the camera toward this beat's buyer as they walk in; see `Look`
+	    Guide     on a face: the green guide line runs to this beat's buyer once they stand; see `sell`
+	    QuietBays this player's own podium prompts are off while the beat is live; see `sell`
+	    Celebrate the finish card's confetti plays as this beat lands, and finishing it is quiet; see `again`
 
 	`Advance.Kind` is two words:
 
@@ -783,7 +788,20 @@ TutorialConfig.Steps = {
 
 		The bank carries again (`CarryConfig.Sources.Bank`, and that file's last header block for the
 		hotbar that came with it), so a first-timer comes home holding the car and the beat is back to
-		teaching the drop, glow and all. The pointer and the advance never changed. ]]
+		teaching the drop, glow and all. The pointer and the advance never changed.
+
+		=== IT PARKS ITSELF NOW — 2026-10-19 ======================================================
+
+		The biggest drop in the game: of the players who banked their first car, about 29% left before
+		putting it on a bay, and neither look of the guide trail moved that (Gamebeast experiment 65).
+		Dylan: "make them auto park the car in the bay if the bay is empty". So while this beat is live
+		a car landing in the hands goes straight onto the lowest empty showroom bay
+		(`TutorialConfig.AutoPark`, `TutorialService._autoPark`), before the player is even home, and
+		the beat completes off the same `CarParked` it always waited for.
+
+		IT STAYS IN THE LIST, and keeps funnel stage 9, so the funnel reads the same before and after
+		the change (it should now read close to 100%). With no empty showroom bay (a Replay on a full
+		lot) the car stays in the hands and this beat teaches the drop exactly as before. ]]
 	{
 		Id = "place",
 		Funnel = 9,
@@ -874,21 +892,100 @@ TutorialConfig.Steps = {
 		that ACCEPT is the easy call, but a player who would rather keep their only car has still
 		learnt what a buyer is. `BuyerService.OfferAnswered` fires for both.
 
+		=== ONE NPC, AND THEY ARE MADE TO WATCH IT — 2026-10-19 ===================================
+
+		Dylan: "we just have one npc come up and that is the offer npc ... we grab their attention to
+		watch the npc give an offer". Four things changed, all for this beat only:
+
+		  • NOBODY ELSE ON THE LOT. Tipping customers are held off until this beat is answered
+		    (`BuyerConfig.Tutorial.SoleNpc`, `CustomerService._wantedFloor`), so the one person who
+		    walks up is the buyer. They come back with the next beat.
+		  • THE BUYER WAITS FOR THEM TO BE WATCHING. The car now parks itself at the bank, so this beat
+		    starts while the player is still on the road; the buyer used to arrive before they were
+		    home. Now the client says when this card is up with nothing over it (`Watched`: no results
+		    screen, no NEW BEST stage) and the buyer is sent `BuyerConfig.Tutorial.Delay` after that.
+		  • THE CAMERA TURNS TO THEM (`Look` on the face, `TutorialConfig.Look`) while they walk in.
+		  • THE PLAYER GOES TO THEM. Once the buyer is standing at the car the green guide line runs
+		    from the player to them (`Guide` on the face, `GuideTrailConfig.Person`) and their gold
+		    outline breathes, so the See Offer prompt is found rather than hunted for. The offer
+		    opened by itself for one build (`BuyerConfig.Tutorial.OpenOnArrival`, now off); Dylan:
+		    "it guides you with classic guide arrow to the offer maybe can highlight the npc so they
+		    open the offer". Opening it themselves is the lesson: every later buyer works that way.
+		  • THE BAYS GO QUIET (`QuietBays`, `DealershipController`). The buyer stands beside the car,
+		    and on the way to them the car's Pick Up prompt (16 studs) came up before See Offer (12);
+		    one E lifted the car and withdrew the offer. Every podium prompt on their lot is off until
+		    the offer is answered.
+
 		With buyers switched off this beat is out of the list, and COLLECT is the last beat. ]]
 	{
 		Id = "sell",
 		Funnel = 10,
 		Only = BuyerConfig.Enabled,
-		Title = "CUSTOMERS ARE COMING",
-		Hint = "Parked cars earn tips. Selling removes the car from your showroom",
+		--- Was "CUSTOMERS ARE COMING" / "Parked cars earn tips. Selling removes the car from your
+		--- showroom", when the player had just parked it themselves and customers were walking in.
+		Title = "YOUR CAR IS PARKED",
+		Hint = "A buyer is on the way with an offer for it",
 		Where = "Lobby",
 		Advance = { Kind = "Signal", Service = "BuyerService", Signal = "OfferAnswered" },
+		Watched = true,
+		QuietBays = true,
 		--- The face once this player's buyer is on the lot. See `TutorialController._arrived`.
 		ArrivedWhen = "Buyer",
 		Arrived = {
 			Title = "YOUR FIRST OFFER",
-			Hint = "Decline to keep earning tips, or accept to sell your car",
+			--- Was "Decline to keep earning tips, or accept to sell your car", while the offer opened
+			--- by itself. Now the player has to go to the buyer, so the card says that.
+			Hint = "Walk over to the buyer to see their offer",
 			Target = { Kind = "World", What = "Buyer", OverSign = true, Follow = true },
+			Look = true,
+			Guide = true,
+		},
+	},
+
+	--[[ ---------------------------------------------------------------- 11. AGAIN
+
+		The offer is answered and the lessons are over: now the second run. Added 2026-10-19 (Dylan:
+		"lets continue to hand hold them a little bit more into the next race, then add a funnel step
+		... that starts their second race").
+
+		THE FINISH CARD MOVED HERE. It used to come up as SELL closed and send the player off alone,
+		with Play beckoning (`RaceConfig.PlayBeckon`). Now the confetti and TUTORIAL COMPLETE! come up
+		as this beat lands (`Celebrate`), and the card stays up with the arrow on PLAY, through the
+		WORLDS and SELECT CAR screens exactly as the first run's PLAY beat goes, with every other
+		button gated. Entering a race finishes it, and with it the tutorial, quietly: the card has
+		already said its last word, and the road is the send-off.
+
+		TWO FUNNEL STAGES. Reaching this beat is stage 11 (the offer answered). Starting the race is
+		stage 12, reported as the tutorial finishes (`TutorialConfig.FinishFunnel`), because a funnel
+		counts arrivals and nothing arrives after the last beat. ]]
+	{
+		Id = "again",
+		Funnel = 11,
+		Title = "TUTORIAL COMPLETE!",
+		Hint = "Now hit PLAY and steal a better car",
+		Where = "Lobby",
+		Advance = { Kind = "Signal", Service = "RaceService", Signal = "RaceEntered" },
+		Celebrate = true,
+		--- The PLAY beat's gate, for its reason: there is one thing to do. See `play`.
+		Gate = "Input",
+		--- The PLAY beat's chain, with its per-screen hints. See `play` for why each link has one.
+		Target = {
+			Kind = "Hud",
+			Path = { "Play" },
+			Then = {
+				Kind = "Page",
+				Page = "Teleport",
+				Path = { "Cards", "Viewport", "Track", "Card1", "TeleportButton" },
+				PathV2 = TutorialConfig.TeleportPathV2,
+				Hint = "Pick a world. CITY is the one you have",
+				Then = {
+					Kind = "Page",
+					Page = "StartCar",
+					Path = { "Cards", "List", "Starter" },
+					PathV2 = TutorialConfig.StartCarPathV2,
+					Hint = "Take your car out",
+				},
+			},
 		},
 	},
 }
@@ -904,6 +1001,56 @@ do
 	end
 	TutorialConfig.Steps = served
 end
+
+--[[ THE FIRST CAR PARKS ITSELF (2026-10-19). While `Beat` is a player's live beat, a car landing in
+	their hands is put on the lowest empty showroom bay by `TutorialService._autoPark`. See the PLACE
+	beat for why. Only an EMPTY bay: a full lot keeps the car in the hands and the beat teaches the
+	drop. `Enabled = false`: PLACE is the player's to do, as it was.
+
+	`After` is the seconds between the car landing in the hands and the park. Never 0 and never a
+	`task.defer`: inside one frame the FirstCarCarried and FirstCarPlaced markers (and BANK done and
+	PLACE done) get the same millisecond stamp, and Gamebeast funnels cannot order a tie, so the
+	onboarding board would show nobody parking. The bank happens out on the road, so nobody sees it. ]]
+TutorialConfig.AutoPark = {
+	Enabled = true,
+	Beat = "place",
+	After = 0.1,
+}
+
+--[[ THE CAMERA TURNS TO THE BUYER (2026-10-19), on a face carrying `Look = true` (SELL's, once the
+	buyer is on the lot): the stock camera swings round behind the player to face the buyer as they
+	walk in, and keeps facing them until they have stood at the car for `Linger` seconds. Only a buyer
+	still walking is watched; one already standing (a rejoin) is just pointed at. `Modules/CameraFacing`
+	does the turning, the same way it turns the camera behind the player after a run.
+
+	`PitchDeg` is how far the shot looks down. Steeper than the line to the buyer on purpose: it puts
+	them above the player's head on screen rather than behind it. `Rate` is how fast the swing closes
+	the gap, per second (the gap shrinks by about 1 - e^-Rate each second). `MinStuds`: closer than
+	this there is nothing to turn toward. `MaxSeconds` is the backstop for a buyer who never arrives.
+	The player cannot turn the camera while it runs, which is why it is short.
+
+	`Enabled = false`: the chip and the gold outline are the only pointer, as before. ]]
+TutorialConfig.Look = {
+	Enabled = true,
+	PitchDeg = 22,
+	Rate = 3,
+	Linger = 0.8,
+	MinStuds = 6,
+	MaxSeconds = 10,
+	--- 2026-10-20: any move or camera turn of the player's ends the turn at once (`CameraFacing.watch`);
+	--- walking is camera-relative, so turning the camera under a moving player bent their path.
+	StopOnInput = true,
+}
+
+--[[ THE STAGE AFTER THE LAST BEAT (2026-10-19). Roblox's onboarding funnel counts players REACHING a
+	stage (`TutorialService._funnel`), so finishing the last beat has no stage of its own unless one is
+	reported for it. The last beat is AGAIN, which a race entry finishes, so this stage reads "started
+	their second race". Reported once, by `TutorialService._advance`, with the same per-session guard
+	as every other stage. `Stage = nil`: nothing after the last beat. ]]
+TutorialConfig.FinishFunnel = {
+	Stage = 12,
+	Id = "race2",
+}
 
 --[[ WHERE AN OLD PROFILE'S BEAT LANDS. This file used to hold five steps — play, steal, bank,
 	collect, upgrade — and the rewrite renamed two of them and retired one. Every save written by

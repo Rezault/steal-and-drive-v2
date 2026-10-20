@@ -111,23 +111,66 @@ function DailyRewardController._autoOpen(self)
 		return
 	end
 	task.wait(cfg.Delay)
+	self:_openWhenFree(cfg.MaxWait)
+end
+
+--[[ Open the page the first second nothing else is in the way: no run, no tutorial, no page, no modal
+	and no NEW BEST stage. Up to `maxWait` seconds, then quietly not at all. Only with a claim. ]]
+function DailyRewardController._openWhenFree(self, maxWait: number, anyway: boolean?)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
-	local deadline = os.clock() + cfg.MaxWait
+	local deadline = os.clock() + maxWait
+	local why = "never free"
 	while os.clock() < deadline do
 		local step = player:GetAttribute(TutorialConfig.StepAttribute)
 		local inTutorial = type(step) == "string" and step ~= ""
 		local UIController = Shard.get("UIController")
 		local pageOpen = UIController and UIController.currentPage ~= nil
 		local modal = playerGui:GetAttribute(GamepadConfig.ModalAttribute) == true
-		if not (self._racing or inTutorial or pageOpen or modal) then
-			if self._state and self._state.claimable then
+		local showcase = Shard.get("ShowcaseController")
+		local staged = showcase ~= nil and showcase:busy()
+		if not (self._racing or inTutorial or pageOpen or modal or staged) then
+			if self._state and (anyway or self._state.claimable) then
 				self:open()
 			end
 			return
 		end
+		why = if self._racing then "racing"
+			elseif inTutorial then "in the tutorial"
+			elseif pageOpen then "page " .. tostring(UIController.currentPage)
+			elseif modal then "a modal"
+			else "the NEW BEST stage"
 		task.wait(1)
 	end
+	if anyway then
+		self.log:info("Daily rewards did not open after the tutorial run: " .. why)
+	end
+end
+
+--[[ `DailyRewardConfig.AfterTutorialRun`: the tutorial ended this session (its step attribute went
+	from a beat to nothing), so the run it ended on is the one that brings this screen up. ]]
+function DailyRewardController._onTutorialStep(self)
+	local step = Players.LocalPlayer:GetAttribute(TutorialConfig.StepAttribute)
+	local inTutorial = type(step) == "string" and step ~= ""
+	if self._sawTutorial and not inTutorial and not self._afterTutorialDone then
+		self._afterTutorialArmed = true
+	end
+	self._sawTutorial = inTutorial
+end
+
+function DailyRewardController._afterRun(self)
+	local cfg = DailyRewardConfig.AfterTutorialRun
+	if not (cfg.Enabled and self._afterTutorialArmed) then
+		return
+	end
+	self._afterTutorialArmed = false
+	self._afterTutorialDone = true
+	self._autoOpened = true -- this is the session's one open
+	task.spawn(function()
+		task.wait(cfg.Delay)
+		--- Even with nothing to claim: the point is that they learn the screen exists.
+		self:_openWhenFree(cfg.MaxWait, true)
+	end)
 end
 
 DailyRewardController:withRemoteEvents({
@@ -140,6 +183,7 @@ DailyRewardController:withRemoteEvents({
 		end,
 		RaceEnd = function()
 			DailyRewardController._racing = false
+			DailyRewardController:_afterRun()
 		end,
 	},
 	REMOTES.Claim,
@@ -152,6 +196,18 @@ DailyRewardController:withLifecycle({
 		self._autoOpened = false
 		self._racing = false
 		self._armedFor = nil :: number?
+		--- `AfterTutorialRun`: seen in the tutorial this session, armed once it ends, done once shown.
+		self._sawTutorial = false
+		self._afterTutorialArmed = false
+		self._afterTutorialDone = false
+	end,
+
+	start = function(self)
+		local player = Players.LocalPlayer
+		player:GetAttributeChangedSignal(TutorialConfig.StepAttribute):Connect(function()
+			self:_onTutorialStep()
+		end)
+		self:_onTutorialStep()
 	end,
 })
 

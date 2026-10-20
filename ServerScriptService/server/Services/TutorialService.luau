@@ -125,6 +125,12 @@ TutorialService:withRemoteEvents({
 		TutorialSkip = function(player: Player)
 			TutorialService:_onSkip(player)
 		end,
+		--[[ client -> server (stepId): the card for this beat is on screen with nothing over it. Only
+			for a beat marked `Watched`; the SELL beat's buyer waits for it (`watchingSince`). A forged
+			one only brings a player's own buyer a few seconds early. ]]
+		TutorialWatching = function(player: Player, stepId: unknown)
+			TutorialService:_onWatching(player, stepId)
+		end,
 	},
 })
 
@@ -255,9 +261,14 @@ function TutorialService._enter(self, player: Player, index: number, completed: 
 		return
 	end
 	self._live[player] = index
+	self._watchingAt[player] = nil
 	self:_store(player, step.Id, false)
 	self:_funnel(player, step)
 	self:_publish(player, completed, false)
+	--- A player who reaches PLACE already holding the car (a rejoin, a Replay) is parked for too.
+	if TutorialConfig.AutoPark.Enabled and step.Id == TutorialConfig.AutoPark.Beat then
+		task.delay(TutorialConfig.AutoPark.After, self._autoPark, self, player)
+	end
 end
 
 --[[ Tell BOTH funnels that this player has REACHED this stage. See the header on why arrival
@@ -344,10 +355,77 @@ function TutorialService._advance(self, player: Player)
 	self._live[player] = nil
 	self:_store(player, doneId or "", true)
 	self:_publish(player, doneId, true)
+	--- The stage after the last beat, which nothing else would report (`TutorialConfig.FinishFunnel`).
+	local finish = TutorialConfig.FinishFunnel
+	if finish and finish.Stage then
+		self:_funnel(player, { Funnel = finish.Stage, Id = finish.Id })
+	end
 	if Analytics then
 		Analytics:TutorialComplete(player)
 	end
 	self.log:info(string.format("%s finished the tutorial.", player.Name))
+end
+
+--[[ PLACE, done for them (`TutorialConfig.AutoPark`): the car in their hands goes on the lowest empty
+	showroom bay, through `GarageService.placeCarried`, the same call a press at a podium makes, so the
+	park, the `CarParked` this beat advances on and the FirstCar funnel all happen exactly as they do
+	for a player who walked it there.
+
+	DELAYED BY EVERY CALLER, never run inside `CarryChanged`. The bank fires that signal as it puts the
+	car in the hands, and parking inside it would fire the empty-hands `CarryChanged` while later
+	listeners were still to hear the full one, so they would hear the two in the wrong order and build
+	a car in the hands after it had gone.
+
+	AND NOT IN THE SAME FRAME EITHER, which `task.defer` was (`TutorialConfig.AutoPark.After`): Gamebeast
+	stamps markers to the millisecond and cannot order two with the same stamp, so FirstCarCarried and
+	FirstCarPlaced, and BANK done and PLACE done, would each read as nobody making it to the second.
+
+	Nothing happens without an empty showroom bay; the car stays in the hands and the beat is taught
+	the old way. ]]
+function TutorialService._autoPark(self, player: Player)
+	local step = self:_liveStep(player)
+	if not (TutorialConfig.AutoPark.Enabled and step and step.Id == TutorialConfig.AutoPark.Beat) then
+		return
+	end
+	local Garage = Shard.get("GarageService")
+	if not (Garage and Garage:getCarriedCar(player)) then
+		return
+	end
+	local free: number? = nil
+	for _, bay in Garage:getBays(player) do
+		if not Garage:isWorkshopBay(bay.index) and not Garage:getBayCar(player, bay.index)
+			and (not free or bay.index < free) then
+			free = bay.index
+		end
+	end
+	if not free then
+		self.log:info(string.format("%s has no empty showroom bay, so their car stays in their hands.", player.Name))
+		return
+	end
+	local ok, reason = Garage:placeCarried(player, free)
+	self.log:info(string.format("Parked %s's car on bay %d for them: %s.", player.Name, free, if ok then "done" else tostring(reason)))
+end
+
+--[[ The client says the card for `stepId` is up with nothing over it. Kept only for the live beat, and
+	only for one marked `Watched`; cleared whenever the beat changes (`_enter`). ]]
+function TutorialService._onWatching(self, player: Player, stepId: unknown)
+	local step = self:_liveStep(player)
+	if not (step and step.Watched and step.Id == stepId) then
+		return
+	end
+	if not self._watchingAt[player] then
+		self._watchingAt[player] = os.clock()
+	end
+end
+
+--[[ PUBLIC (BuyerService) - since when, by `os.clock()`, this player's client has had the card for
+	`stepId` on screen with nothing over it, or nil if it has not said so on this beat. ]]
+function TutorialService.watchingSince(self, player: Player, stepId: string): number?
+	local step = self:_liveStep(player)
+	if not (step and step.Id == stepId) then
+		return nil
+	end
+	return self._watchingAt[player]
 end
 
 --[[ PUBLIC (RaceService.wreckRace) — the attempt this beat is part of has failed; put the player
@@ -729,6 +807,7 @@ function TutorialService._forget(self, player: Player)
 	self._parkedBay[player] = nil
 	self._sentBay[player] = nil
 	self._funnelled[player] = nil
+	self._watchingAt[player] = nil
 end
 
 --[[ Bring the tutorial up: bind the beats, watch the joins, catch up whoever is already here.
@@ -785,6 +864,13 @@ function TutorialService._boot(self): boolean
 		end
 	end))
 
+	--- A car landing in the hands on PLACE is parked for them, a moment later (`_autoPark` says why).
+	self._trove:Add(Garage:getSignal("CarryChanged"):Connect(function(player: Player, key: string?)
+		if TutorialConfig.AutoPark.Enabled and type(key) == "string" and key ~= "" then
+			task.delay(TutorialConfig.AutoPark.After, self._autoPark, self, player)
+		end
+	end))
+
 	self._trove:Add(Garage:getSignal("ProfileReady"):Connect(function(player: Player)
 		self:_watch(player)
 	end))
@@ -818,6 +904,8 @@ TutorialService:withLifecycle({
 		self._sentBay = {} :: { [Player]: number }
 		--- Which funnel stages this session has already reported, per player. See `_funnel`.
 		self._funnelled = {} :: { [Player]: { [number]: boolean } }
+		--- When the client said the live beat's card was up with nothing over it. See `watchingSince`.
+		self._watchingAt = {} :: { [Player]: number }
 		self._trove = Trove.new()
 	end,
 

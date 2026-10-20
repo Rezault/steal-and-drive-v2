@@ -27,6 +27,11 @@
 	The bay is re-picked on `Interval`; the drawing follows the player every frame, because a line that
 	trails a quarter second behind its owner's feet reads as broken.
 
+	=== OR TO A PERSON, WHEN THE TUTORIAL SAYS SO (2026-10-19) ================================
+
+	`pointAt` takes the line off the bays and on to one part, hands full or not: the tutorial's buyer,
+	once they are standing at the parked car (`GuideTrailConfig.Person`). Always the Classic beam.
+
 	=== THE LOOK IS GAMEBEAST'S, PER PLAYER ====================================================
 
 	Modern against Classic is an A/B (`GuideTrailConfig.Remote` has the setup). `_observeRemote`
@@ -70,7 +75,7 @@ function GuideTrailController._wanted(self): boolean
 	if not GuideTrailConfig.Enabled or self._style == "Off" or self._suspended then
 		return false
 	end
-	if self._preview then
+	if self._preview or (self._person and self._person.Parent) then
 		return true
 	end
 	local player = Players.LocalPlayer
@@ -87,6 +92,10 @@ end
 -- === Which bay ==============================================================
 
 function GuideTrailController._pickDeck(self, here: Vector3): BasePart?
+	--- A person the tutorial named beats every bay. See `pointAt`.
+	if self._person and self._person.Parent then
+		return self._person
+	end
 	local carry = Shard.get("CarryController")
 	if not carry then
 		return nil
@@ -125,19 +134,27 @@ end
 
 -- === Drawing ================================================================
 
---- The look in use, built on first need. Nil while the style is "Off".
+--- Is `part` a person `pointAt` named (now, or the last one, still fading out)?
+function GuideTrailController._isPerson(self, part: BasePart?): boolean
+	return part ~= nil and (part == self._person or part == self._lastPerson)
+end
+
+--- The look in use, built on first need. Nil while the style is "Off". Classic for a person
+--- whatever the style: see `GuideTrailConfig.Person`.
 function GuideTrailController._look(self)
-	if self._renderer and self._rendererStyle == self._style then
+	local person = self._person ~= nil or self:_isPerson(self._lastDeck)
+	local style = if person and self._style ~= "Off" then "Classic" else self._style
+	if self._renderer and self._rendererStyle == style then
 		return self._renderer
 	end
 	if self._renderer then
 		self._renderer:destroy()
 		self._renderer = nil
 	end
-	local look = LOOKS[self._style]
+	local look = LOOKS[style]
 	if look then
 		self._renderer = look.new()
-		self._rendererStyle = self._style
+		self._rendererStyle = style
 	end
 	return self._renderer
 end
@@ -161,7 +178,13 @@ function GuideTrailController._step(self, dt: number)
 			self._deck = self:_pickDeck(root.Position)
 		end
 		deck = self._deck
-		if deck and nearDeck(deck, feet :: Vector3, GuideTrailConfig.ArriveStuds) then
+		if deck and deck == self._person then
+			--- At the person: their prompt is up. Flat, so a buyer on a step is still reached.
+			local gap = deck.Position - root.Position
+			if Vector3.new(gap.X, 0, gap.Z).Magnitude <= GuideTrailConfig.Person.ArriveStuds then
+				deck = nil
+			end
+		elseif deck and nearDeck(deck, feet :: Vector3, GuideTrailConfig.ArriveStuds) then
 			--- Arrived: the prompt is up and the deck is glowing. The bay is kept, so stepping back
 			--- off it brings the same line straight back.
 			deck = nil
@@ -178,7 +201,8 @@ function GuideTrailController._step(self, dt: number)
 	local drawAt = deck or self._lastDeck
 	if look and self._alpha > 0 and root and drawAt and drawAt.Parent and feet then
 		self._lastDeck = drawAt
-		look:draw(root.Position, feet, drawAt, self._alpha, dt)
+		local toPoint = if self:_isPerson(drawAt) then drawAt.Position + Vector3.yAxis * GuideTrailConfig.Person.Lift else nil
+		look:draw(root.Position, feet, drawAt, self._alpha, dt, toPoint)
 	elseif look then
 		look:hide()
 		self._lastDeck = nil
@@ -293,6 +317,20 @@ function GuideTrailController.setPreview(self, on: boolean)
 	self:_apply()
 end
 
+--[[ Public (`TutorialController._stepGuide`): point the line at `part` instead of a bay, or nil to
+	hand it back to the hands. Idempotent, so it may be called every frame. The bay picked before is
+	dropped either way, so the next pick starts clean. ]]
+function GuideTrailController.pointAt(self, part: BasePart?)
+	if part == self._person then
+		return
+	end
+	self._person = part
+	self._lastPerson = part or self._lastPerson
+	self._deck = nil
+	self._sinceCheck = math.huge
+	self:_apply()
+end
+
 GuideTrailController:withRemoteEvents({
 	{
 		--- The race bracket, the same one the glow and the dealership pin use.
@@ -319,6 +357,8 @@ GuideTrailController:withLifecycle({
 		self._sinceCheck = 0
 		self._deck = nil :: BasePart?
 		self._lastDeck = nil :: BasePart?
+		self._person = nil :: BasePart? -- `pointAt`'s part, which wins over every bay while set
+		self._lastPerson = nil :: BasePart? -- the last one, so its fade-out is drawn as a person's
 	end,
 
 	start = function(self)

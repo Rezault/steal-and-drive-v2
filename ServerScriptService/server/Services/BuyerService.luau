@@ -416,24 +416,37 @@ end
 	car moved) leaves no row, and the next pass sends another.
 
 	NO CAR TO SELL PASSES THE BEAT. A player whose only car went back to the inventory or is marked
-	NOT FOR SALE would otherwise wait on this beat for a buyer who can never come. ]]
+	NOT FOR SALE would otherwise wait on this beat for a buyer who can never come.
+
+	NOT UNTIL THEY ARE HOME AND WATCHING (2026-10-19). The beat now starts at the bank, on the road
+	(the car parks itself, `TutorialConfig.AutoPark`), so the clock waits for the trip home to end and
+	then for the client to say the card is up with nothing over it (`TutorialService.watchingSince`).
+	`Fallback` seconds after they are home the buyer comes anyway. ]]
 function BuyerService._tutorialTick(self, player: Player)
 	local tutorial = BuyerConfig.Tutorial
 	if player:GetAttribute(TutorialConfig.StepAttribute) ~= tutorial.Beat then
 		self._tutorialSince[player] = nil
 		return
 	end
+	local Race = Shard.get("RaceService")
+	if Race and (Race:isRacing(player) or Race:isReturning(player)) then
+		self._tutorialSince[player] = nil
+		return
+	end
+	local Tutorial = Shard.get("TutorialService")
+	--- When they were first seen home on the beat; the `Fallback` counts from here.
 	local since = self._tutorialSince[player]
 	if not since then
 		self._tutorialSince[player] = os.clock()
 		return
 	end
-	if os.clock() - since < tutorial.Delay or next(self:_offers(player)) ~= nil then
+	local watching = Tutorial and Tutorial:watchingSince(player, tutorial.Beat)
+	local due = (watching ~= nil and os.clock() - watching >= tutorial.Delay) or os.clock() - since >= tutorial.Fallback
+	if not due or next(self:_offers(player)) ~= nil then
 		return
 	end
 
 	local Garage = Shard.get("GarageService")
-	local Tutorial = Shard.get("TutorialService")
 	--- An unloaded profile has no bays, which would read below as "nothing to sell".
 	if not (Garage and Garage:isProfileReady(player)) then
 		return
@@ -452,6 +465,32 @@ function BuyerService._tutorialTick(self, player: Player)
 	if #self:_candidates(player, {}) == 0 and Tutorial then
 		Tutorial:passBeat(player, tutorial.Beat, why)
 	end
+end
+
+--[[ `BuyerConfig.Tutorial.OpenOnArrival`: the tutorial's buyer has walked up to the car, so open their
+	offer for the player `OpenDelay` later, through `_open`, the same call their prompt makes. Re-checked
+	after the wait: still on the beat, still home, and the offer still standing (`_open` answers "gone"
+	otherwise, which closes nothing that was open). ]]
+function BuyerService._openForTutorial(self, player: Player, carId: string)
+	local tutorial = BuyerConfig.Tutorial
+	if not (tutorial.Enabled and tutorial.OpenOnArrival) then
+		return
+	end
+	if player:GetAttribute(TutorialConfig.StepAttribute) ~= tutorial.Beat then
+		return
+	end
+	task.delay(tutorial.OpenDelay, function()
+		if player.Parent ~= Players or player:GetAttribute(TutorialConfig.StepAttribute) ~= tutorial.Beat then
+			return
+		end
+		local Race = Shard.get("RaceService")
+		if Race and (Race:isRacing(player) or Race:isReturning(player)) then
+			return
+		end
+		if self:_offers(player)[carId] then
+			self:_open(player, carId)
+		end
+	end)
 end
 
 -- === Admin ==================================================================
@@ -613,6 +652,7 @@ BuyerService:withLifecycle({
 			self._trove:Add(Customers:getSignal("BuyerArrived"):Connect(function(player: Player, carId: string, walked: boolean)
 				if walked then
 					self:_startClock(player, carId)
+					self:_openForTutorial(player, carId)
 				end
 			end))
 		end

@@ -79,10 +79,12 @@ function GuideTrailClassic.new()
 end
 
 --[[ Draw the line from a character whose root is at `root` to `deck`, at overall opacity `alpha`.
-	Called every frame while it is up; `hide` takes it down. ]]
-function GuideTrailClassic.draw(self, root: Vector3, _feet: Vector3, deck: BasePart, alpha: number)
+	Called every frame while it is up; `hide` takes it down. `toPoint` replaces the point over the
+	deck when the line is going to a person instead, and brings that line's taller arch with it
+	(`GuideTrailConfig.Person`). ]]
+function GuideTrailClassic.draw(self, root: Vector3, _feet: Vector3, deck: BasePart, alpha: number, _dt: number?, toPoint: Vector3?)
 	local cfg = GuideTrailConfig.Classic
-	local goal = deck.Position + Vector3.yAxis * (deck.Size.Y / 2 + cfg.EndLift)
+	local goal = toPoint or deck.Position + Vector3.yAxis * (deck.Size.Y / 2 + cfg.EndLift)
 
 	local flat = Vector3.new(goal.X - root.X, 0, goal.Z - root.Z)
 	local heading = if flat.Magnitude > 1e-3 then flat.Unit else Vector3.zAxis
@@ -96,7 +98,8 @@ function GuideTrailClassic.draw(self, root: Vector3, _feet: Vector3, deck: BaseP
 	end
 
 	local along = span / length
-	local lift = Vector3.yAxis * (math.min(length * cfg.Arc, cfg.ArcMax) / 0.75)
+	local bend = if toPoint then GuideTrailConfig.Person else cfg
+	local lift = Vector3.yAxis * (math.min(length * bend.Arc, bend.ArcMax) / 0.75)
 	local third = along * (length / 3)
 	local out = third + lift
 	local back = third - lift

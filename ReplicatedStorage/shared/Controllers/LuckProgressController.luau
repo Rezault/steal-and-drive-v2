@@ -129,6 +129,15 @@ function LuckProgressController._show(self, reached: number, top: number)
 	end)
 end
 
+--- Public (PoliceHudController): the card's bottom edge in `AbsolutePosition` space while it is up
+--- (or still fading out), else nil. The heat stars share its corner and slide under it.
+function LuckProgressController.bottom(self): number?
+	if not (self._gui and self._gui.Enabled and self._group.GroupTransparency < 0.95) then
+		return nil
+	end
+	return self._group.AbsolutePosition.Y + self._group.AbsoluteSize.Y
+end
+
 -- Reversing or a revive must not celebrate a tile twice.
 function LuckProgressController._advance(self, tile: number, top: number)
 	if top <= 0 then return end

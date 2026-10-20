@@ -61,6 +61,11 @@ GuideTrailConfig.Style = "Classic"
 	SHIPPING THE WINNER: end the experiment on the dashboard, set `GuideTrail.Style` in "live" to it,
 	and set `Style` above to match. Deleting the losing module is then safe (see the header).
 
+	SHIPPED 2026-10-19: CLASSIC. Neither look moved the PLACE beat, and the tutorial now parks the
+	first car for the player (`TutorialConfig.AutoPark`), so the trail only serves later carries.
+	Dylan: "we can switch over to just classic". Experiment 65 is terminated and "live" says Classic,
+	which matches `Style`. Modern is kept for the admin panel's Look pick; nobody else is served it.
+
 	Studio playtests read Gamebeast's separate "studio" environment, which has no "live", so Studio
 	always draws `Style` (and the server logs one "No Gamebeast config found" per first-car marker).
 	`Path` starts with the configuration's name; renaming it on the dashboard breaks this. ]]
@@ -98,6 +103,29 @@ GuideTrailConfig.SwitchMargin = 6
 	an event, and a long fade on a line that follows you reads as lag. ]]
 GuideTrailConfig.FadeIn = 0.3
 GuideTrailConfig.FadeOut = 0.2
+
+--[[ === A PERSON, NOT A BAY (2026-10-19) =====================================================
+
+	The tutorial's SELL beat points this same line at its buyer once they are standing at the car,
+	with empty hands (Dylan: "it guides you with classic guide arrow to the offer maybe can highlight
+	the npc so they open the offer"). `TutorialController._stepGuide` hands the buyer's root to
+	`GuideTrailController:pointAt`, and while it is set it wins over any bay.
+
+	ALWAYS THE CLASSIC BEAM, whatever the look: Modern lays a track to a deck's edge, and a person
+	has no deck. `Lift` is studs above their root the line ends at (the chest). Within `ArriveStuds`
+	of them, measured flat, the line comes down; that is inside `BuyerConfig.Prompt.MaxDistance`, so
+	their See Offer prompt is already on screen when it goes.
+
+	`Arc` and `ArcMax` replace Classic's for this line, and are three times as tall on purpose. The
+	tutorial's camera turn (`TutorialConfig.Look`) leaves the view looking straight down the line from
+	behind the player, and at Classic's low arch the whole line hid behind their own body (seen in a
+	playtest, 2026-10-19). Tall, it climbs over their head and drops on to the buyer. ]]
+GuideTrailConfig.Person = {
+	Lift = 0.5,
+	ArriveStuds = 8,
+	Arc = 0.3,
+	ArcMax = 9,
+}
 
 -- === Classic ================================================================
 

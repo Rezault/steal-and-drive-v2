@@ -236,6 +236,11 @@ function PoliceHudController._buildHeat(self)
 	self._heatShown = -1
 end
 
+--- Pixels between the LUCK INCREASED card and the heat readout slid under it, and how fast the slide
+--- closes (per second, exponential). See `_stepHeat`.
+local HEAT_LUCK_GAP = 6
+local HEAT_SLIDE_RATE = 14
+
 --- "1.45" for a multiplier, trailing zeros off.
 local function multiplierText(value: number): string
 	return (string.gsub(string.format("%.2f", value), "%.?0+$", ""))
@@ -249,6 +254,29 @@ function PoliceHudController._stepHeat(self, heat, now: number)
 	end
 	local show = heat ~= nil and (heat.stars > 0 or heat.earned > 0)
 	gui.Enabled = show
+	--[[ THE LUCK INCREASED card is the same top-left corner, up for a few seconds at a time (2026-10-20,
+		Aleafo's "overlap"). The readout slides down under it while it is up and back when it goes:
+		the drop is however far the card's bottom edge reaches past the readout's own top, eased.
+		Both are measured in `AbsolutePosition`, one shared space whatever either gui's inset. ]]
+	local luck = Shard.get("LuckProgressController")
+	local bottom = luck and luck:bottom()
+	local drop = self._heatDrop or 0
+	local want = 0
+	if bottom then
+		want = math.max(0, bottom + HEAT_LUCK_GAP - (self._heatStars.AbsolutePosition.Y - drop))
+	end
+	local dt = math.clamp(now - (self._heatAt or now), 0, 0.1)
+	self._heatAt = now
+	drop += (want - drop) * (1 - math.exp(-HEAT_SLIDE_RATE * dt))
+	if math.abs(want - drop) < 0.5 then
+		drop = want
+	end
+	if drop ~= self._heatDrop then
+		self._heatDrop = drop
+		local base = PoliceConfig.Heat
+		self._heatStars.Position = UDim2.new(base.HudX, 0, base.HudY, math.round(drop))
+		self._heatBonus.Position = UDim2.new(base.HudX, 0, base.HudY + base.HudHeight * 1.05, math.round(drop))
+	end
 	if not show then
 		self._heatShown = -1
 		return

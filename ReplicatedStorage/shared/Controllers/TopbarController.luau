@@ -468,6 +468,24 @@ function TopbarController._buildRestore(self)
 	self._restore = icon
 end
 
+--- The feedback button (`InterfaceConfig.FeedbackIcon`): one click opens Roblox's feedback prompt.
+function TopbarController._buildFeedback(self)
+	local cfg = InterfaceConfig.FeedbackIcon
+	local icon = Icon.new():setName(cfg.Name):setOrder(cfg.Order):setLeft():setLabel(cfg.Label):setCaption(cfg.Caption):oneClick(true)
+	icon:bindEvent("selected", function()
+		--- Async and yielding, and absent on an engine that predates it: so spawned and guarded.
+		task.spawn(function()
+			local ok, err = pcall(function()
+				game:GetService("SocialService"):PromptFeedbackSubmissionAsync()
+			end)
+			if not ok then
+				self.log:warn("The feedback prompt could not open (it never does in Studio): " .. tostring(err))
+			end
+		end)
+	end)
+	self._feedback = icon
+end
+
 --[[ Public (`InterfaceController`): leave SHOW UI up and take everything else in the strip down.
 
 	PER ICON RATHER THAN `Icon.setTopbarEnabled`, which is what this used to be and cannot be any
@@ -524,6 +542,7 @@ function TopbarController._setRacing(self, racing: boolean)
 		{ self._radio, not racing },
 		{ self._icon, not racing },
 		{ self._daily, not racing },
+		{ self._feedback, not racing },
 		{ self._settings, not self._raceOnly or racing },
 	} do
 		local icon, enabled = entry[1], entry[2]
@@ -663,6 +682,10 @@ TopbarController:withLifecycle({
 			Dispatcher:Subscribe(MusicConfig.StateEvent, function(muted: boolean)
 				self:_paint(muted == true)
 			end)
+		end
+
+		if InterfaceConfig.FeedbackIcon.Enabled then
+			self:_buildFeedback()
 		end
 
 		--[[ ...and SHOW UI, built last and hidden, so that everything above it is already in the
