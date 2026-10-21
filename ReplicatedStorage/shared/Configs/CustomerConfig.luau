@@ -1060,6 +1060,43 @@ end
 function CustomerConfig.simulate(values: {number}, slots: number, seconds: number, indices: {number}?, efficiencies: {number}?, floorSlots: {number}?, vip: boolean?): (number, number)
  return ShowroomEconomy.estimate(CustomerConfig, values, slots, seconds, indices, efficiencies, floorSlots, vip)
 end
+
+--[[ === PLACING A CAR NEVER LOWERS THE LOT'S INCOME — 2026-10-21 ===============================
+
+	WAS: the money was whatever the crowd happened to do. Each floor has a capped crowd (`Crowd.Base`
+	+ the Customers upgrade downstairs, `UpstairsVisitors` up), each customer looks at 2-4 cars and
+	tips ONCE, for the best one they liked. Past the cap a new car brings nobody new; it only spends
+	their looks and lengthens their visits, so a car below the floor's average LOWERED the lot (a
+	playtest: $683.5M/hr to $636.8M/hr on placing a $45.3M car; the same car on bay 8 vs bay 9 read
+	$18.2M vs $17.6M, walking distance plus the 8-run estimate's ±3% noise). The owner: "placing down
+	another car should never make the income go down", and "do not change the economy so players earn
+	a crazy amount more money".
+
+	IS: a formula, per floor, paid as a rate (`ShowroomEconomy.estimate`, `CustomerService._bank`):
+
+	    per second = perLook(b1 + Decay*b2 + Decay^2*b3 + ...) x Pace[floor] x customers^CrowdPower
+
+	`b` are the floor's tip bases (`GarageService.getBayTip`) best first, and `customers` is the
+	floor's crowd as the live lot spawns it, min(capacity, cars). Every term only grows when a car is
+	added: the ranking can only move up, and the crowd only grows. Decay makes a big lot level off the
+	way the crowd did, so a full lot earns what it earned before, not the sum of every car.
+
+	FITTED, NOT GUESSED: the constants are a least-squares fit to the old simulation over 160 random
+	lots (1-6 cars, 2-6 customers, both floors, a 12x spread of car values, the real customer kinds):
+	rms error 13%, worst 33%. The live crowd still walks and reacts exactly as before; a liked look
+	pays out what the lot has earned since the last one, so the bubbles and bursts are unchanged and
+	the total is the formula's. The HUD's ~$/hr, the offline label and the WELCOME BACK payout all
+	read this same function, so they cannot disagree, and nothing is random any more.
+
+	`Ranked = false`: the crowd simulation and per-look tips, exactly as before this note. ]]
+CustomerConfig.Income = {
+	Ranked = true,
+	Decay = 0.2,
+	CrowdPower = 0.5,
+	--- Liked looks per second the formula pays for, downstairs and upstairs (the stairs walk is why
+	--- upstairs is lower). Multiplies `perLook`, so `Tip.ValueFraction` and `ByWorld` still tune it.
+	Pace = { 0.0283, 0.0173 },
+}
 return CustomerConfig
 
 
