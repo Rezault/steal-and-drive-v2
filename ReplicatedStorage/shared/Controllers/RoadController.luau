@@ -93,6 +93,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -147,7 +148,17 @@ function RoadController._tileSource(self, world: number?): ({ Model }, CFrame?, 
 	local roads = ReplicatedStorage:WaitForChild(RaceConfig.WorldRoadsName, 10)
 	local origin = roads and roads:GetAttribute("RaceOrigin")
 	local map = WorldConfig.mapFor(world)
-	local folder = map and roads and roads:FindFirstChild(map)
+	local folder = map and roads and (self._roads[map] or roads:FindFirstChild(map))
+	--[[ Not here yet. With `RaceConfig.WorldRoadsPerPlayer` that is a road still on its way rather
+		than one that does not exist, so ask for it and wait (`_awaitRoad`), behind the entry's own
+		loading screen. One that does not land in time is warned about there, and this run gets the
+		default road, which is what a world with no map has always driven. ]]
+	if map and roads and not folder and self:_serverHasRoad(map) then
+		folder = self:_awaitRoad(world, map)
+		if not folder then
+			map = nil
+		end
+	end
 	if folder then
 		local tiles = tilesOf(folder)
 		if #tiles > 0 then
@@ -966,8 +977,12 @@ end
 	nowhere else on purpose: the deck height, the drive centre, every tile pivot and therefore every
 	obstacle, every traffic car and the camera are all derived from it below, so one addition here
 	moves the entire race and nothing downstream has to know a lane exists. ]]
-function RoadController._buildRoad(self, world: number?, laneOffset: Vector3?): boolean
+function RoadController._buildRoad(self, world: number?, laneOffset: Vector3?, token: number?): boolean
 	local variants, origin, map = self:_tileSource(world)
+	--- `_tileSource` can wait for a road to arrive, and the race can end while it does.
+	if token and token ~= self._raceToken then
+		return false
+	end
 	local first = variants[1]
 	if not (first and origin) then
 		self.log:warn("No road art published; cannot build local road.")
@@ -1474,6 +1489,11 @@ function RoadController._onRaceStart(self, world: number?, laneOffset: Vector3?)
 		return
 	end
 	self._active = true
+	self._raceToken += 1
+	local token = self._raceToken
+	--- Taken before the build rather than after it, because the build can now wait for this world's
+	--- road to arrive, and the server's clock started when it sent `RaceStart`. See the ack below.
+	local deadline = os.clock() + math.max(1, RaceConfig.EnterReadyTimeout - 0.5)
 
 	--- Last run's road out of the scene first, if any of it is still leaving: this run's ring is
 	--- about to be built where it is standing. See `_finishEvict` for why here is where it is free.
@@ -1482,8 +1502,10 @@ function RoadController._onRaceStart(self, world: number?, laneOffset: Vector3?)
 	-- The world rides along: this is the first authoritative word the client has about where it is
 	-- going, and the screen has been guessing from a replicated attribute until now.
 	self:_reportLoad("road", world)
-	if not self:_buildRoad(world, laneOffset) then
-		self._active = false
+	if not self:_buildRoad(world, laneOffset, token) then
+		if token == self._raceToken then
+			self._active = false
+		end
 		return
 	end
 
@@ -1499,7 +1521,6 @@ function RoadController._onRaceStart(self, world: number?, laneOffset: Vector3?)
 		that it happened and not which half of the promise failed. ]]
 	self:_reportLoad("stream")
 	task.spawn(function()
-		local deadline = os.clock() + math.max(1, RaceConfig.EnterReadyTimeout - 0.5)
 		local car = self:_awaitCar(deadline)
 		if not (car and self._active) then
 			if self._active then
@@ -1569,6 +1590,7 @@ end
 
 function RoadController._onRaceEnd(self)
 	self._active = false
+	self._raceToken += 1
 	if self._conn then
 		self._conn:Disconnect()
 		self._conn = nil
@@ -1655,6 +1677,149 @@ function RoadController._onRaceEnd(self)
 	self._map = nil
 end
 
+-- === Getting this player's world road =======================================
+--[[ The client half of `RaceConfig.WorldRoadsPerPlayer`; `RoadService._sendRoad` is the other.
+
+	A world's road arrives in `PlayerGui.<WorldRoadsName>` as a folder carrying the number of
+	instances it will hold. `_adoptRoad` waits for all of them, moves the folder into this client's
+	own `ReplicatedStorage.<WorldRoadsName>` (where `_tileSource` has always read worlds from) and
+	tells the server, which then lets go of its copy. That arrives here as the folder's parent going
+	nil, and the folder is put straight back. ]]
+
+--- Seconds a road may take to land before this client gives up on it. A City on a slow phone is a
+--- few seconds; past this the connection is not really there, and a race entry has its own fallback.
+local ROAD_ARRIVAL_CAP = 90
+--- Seconds without an answer before asking for a road again. The server sends each world once, so a
+--- repeat only matters if the first ask landed before the server was ready to answer it.
+local ROAD_ASK_AGAIN = 15
+--- Longest the first ask waits for the join screen to lift, for a join screen that never says so.
+local PREFETCH_CAP = 60
+
+--- Can the server send this map? False with the feature off, which means every world is already in
+--- ReplicatedStorage for everybody.
+function RoadController._serverHasRoad(self, map: string): boolean
+	if not RaceConfig.WorldRoadsPerPlayer then
+		return false
+	end
+	local roads = ReplicatedStorage:FindFirstChild(RaceConfig.WorldRoadsName)
+	local maps = roads and roads:GetAttribute(RaceConfig.WorldRoadMapsAttribute)
+	return type(maps) == "string" and string.find(maps, "|" .. map .. "|", 1, true) ~= nil
+end
+
+--- Ask for a world's road, unless it is here already, was asked for recently, or is not the
+--- server's to send.
+function RoadController._requestRoad(self, world: unknown)
+	local index = WorldConfig.resolve(world)
+	local map = WorldConfig.mapFor(index)
+	if not map or self._roads[map] or not self:_serverHasRoad(map) then
+		return
+	end
+	local asked = self._asked[map]
+	if asked and os.clock() - asked < ROAD_ASK_AGAIN then
+		return
+	end
+	self._asked[map] = os.clock()
+	self:getRemoteEvent("RequestWorldRoad"):Fire(index)
+end
+
+--- Wait for the road a race entry needs, asking for it first. Nil if it does not land in time.
+function RoadController._awaitRoad(self, world: number?, map: string): Instance?
+	self:_requestRoad(world)
+	local giveUp = os.clock() + RaceConfig.WorldRoadWait
+	while not self._roads[map] and os.clock() < giveUp do
+		task.wait(0.1)
+	end
+	if not self._roads[map] then
+		self.log:warn(string.format(
+			"The road for '%s' had not finished arriving after %ds; racing the default road this once.",
+			map, RaceConfig.WorldRoadWait
+		))
+	end
+	return self._roads[map]
+end
+
+--- Take a delivered road once every instance of it is here. See the block above.
+function RoadController._adoptRoad(self, folder: Instance)
+	local expected = folder:GetAttribute(RaceConfig.WorldRoadCountAttribute)
+	if not folder:IsA("Folder") or type(expected) ~= "number" then
+		return
+	end
+	local map = folder.Name
+	local began = os.clock()
+	while #folder:GetDescendants() < expected do
+		if not folder.Parent or os.clock() - began > ROAD_ARRIVAL_CAP then
+			self.log:warn(string.format(
+				"The road for '%s' never finished arriving (%d of %d instances).",
+				map, #folder:GetDescendants(), expected
+			))
+			-- So the next race into it asks straight away (the server will send a lost one again).
+			self._asked[map] = nil
+			return
+		end
+		task.wait(0.25)
+	end
+
+	local home = ReplicatedStorage:FindFirstChild(RaceConfig.WorldRoadsName) or ReplicatedStorage
+	folder.Parent = home
+	self._roads[map] = folder
+	folder.AncestryChanged:Connect(function(_, parent)
+		if parent == nil and self._roads[map] == folder then
+			-- Deferred: the engine refuses a re-parent from inside an ancestry change.
+			task.defer(function()
+				if folder.Parent == nil then
+					folder.Parent = home
+				end
+			end)
+		end
+	end)
+	self.log:info(string.format("Road for '%s' arrived: %d instances in %.1fs.", map, expected, os.clock() - began))
+	self:getRemoteEvent("WorldRoadReceived"):Fire(map)
+end
+
+--[[ Watch the PlayerGui for roads being delivered, for the whole session.
+
+	EVERY INBOX, NOT ONLY THE FIRST. The server's inbox is a ScreenGui that survives a respawn
+	(`RoadService._inbox` has why a Folder did not), but if one is ever lost the server makes a new
+	one, and a watcher that stopped looking after the first would never see a road again. ]]
+function RoadController._watchRoadInbox(self)
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local function watch(inbox: Instance)
+		if inbox.Name ~= RaceConfig.WorldRoadsName then
+			return
+		end
+		for _, child in inbox:GetChildren() do
+			task.spawn(self._adoptRoad, self, child)
+		end
+		inbox.ChildAdded:Connect(function(child)
+			self:_adoptRoad(child)
+		end)
+	end
+	playerGui.ChildAdded:Connect(watch)
+	for _, child in playerGui:GetChildren() do
+		watch(child)
+	end
+end
+
+--[[ Ask for this player's world once the join is over, and for every world they move to after it.
+
+	AFTER THE JOIN ON PURPOSE. The join is the client's worst few seconds (the lobby is still streaming
+	in) and a road is no use to anybody until they press Play. `JoinScreenRunning` is the join screen's
+	own flag, cleared as it lifts. ]]
+function RoadController._prefetchRoads(self)
+	if not RaceConfig.WorldRoadsPerPlayer then
+		return
+	end
+	local player = Players.LocalPlayer
+	local giveUp = os.clock() + PREFETCH_CAP
+	while ReplicatedFirst:GetAttribute("JoinScreenRunning") == true and os.clock() < giveUp do
+		task.wait(0.5)
+	end
+	self:_requestRoad(player:GetAttribute(WorldConfig.WorldAttribute))
+	player:GetAttributeChangedSignal(WorldConfig.WorldAttribute):Connect(function()
+		self:_requestRoad(player:GetAttribute(WorldConfig.WorldAttribute))
+	end)
+end
+
 RoadController:withRemoteEvents({
 	{
 		RaceStart = function(_seed, world, laneOffset)
@@ -1665,6 +1830,8 @@ RoadController:withRemoteEvents({
 		end,
 	},
 	"RaceReady",
+	"RequestWorldRoad",
+	"WorldRoadReceived",
 })
 
 RoadController:withLifecycle({
@@ -1692,9 +1859,16 @@ RoadController:withLifecycle({
 		-- Survives a race teardown on purpose: controllers register once at start and stay
 		-- registered across every race, exactly like their remote handlers do.
 		self._shiftListeners = {} -- [fn] = true
+		--- Bumped by every race start and end, so a build that waited for its road can tell it is stale.
+		self._raceToken = 0
+		self._roads = {} :: { [string]: Instance } -- [map] = this client's copy of a delivered world road
+		self._asked = {} :: { [string]: number } -- [map] = when it was last asked for
 	end,
 
-	start = function(_self) end,
+	start = function(self)
+		task.spawn(self._watchRoadInbox, self)
+		task.spawn(self._prefetchRoads, self)
+	end,
 })
 
 return RoadController

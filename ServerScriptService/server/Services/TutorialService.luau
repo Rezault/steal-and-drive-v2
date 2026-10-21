@@ -376,9 +376,9 @@ end
 	listeners were still to hear the full one, so they would hear the two in the wrong order and build
 	a car in the hands after it had gone.
 
-	AND NOT IN THE SAME FRAME EITHER, which `task.defer` was (`TutorialConfig.AutoPark.After`): Gamebeast
-	stamps markers to the millisecond and cannot order two with the same stamp, so FirstCarCarried and
-	FirstCarPlaced, and BANK done and PLACE done, would each read as nobody making it to the second.
+	AND NOT INSIDE ONE SECOND EITHER (`TutorialConfig.AutoPark.After` has the measurement): Gamebeast
+	keeps a marker's time to the whole second and cannot order two in the same one, so FirstCarCarried
+	and FirstCarPlaced, and BANK done and PLACE done, would read as almost nobody making it to the second.
 
 	Nothing happens without an empty showroom bay; the car stays in the hands and the beat is taught
 	the old way. ]]

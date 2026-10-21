@@ -6,7 +6,9 @@
 local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
 local TweenService = game:GetService("TweenService")
 
 -- Keep Roblox's overlay until our replacement exists, including while PlayerGui replicates.
@@ -24,7 +26,10 @@ local CONTROLLERS_TIMEOUT = 45
 -- and the engine finishes it in the background either way, so the screen stops waiting rather than
 -- making the player wait for it.
 -- Optional assets finish in the background after this small join budget.
+-- ONE budget, shared by finding the plot and both preloads (2026-10-20); see "Loading assets".
 local PRELOAD_TIMEOUT = 5
+-- The part of that budget the plot lookup may spend; the UI and sounds are loading meanwhile.
+local PLOT_LOOKUP_TIMEOUT = 2
 local HARD_TIMEOUT = 115
 local MIN_HOLD = 1.2
 local FADE_TIME = 0.5
@@ -212,6 +217,41 @@ local target = 0.08
 local shown = 0
 local alive = true
 
+--[[ THE JOIN FUNNEL (2026-10-20). Every phase below is reported to the server the moment it lands,
+	so a join that never reaches the game still says how far it got and how much memory the device
+	was using when it stopped. `AnalyticsService` owns the other half: it parents the plain
+	`JoinProgress` RemoteEvent (this script cannot require Shard's remotes) and turns the reports into
+	the Roblox "Join" funnel and the `JoinFinished` / `JoinFailed` markers. A report made before the
+	remote has replicated waits in `outbox`. Keep the phase names in step with its `JOIN_STEPS`. ]]
+local JOIN_REMOTE = "JoinProgress"
+local joinRemote: RemoteEvent? = nil
+local outbox = {} :: { { any } }
+--- Seconds each phase took, by funnel phase name, for the `playing` report.
+local laps = {} :: { [string]: number }
+local preloadCount, preloadFetched = 0, 0
+
+local function report(phase: string, data: { [string]: any }?)
+	local payload = data or {}
+	payload.memoryMb = math.floor(Stats:GetTotalMemoryUsageMb())
+	payload.screen = os.clock() - shownAt
+	if joinRemote then
+		joinRemote:FireServer(phase, payload)
+	else
+		table.insert(outbox, { phase, payload })
+	end
+end
+
+task.spawn(function()
+	local found = ReplicatedStorage:WaitForChild(JOIN_REMOTE, 60)
+	if found and found:IsA("RemoteEvent") then
+		for _, entry in outbox do
+			found:FireServer(entry[1], entry[2])
+		end
+		table.clear(outbox)
+		joinRemote = found
+	end
+end)
+
 local renderConnection = RunService.RenderStepped:Connect(function(dt)
 	spinner.Rotation = (spinner.Rotation + dt * 320) % 360
 	local camera = workspace.CurrentCamera
@@ -268,7 +308,8 @@ local function presentationReady(): boolean
 end
 
 local erred = false
-local function showError()
+--- `stage` is why, for the funnel: boot | controllers | spawn | timeout.
+local function showError(stage: string)
 	if erred then
 		return
 	end
@@ -276,6 +317,7 @@ local function showError()
 	headline.Text = "COULDN'T LOAD"
 	status.Text = "Something went wrong starting the game. Please rejoin."
 	warn("[JoinScreen] Boot failed (" .. tostring(ReplicatedFirst:GetAttribute(FAILED_ATTRIBUTE)) .. "); asking the player to rejoin.")
+	report("failed", { stage = stage })
 end
 
 local function finish()
@@ -291,6 +333,26 @@ local function finish()
 	if remaining > 0 then
 		task.wait(remaining)
 	end
+
+	-- Where the device's memory is at the moment the game appears, for the low-end crash question.
+	local function tagMb(tag: Enum.DeveloperMemoryTag): number
+		return math.floor(Stats:GetMemoryUsageMbForTag(tag))
+	end
+	report("playing", {
+		loaded = laps.loaded,
+		started = laps.started,
+		spawned = laps.spawned,
+		assets = laps.assets,
+		assetCount = preloadCount,
+		assetsFetched = preloadFetched,
+		textureMb = tagMb(Enum.DeveloperMemoryTag.GraphicsTexture),
+		meshMb = tagMb(Enum.DeveloperMemoryTag.GraphicsMeshParts),
+		partsMb = tagMb(Enum.DeveloperMemoryTag.GraphicsParts),
+		soundMb = tagMb(Enum.DeveloperMemoryTag.Sounds),
+		luaMb = tagMb(Enum.DeveloperMemoryTag.LuaHeap),
+	})
+	-- Cleared as the overlay starts to lift. `RoadController` waits on it before asking for its road.
+	ReplicatedFirst:SetAttribute("JoinScreenRunning", false)
 
 	local info = TweenInfo.new(FADE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(overlay, info, { BackgroundTransparency = 1 }):Play()
@@ -313,9 +375,10 @@ task.spawn(function()
 	-- "it takes too long" is only fixable once it is known which one is long.
 	local phaseStart = os.clock()
 	local timings = {} :: { string }
-	local function lap(name: string)
+	local function lap(name: string, phase: string)
 		local now = os.clock()
 		table.insert(timings, string.format("%s %.1fs", name, now - phaseStart))
+		laps[phase] = now - phaseStart
 		phaseStart = now
 	end
 
@@ -323,7 +386,8 @@ task.spawn(function()
 	if not game:IsLoaded() then
 		game.Loaded:Wait()
 	end
-	lap("loaded")
+	lap("loaded", "loaded")
+	report("loaded")
 
 	setStep("Starting the game…", 0.35)
 	local function started(): boolean
@@ -345,19 +409,25 @@ task.spawn(function()
 		end, HARD_TIMEOUT - CONTROLLERS_TIMEOUT - 5)
 	end
 	if not started() then
-		showError()
+		showError(if broken() then "boot" else "controllers")
 		--- Lift anyway if the controllers come up late; otherwise the message stays.
 		-- The recovery monitor below also waits for character, camera and menu readiness.
 		return
 	end
-	lap("controllers")
+	lap("controllers", "started")
+	-- The slowest controller phase, named by `Modules/BootGuard.publishSlowest` (same spelling).
+	report("started", {
+		slowest = ReplicatedFirst:GetAttribute("BootSlowest"),
+		slowestSeconds = ReplicatedFirst:GetAttribute("BootSlowestSeconds"),
+	})
 	setStep("Preparing your character…", 0.5)
 	if not await(presentationReady, 25) then
 		ReplicatedFirst:SetAttribute("JoinWaitStage", "character-camera-menu")
-		showError()
+		showError("spawn")
 		return
 	end
-	lap("character-camera-menu")
+	lap("character-camera-menu", "spawned")
+	report("spawned")
 
 	--[[ ONLY WHAT THE PLAYER MEETS THE MOMENT THE OVERLAY LIFTS (2026-09-28). This used to gather
 		ReplicatedStorage, which is every car mesh and texture in the game and none of it on screen at
@@ -365,6 +435,44 @@ task.spawn(function()
 		instead is the three things the owner named: the UI, the sound effects, and the player's own
 		base, which is where they spawn. ]]
 	setStep("Loading assets…", 0.55)
+	--[[ ONE BUDGET FOR ALL OF IT (2026-10-20). Finding the base, streaming around it and the preload
+		each had a wait of their own, so a slow phone could sit through all three in a row: up to 5 s for
+		the plot's owner stamp, up to 5 s more in `RequestStreamAroundAsync`, then 5 s of preload, for
+		art the engine fetches on first use anyway. They now share `PRELOAD_TIMEOUT`, counted from here.
+		The UI and the sound effects are asked for at once instead of after the plot is found, the plot's
+		art the moment it is, and the stream request is not waited on at all: the character is already
+		standing on the plot, which is what the client streams around. ]]
+	local optionalUntil = os.clock() + PRELOAD_TIMEOUT
+	local total, loaded, running, shownPercent = 0, 0, 0, 0
+	local function preload(list: { Instance })
+		if #list == 0 then
+			return
+		end
+		total += #list
+		running += 1
+		task.spawn(function()
+			local ok, err = pcall(function()
+				ContentProvider:PreloadAsync(list, function()
+					loaded += 1
+					if not alive or erred then
+						return
+					end
+					-- One Instance can resolve more than one content ID (for example, a MeshPart's
+					-- mesh and texture), so callback count is not guaranteed to stop at #assets.
+					local ratio = math.clamp(loaded / total, 0, 1)
+					target = math.max(target, 0.55 + 0.42 * ratio)
+					-- Never backwards, though the plot's list joining late makes the ratio dip.
+					shownPercent = math.max(shownPercent, math.floor(ratio * 100))
+					status.Text = string.format("Loading assets…  %d%%", shownPercent)
+				end)
+			end)
+			if not ok then
+				warn("[JoinScreen] Preload failed:", err)
+			end
+			running -= 1
+		end)
+	end
+
 	local assets = {} :: { Instance }
 	local function visible(instance: Instance): boolean
 		local ancestor: Instance? = instance
@@ -379,7 +487,7 @@ task.spawn(function()
 		end
 		return true
 	end
-	local function gather(root: Instance)
+	local function gather(root: Instance, into: { Instance })
 		for _, descendant in root:GetDescendants() do
 			if root == playerGui and not visible(descendant) then
 				continue
@@ -394,11 +502,11 @@ task.spawn(function()
 				or descendant:IsA("SurfaceAppearance")
 				or descendant:IsA("Sound")
 			then
-				table.insert(assets, descendant)
+				table.insert(into, descendant)
 			end
 		end
 	end
-	gather(playerGui)
+	gather(playerGui, assets)
 
 	--[[ THE SOUND EFFECTS: every Sound in SoundService's groups BUT the soundtrack's and the radio's.
 		Those two are whole songs, the largest downloads in the game, and a track that starts a second
@@ -414,6 +522,7 @@ task.spawn(function()
 			end
 		end
 	end
+	preload(assets)
 
 	--[[ THE PLAYER'S OWN BASE, which is where they spawn and the first thing on screen. Found by the
 		owner stamp the server writes on the plot (`PlotConfig.OwnerUserIdAttribute`) under
@@ -431,45 +540,26 @@ task.spawn(function()
 			end
 		end
 		return false
-	end, 5)
+	end, math.min(PLOT_LOOKUP_TIMEOUT, math.max(0, optionalUntil - os.clock())))
 	if myPlot and myPlot:IsA("Model") then
-		pcall(function()
-			player:RequestStreamAroundAsync(myPlot:GetPivot().Position, 5)
-		end)
-		gather(myPlot)
-	end
-
-	local total = #assets
-	local loaded = 0
-	local preloadFinished = total == 0
-	if total > 0 then
+		local plotPosition = myPlot:GetPivot().Position
 		task.spawn(function()
-			local ok, err = pcall(function()
-				ContentProvider:PreloadAsync(assets, function()
-					loaded += 1
-					if not alive or erred then
-						return
-					end
-					-- One Instance can resolve more than one content ID (for example, a MeshPart's
-					-- mesh and texture), so callback count is not guaranteed to stop at #assets.
-					local ratio = math.clamp(loaded / total, 0, 1)
-					target = math.max(target, 0.55 + 0.42 * ratio)
-					status.Text = string.format("Loading assets…  %d%%", math.floor(ratio * 100))
-				end)
+			pcall(function()
+				player:RequestStreamAroundAsync(plotPosition, 5)
 			end)
-			if not ok then
-				warn("[JoinScreen] Preload failed:", err)
-			end
-			preloadFinished = true
 		end)
-
-		if not await(function()
-			return preloadFinished
-		end, PRELOAD_TIMEOUT) then
-			warn(string.format("[JoinScreen] Preload hit its cap with %d/%d fetched.", loaded, total))
-		end
+		local plotAssets = {} :: { Instance }
+		gather(myPlot, plotAssets)
+		preload(plotAssets)
 	end
-	lap(string.format("assets(%d)", total))
+
+	if not await(function()
+		return running == 0
+	end, math.max(0, optionalUntil - os.clock())) then
+		warn(string.format("[JoinScreen] Preload hit its cap with %d/%d fetched.", loaded, total))
+	end
+	lap(string.format("assets(%d)", total), "assets")
+	preloadCount, preloadFetched = total, loaded
 	ReplicatedFirst:SetAttribute("JoinTimings", table.concat(timings, ", "))
 	print("[JoinScreen] " .. table.concat(timings, ", "))
 
@@ -483,7 +573,7 @@ task.delay(HARD_TIMEOUT, function()
 			warn("[JoinScreen] Optional loading timed out; the game is ready.")
 			finish()
 		else
-			showError()
+			showError("timeout")
 		end
 	end
 end)

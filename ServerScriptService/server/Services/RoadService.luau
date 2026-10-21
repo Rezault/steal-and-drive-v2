@@ -7,7 +7,9 @@
 
 	  1. Publishes the ROAD ART every client needs to clone — the authored world folders from
 	     `Workspace.Worlds` into `ReplicatedStorage.WorldRoads`, plus the legacy single tile
-	     template for a world that has no map of its own.
+	     template for a world that has no map of its own. Since 2026-10-20 the worlds stay in
+	     `ServerStorage.WorldRoads` instead and each player is SENT their own world's road on
+	     request (`_sendRoad`); see `RaceConfig.WorldRoadsPerPlayer`.
 	  2. Publishes the RACE ORIGIN: the one CFrame every world's road is laid at, so that both
 	     sides agree on where the race is without either of them measuring it.
 	  3. Stashes the authored `Workspace.RoadSegments` (and anything left in `Workspace.Worlds`)
@@ -45,7 +47,9 @@
 
 local CollectionService = game:GetService("CollectionService")
 local MaterialService = game:GetService("MaterialService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Shard = require(ReplicatedStorage.Packages.Shard)
@@ -54,6 +58,22 @@ local RoadStudsConfig = require(ReplicatedStorage.shared.Configs.RoadStudsConfig
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
 
 local RoadService = Shard.new("RoadService")
+
+RoadService:withRemoteEvents({
+	{
+		--[[ client -> server (world: number): send me this world's road. Asked once the join screen
+			has lifted, when the player's world changes, and by a race entry that finds it missing.
+			Every guard is in `_sendRoad`; this is only the untrusted front door. ]]
+		RequestWorldRoad = function(player: Player, world: unknown)
+			RoadService:_sendRoad(player, world)
+		end,
+		--[[ client -> server (map: string): every instance of that road has arrived and the client
+			has moved it into a folder of its own, so the server can let go of its copy. ]]
+		WorldRoadReceived = function(player: Player, map: unknown)
+			RoadService:_onRoadReceived(player, map)
+		end,
+	},
+})
 
 local function axisVector(letter: string): Vector3
 	letter = string.upper(letter or "Z")
@@ -129,13 +149,29 @@ end
 
 	MOVED, NOT CLONED: a copy would leave the originals in Workspace rendering and replicating,
 	which is half of what this is for. The place file is untouched — a playtest's reparenting
-	reverts when it stops. See `RaceConfig.WorldRoadsName` for why all of them go at once. ]]
-function RoadService._publishWorldRoads(self): Folder
-	local published = ReplicatedStorage:FindFirstChild(RaceConfig.WorldRoadsName)
-	if not published then
-		published = Instance.new("Folder")
-		published.Name = RaceConfig.WorldRoadsName
-		published.Parent = ReplicatedStorage
+	reverts when it stops. See `RaceConfig.WorldRoadsName` for why all of them go at once.
+
+	WITH `RaceConfig.WorldRoadsPerPlayer` ON they do not go at once, or to ReplicatedStorage at
+	all: the worlds move to `ServerStorage.<WorldRoadsName>` and are sent per player by
+	`_sendRoad`, and ReplicatedStorage gets an empty folder of the same name to carry the race
+	origin. Returns the folder the worlds are in, then the one clients read the origin from (the
+	same folder when the flag is off). ]]
+function RoadService._publishWorldRoads(self): (Folder, Folder)
+	local public = ReplicatedStorage:FindFirstChild(RaceConfig.WorldRoadsName)
+	if not public then
+		public = Instance.new("Folder")
+		public.Name = RaceConfig.WorldRoadsName
+		public.Parent = ReplicatedStorage
+	end
+
+	local published = public
+	if RaceConfig.WorldRoadsPerPlayer then
+		published = ServerStorage:FindFirstChild(RaceConfig.WorldRoadsName)
+		if not published then
+			published = Instance.new("Folder")
+			published.Name = RaceConfig.WorldRoadsName
+			published.Parent = ServerStorage
+		end
 	end
 
 	local library = authoredFolder(WorldConfig.RoadFolderName)
@@ -150,7 +186,111 @@ function RoadService._publishWorldRoads(self): Folder
 		library.Parent = self:_stash()
 	end
 
-	return published
+	return published, public
+end
+
+-- === Sending a player their world's road =====================================
+-- The whole contract is in `RaceConfig.WorldRoadsPerPlayer`; `RoadController` is the other half.
+
+--[[ Where in a player's PlayerGui their roads arrive. PlayerGui is the one container the server can
+	fill for a single client: everything under it replicates to its owner and nobody else.
+
+	A SCREENGUI WITH `ResetOnSpawn` OFF, NOT A FOLDER. This place resets PlayerGui on every spawn
+	(`StarterGui.ResetPlayerGuiOnSpawn`), and that destroys a Folder there along with whatever is
+	arriving in it: the first version lost its inbox to the respawn at the end of a race, and the next
+	world's road landed in a new one nobody was watching. Disabled, because nothing in it is drawn. ]]
+function RoadService._inbox(self, player: Player): Instance?
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then
+		return nil
+	end
+	local inbox = playerGui:FindFirstChild(RaceConfig.WorldRoadsName)
+	if not inbox then
+		local gui = Instance.new("ScreenGui")
+		gui.Name = RaceConfig.WorldRoadsName
+		gui.Enabled = false
+		gui.ResetOnSpawn = false
+		gui.Parent = playerGui
+		inbox = gui
+	end
+	return inbox
+end
+
+--[[ Send `player` one world's road. `world` is whatever their client sent.
+
+	ONCE PER WORLD PER PLAYER. Asking again while it is on its way, or after it has arrived, does
+	nothing, which also caps what one client can make the server clone at the five worlds there are.
+	A world with no map of its own is not sent at all: it drives the default tile, which every client
+	already has in ReplicatedStorage.
+
+	The folder goes first, empty, carrying the count the client waits for, and the tiles follow it a
+	frame apiece: one tile is 10 to 19 ms of cloning, and a whole City in one go was 82 ms (measured
+	on a Studio client, 2026-10-20), which on the server is a stall for every player in it. ]]
+function RoadService._sendRoad(self, player: Player, world: unknown)
+	if not RaceConfig.WorldRoadsPerPlayer or not self._published then
+		return
+	end
+	local index = tonumber(world)
+	if not index or index ~= index or index % 1 ~= 0 or not WorldConfig.Worlds[index] then
+		return
+	end
+	local map = WorldConfig.mapFor(index)
+	local source = map and self._published:FindFirstChild(map)
+	if not source then
+		return
+	end
+
+	local sent = self._sent[player]
+	if not sent then
+		sent = {}
+		self._sent[player] = sent
+	end
+	if sent[map] then
+		return
+	end
+	local inbox = self:_inbox(player)
+	if not inbox then
+		return
+	end
+
+	local tiles = tilesOf(source)
+	local count = 0
+	for _, tile in tiles do
+		count += 1 + #tile:GetDescendants()
+	end
+
+	local folder = Instance.new("Folder")
+	folder.Name = map
+	folder:SetAttribute(RaceConfig.WorldRoadCountAttribute, count)
+	folder.Parent = inbox
+	sent[map] = folder
+
+	task.spawn(function()
+		for _, tile in tiles do
+			-- Gone: they left, or (from a client that did not wait) it was already acknowledged.
+			if folder.Parent == nil or player.Parent == nil then
+				-- Destroyed under us rather than acknowledged: let the next ask send it again.
+				if sent[map] == folder then
+					sent[map] = nil
+				end
+				return
+			end
+			tile:Clone().Parent = folder
+			RunService.Heartbeat:Wait()
+		end
+	end)
+end
+
+--[[ The client has the whole road and has moved it out of its PlayerGui. Unparenting ours replicates
+	as a parent change, which leaves the client's copy alive where it put it, and lets this one be
+	collected. `true` stays behind so the world is never sent to this player twice. ]]
+function RoadService._onRoadReceived(self, player: Player, map: unknown)
+	local sent = self._sent[player]
+	local folder = if sent and type(map) == "string" then sent[map] else nil
+	if typeof(folder) == "Instance" then
+		folder.Parent = nil
+		sent[map] = true
+	end
 end
 
 --[[ Re-point one tile's drivable surface at the flat MaterialVariant twins. See RoadStudsConfig for
@@ -389,6 +529,11 @@ end
 RoadService:withLifecycle({
 	init = function(self)
 		self._frames = {} :: { [string]: any } -- by MAP NAME, not world index: two worlds may share one
+		--- [player][map] = the folder on its way to them, or true once they have it.
+		self._sent = {} :: { [Player]: { [string]: Folder | boolean } }
+		Players.PlayerRemoving:Connect(function(player)
+			self._sent[player] = nil
+		end)
 	end,
 
 	start = function(self)
@@ -420,9 +565,9 @@ RoadService:withLifecycle({
 		self._origin = RaceConfig.RaceOriginOverride or CFrame.new(authored.Position)
 
 		-- Publish the worlds, then measure each of them.
-		local published = self:_publishWorldRoads()
-		published:SetAttribute("RaceOrigin", self._origin)
-		published:SetAttribute("ForwardAxis", tostring(template:GetAttribute("ForwardAxis") or "Z"))
+		local published, public = self:_publishWorldRoads()
+		public:SetAttribute("RaceOrigin", self._origin)
+		public:SetAttribute("ForwardAxis", tostring(template:GetAttribute("ForwardAxis") or "Z"))
 
 		if not RoadStudsConfig.RoadStuds then
 			self:_flattenRoads(published, template)
@@ -453,14 +598,27 @@ RoadService:withLifecycle({
 			end
 		end
 
+		-- Last, so no player is ever sent a world before it has been flattened and measured.
+		self._published = published
+		if RaceConfig.WorldRoadsPerPlayer then
+			local maps = {}
+			for _, folder in published:GetChildren() do
+				if #tilesOf(folder) > 0 then
+					table.insert(maps, folder.Name)
+				end
+			end
+			public:SetAttribute(RaceConfig.WorldRoadMapsAttribute, "|" .. table.concat(maps, "|") .. "|")
+		end
+
 		local names = {}
 		for map, frame in self._frames do
 			table.insert(names, string.format("%s x%d", map, frame.variants))
 		end
 		table.sort(names)
 		self.log:info(string.format(
-			"Road provider ready — %d world road(s) published (%s), race origin %s, SegmentLength %.1f. Road is client-streamed.",
+			"Road provider ready — %d world road(s) published (%s, %s), race origin %s, SegmentLength %.1f. Road is client-streamed.",
 			#names, #names > 0 and table.concat(names, ", ") or "none",
+			if RaceConfig.WorldRoadsPerPlayer then "sent per player" else "to every client",
 			tostring(self._origin.Position), self._segmentLength or -1
 		))
 	end,

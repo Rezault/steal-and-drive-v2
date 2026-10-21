@@ -40,6 +40,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local NewUIConfig = require(ReplicatedStorage.shared.Configs.NewUIConfig)
+--- Where an authored ScreenGui is at runtime: the server moves them out of StarterGui at boot.
+local StarterGuiOnce = require(ReplicatedStorage.shared.Modules.StarterGuiOnce)
 
 --- How long the claim waits for the OTHER UI before deciding it is not in this place. Generous,
 --- because nothing is blocked on it: this runs in its own thread and only ever destroys.
@@ -63,6 +65,16 @@ function UIRoot.isNewUI(): boolean
 			if type(override) == "boolean" then
 				enabled = override
 			end
+		end
+
+		--[[ THE OLD UI IS NOT IN STARTERGUI ANY MORE (2026-10-20). It is parked at
+			`ServerStorage.UIImports.MainUI`, because StarterGui replicates: every join was sending it
+			twice (StarterGui itself, then the PlayerGui copy) only for the claim below to destroy it.
+			An answer of "old" with no old UI to give would leave every lookup waiting on a ScreenGui
+			that never comes, so it falls back to the new one. Drag it back to use the old UI again. ]]
+		if not enabled and not StarterGuiOnce.find(NewUIConfig.LegacyScreenGuiName) then
+			warn("[UIRoot] The old UI is not in StarterGui (it is parked in ServerStorage.UIImports); using the new one.")
+			enabled = true
 		end
 
 		resolved = enabled

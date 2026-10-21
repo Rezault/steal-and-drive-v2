@@ -36,6 +36,9 @@ BootGuard.FailedAttribute = "BootFailed"
 
 --- Every module that threw on the way up, "Name.phase".
 BootGuard.failed = {} :: { string }
+--- Wall-clock seconds each guarded phase took, "Name.phase" -> seconds, yields included (a
+--- `WaitForChild` counts). The client bootstrap adds "Name.require". Where a slow boot went.
+BootGuard.timings = {} :: { [string]: number }
 
 local function run(name: string, phase: string, fn: (any) -> (), self: any)
 	local done = false
@@ -44,7 +47,9 @@ local function run(name: string, phase: string, fn: (any) -> (), self: any)
 			warn(string.format("[Boot] %s.%s has been running for %ds; the rest of the boot is waiting on it.", name, phase, STALL_WARN))
 		end
 	end)
+	local began = os.clock()
 	local ok, err = xpcall(fn, debug.traceback, self)
+	BootGuard.timings[name .. "." .. phase] = os.clock() - began
 	done = true
 	if not ok then
 		table.insert(BootGuard.failed, name .. "." .. phase)
@@ -79,6 +84,26 @@ end
 --- practice; harmless on the server.
 function BootGuard.report(why: string)
 	ReplicatedFirst:SetAttribute(BootGuard.FailedAttribute, why)
+end
+
+--[[ The slowest entry in `timings` ("OfflineController.start") and its seconds, as two `ReplicatedFirst`
+	attributes for the join funnel: `JoinScreen` sends them with its `started` report and the server
+	puts them on `JoinFinished`, which is how a slow boot on a real phone gets a name. Called by the
+	client bootstrap BEFORE it sets `ShardClientStarted`, so they are there when the screen looks.
+	`JoinScreen` spells both names too; keep them in step. ]]
+BootGuard.SlowestAttribute = "BootSlowest"
+BootGuard.SlowestSecondsAttribute = "BootSlowestSeconds"
+function BootGuard.publishSlowest()
+	local slowest, seconds = nil, 0
+	for key, took in BootGuard.timings do
+		if took > seconds then
+			slowest, seconds = key, took
+		end
+	end
+	if slowest then
+		ReplicatedFirst:SetAttribute(BootGuard.SlowestAttribute, slowest)
+		ReplicatedFirst:SetAttribute(BootGuard.SlowestSecondsAttribute, seconds)
+	end
 end
 
 return BootGuard

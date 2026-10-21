@@ -90,7 +90,8 @@ and RACE AGAIN, and the same countdown races again. Except after a getaway, wher
 there HOME wears the green and the countdown heads home (`SECONDARY_RAMP`). Every answer publishes the same
 `WreckAnsweredEvent` and then tells the server (`RaceEndAnswer`), which runs the return. The corner is
 `RaceUIController.buildEndShot`: the getaway car turning on its sunburst, the cruiser, the wreck, or
-your ragdoll. While the tutorial is running the countdown goes home, because its next beat is there.
+your ragdoll. While the tutorial is running the countdown goes home, because its next beat is there,
+and in one arm of an A/B a getaway there offers HOME and nothing else (`TutorialConfig.RaceAgain`).
 
 This client says it draws the panel (`RaceEndOptIn`) once the template is in hand; until then the
 server ends runs the old way, with no wait.
@@ -113,6 +114,7 @@ local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
 local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
 local ReviveConfig = require(ReplicatedStorage.shared.Configs.ReviveConfig)
 local RewardConfig = require(ReplicatedStorage.shared.Configs.RewardConfig)
+local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 local GamepadInput = require(ReplicatedStorage.shared.Modules.GamepadInput)
@@ -1088,7 +1090,8 @@ end
 	call an Instance value", every press, silently until you try one. `UIController` has the same
 	hazard written down for `Open`/`Close`; this is the same trap one file over. ]]
 function ReviveController._pressAccept(self)
-	if self._locked or not self._open then
+	-- `_homeOnly`: RACE AGAIN is not on the panel, so ButtonA has nothing to press (see `_show`).
+	if self._locked or not self._open or self._homeOnly then
 		return
 	end
 	if self._ending then
@@ -1194,6 +1197,38 @@ function ReviveController._showEnd(self, payload)
 		studs = if summary then summary.studs else 0,
 		lives = 0,
 	})
+end
+
+--[[ === RACE AGAIN IN THE TUTORIAL, PER PLAYER (`TutorialConfig.RaceAgain`) ===============
+
+	Gamebeast's value for this player, followed for the session: `Observe` calls back once the configs
+	have loaded and again on every change, which includes their experiment group arriving a few
+	seconds in, long before anybody has finished a first run. Anything that is not a boolean is the
+	build's `Offered`, so a failure here costs the test and nothing else. ]]
+function ReviveController._observeRaceAgain(self)
+	local remote = TutorialConfig.RaceAgain.Remote
+	if not remote.Enabled then
+		return
+	end
+	task.spawn(function()
+		local ok, err = pcall(function()
+			local Gamebeast = require(ReplicatedStorage:WaitForChild("Gamebeast"))
+			Gamebeast:GetService("Configs"):Observe(remote.Path, function(value)
+				self._remoteRaceAgain = if type(value) == "boolean" then value else nil
+			end)
+		end)
+		if not ok then
+			self.log:warn("Gamebeast config unavailable, the tutorial offers RACE AGAIN as built: " .. tostring(err))
+		end
+	end)
+end
+
+--- Does a getaway in the tutorial offer RACE AGAIN to this player? Gamebeast's answer, else the build's.
+function ReviveController._offersRaceAgain(self): boolean
+	if self._remoteRaceAgain ~= nil then
+		return self._remoteRaceAgain
+	end
+	return TutorialConfig.RaceAgain.Offered
 end
 
 --[[ The controller's two buttons, live only while the screen is.
@@ -1664,6 +1699,7 @@ function ReviveController._show(self, offer)
 		return
 	end
 	self._pressed = false
+	self._homeOnly = false
 	if self._wreck then
 		--[[ The replay guard (see the header): idle when this answered for the player last time and
 			nothing has been pressed since. Decided once per offer so the line cannot change its mind. ]]
@@ -1677,9 +1713,16 @@ function ReviveController._show(self, offer)
 			local tutorial = Shard.get("TutorialController")
 			if tutorial and tutorial.isActive and tutorial:isActive() then
 				self._idle = true
+				--- ...and in one arm of the A/B a getaway's panel offers home and nothing else.
+				self._homeOnly = offer.ending == "bank" and not self:_offersRaceAgain()
 			end
 		end
 		self:_paintRun(offer)
+	end
+	--[[ Written every time, like the words: the next panel may offer RACE AGAIN again. The kit's row
+		is a centred list, so HOME moves to the middle on its own. ]]
+	if self._buttonSlot then
+		self._buttonSlot.Visible = not self._homeOnly
 	end
 
 	self._gui.Enabled = true
@@ -1897,9 +1940,13 @@ ReviveController:withLifecycle({
 		self._accepted = false -- REVIVE pressed and not yet answered; see `_pressAccept`
 		self._autoReplayedAt = nil -- when the countdown last raced again for the player
 		self._lastInputAt = 0 -- ...and the last press of anything, for the replay guard
+		self._homeOnly = false -- this panel has no RACE AGAIN (`_show`)
+		self._remoteRaceAgain = nil -- Gamebeast's `TutorialConfig.RaceAgain` for this player, once known
 	end,
 
 	start = function(self)
+		self:_observeRaceAgain()
+
 		UserInputService.InputBegan:Connect(function(input: InputObject)
 			if not IDLE_INPUTS[input.UserInputType] then
 				self._lastInputAt = os.clock()

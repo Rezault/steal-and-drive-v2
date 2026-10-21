@@ -2,6 +2,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 --- One broken controller must not stop the rest (`Modules/BootGuard` has the whole of why).
 local BootGuard = require(ReplicatedStorage.shared.Modules.BootGuard)
 
+--- The authored guis are copied into PlayerGui here rather than by the engine, so each one is sent
+--- once (`Modules/StarterGuiOnce` has the why). Spawned: it waits for the character.
+task.spawn(require(ReplicatedStorage.shared.Modules.StarterGuiOnce).copyInto, game:GetService("Players").LocalPlayer)
+
 --[[ Wait for the server, but NOT FOREVER (2026-10-14). This was an unbounded loop, so a server whose
 	services never finished starting left every client here for good: the join screen's hard timeout,
 	then black. After `SERVER_WAIT` seconds the client says so on the join screen and starts anyway. ]]
@@ -24,7 +28,9 @@ local Shard = require(ReplicatedStorage.Packages.Shard)
 for _, controller in script:GetChildren() do
 	if controller:IsA("ModuleScript") then
 		--- A module that throws while loading is named and skipped, not the end of the loop.
+		local began = os.clock()
 		local ok, module = pcall(require, controller)
+		BootGuard.timings[controller.Name .. ".require"] = os.clock() - began
 		if ok then
 			BootGuard.wrap(module, controller.Name)
 		else
@@ -45,6 +51,7 @@ end)
 	:andThen(function()
 		print("[SHARD]", workspace:GetServerTimeNow() - start, "ms to init and start controllers")
 		-- print("All controllers initialized and started successfully.")
+		BootGuard.publishSlowest()
 		workspace:SetAttribute("ShardClientStarted", true)
 		ReplicaClient.RequestData()
 	end)

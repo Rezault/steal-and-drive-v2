@@ -254,8 +254,43 @@ local RaceConfig = {
 		THE COST IS REAL AND IT IS THE FIRST THING TO REVISIT: ~16k parts reach every client at
 		join whether or not they ever drive those worlds. It is fine for a greybox and it is not
 		fine for ship. The fix when it matters is one place per world (TeleportService), which is
-		also what makes the teleport screen's name literally true. ]]
+		also what makes the teleport screen's name literally true.
+
+		REVISITED 2026-10-20 (`WorldRoadsPerPlayer` below): it was 25k instances, the biggest thing
+		in ReplicatedStorage, all of it landing before `game.Loaded` on every join. ]]
 	WorldRoadsName = "WorldRoads",
+
+	--[[ === EACH PLAYER IS SENT THEIR OWN WORLD'S ROAD, AFTER THE JOIN (2026-10-20) ==============
+
+		The worlds stay on the server (`ServerStorage.<WorldRoadsName>`) and `ReplicatedStorage`
+		keeps only an empty folder carrying the race origin. A client asks for a world's road
+		(`RoadController._requestRoad`): once the join screen has lifted, again whenever its world
+		changes, and at a race entry that finds it missing. `RoadService` clones that world's tiles
+		into the player's PlayerGui, which replicates to that one player and nobody else, a tile a
+		frame because a whole City is ~80 ms of cloning.
+
+		THE "FOLDER BEFORE ITS DESCENDANTS" PROBLEM the note above calls unsolvable is solved by a
+		count: the folder carries `WorldRoadCountAttribute`, the number of instances the server is
+		about to put in it, and the client does not touch it until it holds that many.
+
+		THE SERVER KEEPS NO COPY. Once the client has the whole road it moves it into its own
+		`ReplicatedStorage.<WorldRoadsName>` (a client-side child, which `_tileSource` reads exactly
+		where it always did) and says so; the server then unparents its copy. Measured in Studio on
+		2026-10-20: the client's copy survives that, is parented to nil rather than destroyed, and
+		can be re-parented and cloned. So a full server costs one world's clone per join, briefly,
+		rather than a world per player for the whole session.
+
+		A race into a world whose road has not arrived waits up to `WorldRoadWait` for it, behind the
+		entry's loading screen, and then builds the default road rather than no road. Set this false
+		to go back to every world in ReplicatedStorage for everybody. ]]
+	WorldRoadsPerPlayer = true,
+	WorldRoadCountAttribute = "Instances",
+	--- On the public folder: every map the server can send, as "|City|Desert|", so a client never
+	--- waits on a road for a world the server has no art for.
+	WorldRoadMapsAttribute = "Maps",
+	--- Seconds a race entry waits for its world's road. Inside `EnterReadyTimeout` with room left
+	--- for the car to arrive and the ring to be laid, or the entry is aborted instead.
+	WorldRoadWait = 6,
 
 	--[[ Where the race is built, for every world.
 

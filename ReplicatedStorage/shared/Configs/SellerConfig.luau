@@ -286,20 +286,27 @@ SellerConfig.Price = {
 	=== WAS, against a usual price of 3x worth: 0.36-0.5 / 0.5-0.7 / 0.7-1.0 / 1.0-1.15, so even a
 	STEAL was 1.08x worth and the average ~2.3x. ===
 
-	A STEAL is under worth and a GOOD DEAL is about it; FAIR and RIP-OFF are the markups a dealer
-	charges. Mean by weight:
+	=== THE LABELS SAY WHAT THE SIGN SAYS — 2026-10-21 ===
+	Aleafo: "i keep buying cars that are listed as fair but its like +30% or +44% above the average
+	price, how is that a fair price". WAS Good 0.9-1.15 (w 0.30), Fair 1.15-1.5 (w 0.38), RipOff
+	1.5-2.0 (w 0.20), so FAIR was always +15% to +50% and a GOOD DEAL could be +15%. IS: a STEAL and
+	a GOOD DEAL are BELOW worth, FAIR is at worth to +15% (Aleafo, same night: "lets make fair 15
+	then"; was +20% for an hour), and anything past that is a RIP-OFF. Same four keys, because the
+	sign's badge ramps are authored per `Key`.
 
-	    0.12 x 0.825 + 0.30 x 1.025 + 0.38 x 1.325 + 0.20 x 1.75  =  ~1.26x worth
+	Mean by weight:
 
-	about half the old average. A car on a free bay earns its worth back in `SellSeconds`
-	(`GarageConfig.Income`), so even a RIP-OFF pays for itself in under ten minutes. Move a weight
-	and redo that sum. Much under 1 and buying everything beats thinking; much over 1.6 and nobody
-	buys. ]]
+	    0.10 x 0.825 + 0.25 x 0.95 + 0.35 x 1.075 + 0.30 x 1.575  =  ~1.17x worth
+
+	WAS ~1.26x, so sellers are ~7% cheaper on average. A car on a free bay earns its worth back in
+	`SellSeconds` (`GarageConfig.Income`), so even a RIP-OFF pays for itself in under ten minutes. Move
+	a weight and redo that sum. Much under 1 and buying everything beats thinking; much over 1.6 and
+	nobody buys. ]]
 SellerConfig.Bands = {
-	{ Key = "Steal", Label = "STEAL!", Weight = 0.12, Min = 0.75, Max = 0.9, Color = Color3.fromRGB(255, 198, 0) },
-	{ Key = "Good", Label = "GOOD DEAL", Weight = 0.30, Min = 0.9, Max = 1.15, Color = Color3.fromRGB(13, 180, 21) },
-	{ Key = "Fair", Label = "FAIR PRICE", Weight = 0.38, Min = 1.15, Max = 1.5, Color = Color3.fromRGB(150, 160, 180) },
-	{ Key = "RipOff", Label = "RIP-OFF", Weight = 0.20, Min = 1.5, Max = 2.0, Color = Color3.fromRGB(226, 96, 96) },
+	{ Key = "Steal", Label = "STEAL!", Weight = 0.10, Min = 0.75, Max = 0.9, Color = Color3.fromRGB(255, 198, 0) },
+	{ Key = "Good", Label = "GOOD DEAL", Weight = 0.25, Min = 0.9, Max = 1.0, Color = Color3.fromRGB(13, 180, 21) },
+	{ Key = "Fair", Label = "FAIR PRICE", Weight = 0.35, Min = 1.0, Max = 1.15, Color = Color3.fromRGB(150, 160, 180) },
+	{ Key = "RipOff", Label = "RIP-OFF", Weight = 0.30, Min = 1.15, Max = 2.0, Color = Color3.fromRGB(226, 96, 96) },
 }
 
 -- === Words and wiring ======================================================

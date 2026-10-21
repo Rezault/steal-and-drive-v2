@@ -125,11 +125,43 @@
 	`SpeedTrap` sources) and a few design ids, named where they are sent. Speed traps get no marker of
 	their own: they are several a run, so they ride on `RunEnded` as a count and a total, the same
 	volume trade `PassiveIncome` makes.
+
+=== THE JOIN FUNNEL (2026-10-20) ==============================================================
+
+	Asked for by Aleafo: joins were reported slow, and some low-end phones crash before they reach the
+	game, and nothing measured either. `ReplicatedFirst.JoinScreen` reports each of its phases over
+	`JoinProgress`, a PLAIN RemoteEvent this service parents to ReplicatedStorage in `init`, because
+	that script runs before any module (Shard included) can be required and has to find it by name.
+	Step 1 is the server seeing the player arrive, so a client that dies before it can send anything
+	still counts as a join that stopped at step 1.
+
+	    Roblox funnel "Join"  Joined > Loaded > Started > Spawned > Playing, one funnel session per
+	                      join (a GUID), so a rejoin is a second run through it. Filter by Platform.
+	    JoinFinished      {seconds, character, screen, loaded, started, spawned, assets, assetCount,
+	                      assetsFetched, slowest, slowestSeconds, memoryMb, textureMb, meshMb,
+	                      partsMb, soundMb, luaMb, recovered, onboarded}   the overlay lifted.
+	                      `seconds` is server time since PlayerAdded and `character` the server's
+	                      own time to a character (profile, plot, LoadCharacter); `screen` and the
+	                      phase fields are the screen's laps; `slowest` is the slowest controller
+	                      phase (`Modules/BootGuard`), e.g. "OfflineController.start"
+	    JoinFailed        {stage, lastPhase, seconds, character, memoryMb}   the screen said
+	                      COULDN'T LOAD; stage = boot | controllers | spawn | timeout
+	    JoinAbandoned     {lastPhase, step, seconds, character, memoryMb, failed}   left before the
+	                      overlay lifted: a quit, a crash or a disconnect, which a server cannot
+	                      tell apart
+
+	GA gets `Join:Finished` (value = seconds), `Join:Failed:<Stage>` and `Join:Abandoned:<Phase>`.
+	`memoryMb` is the client's own total (`Stats:GetTotalMemoryUsageMb`) at its latest report: the
+	number to read beside the Creator Dashboard's "Unexpected out of memory exits". The `...Mb`
+	fields are its `DeveloperMemoryTag`s as the game appears.
 ]]
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+--- Roblox's own, for the "Join" funnel; `FirstCarService` names it the same way.
+local RobloxAnalytics = game:GetService("AnalyticsService")
 
 local GameAnalytics = require(ReplicatedStorage.Packages["gameanalytics-sdk"])
 local Gamebeast = require(ReplicatedStorage:WaitForChild("Gamebeast"))
@@ -275,6 +307,24 @@ end
 local PAGE_COOLDOWN = 20
 local PAGE_CAP = 150
 
+--[[ The join funnel (see the header). Step 1 is `PlayerAdded`; the rest are `JoinScreen`'s phases,
+	spelled as it reports them, so keep the two in step. ]]
+local JOIN_FUNNEL = "Join"
+local JOIN_REMOTE = "JoinProgress"
+local JOIN_STEPS = { joined = 1, loaded = 2, started = 3, spawned = 4, playing = 5 }
+local JOIN_STEP_NAMES = { "Joined", "Loaded", "Started", "Spawned", "Playing" }
+--- Why a screen said COULDN'T LOAD (`JoinScreen`'s `showError`). Anything else reads "unknown".
+local JOIN_FAIL_STAGES = { boot = true, controllers = true, spawn = true, timeout = true }
+
+--- A number a client sent: finite, inside `0..limit`, to one decimal. Anything else is nil, which
+--- leaves the field off the marker rather than charting a lie.
+local function clientNumber(value: unknown, limit: number): number?
+	if type(value) ~= "number" or value ~= value or value < 0 or value > limit then
+		return nil
+	end
+	return math.floor(value * 10 + 0.5) / 10
+end
+
 --[[ What a cash top-up was FOR, from the sentence each `CashService:offerTopUp` caller hands it (the
 	callers are `SellerService`, `UpgradeService` twice, `WorldService`, `WorkshopService` and
 	`CarDealService`). Matched in order, so the bay upgrade is caught before the generic upgrade. A
@@ -382,6 +432,25 @@ AnalyticsService:withLifecycle({
 		--- [userId] = the guide trail look last read for them, for a marker sent as they leave.
 		self._guideStyles = {}
 
+		--- [userId] = { at, session, step, phase, character?, slowest?, memoryMb?, failed?, done? },
+		--- this join's funnel run.
+		self._joins = {}
+		--[[ Here and not in `start`, so the screen of a player who joins while the server is still
+			booting finds it, and so their arrival is timed from as early as this server can see it. ]]
+		local joinRemote = Instance.new("RemoteEvent")
+		joinRemote.Name = JOIN_REMOTE
+		joinRemote.Parent = ReplicatedStorage
+		self._trove:Add(joinRemote)
+		self._trove:Add(joinRemote.OnServerEvent:Connect(function(player: Player, phase: unknown, data: unknown)
+			self:_onJoinProgress(player, phase, data)
+		end))
+		self._trove:Add(Players.PlayerAdded:Connect(function(player: Player)
+			self:_onJoined(player)
+		end))
+		for _, player in Players:GetPlayers() do
+			self:_onJoined(player)
+		end
+
 		--[[ pcall because a Gamebeast outage or a bad key must cost the Gamebeast markers and nothing
 			else; `Marker` checks `_gamebeast` and goes quiet when this failed. ]]
 		local ok, err = pcall(function()
@@ -391,11 +460,25 @@ AnalyticsService:withLifecycle({
 		if not ok then
 			self.log:warn("Gamebeast did not start, its markers are off: " .. tostring(err))
 		end
+
+		--[[ What this build can show an experiment, as a Gamebeast server property the experiment
+			targets: the tutorial's RACE AGAIN A/B enrols only players on a server that says it has the
+			switch (`TutorialConfig.RaceAgain`). Its own pcall, so a failure here costs that test and
+			not the markers. ]]
+		if self._gamebeast and TutorialConfig.RaceAgain.Remote.Enabled then
+			local propOk, propErr = pcall(function()
+				Gamebeast:GetService("Experiments"):SetServerProperty(TutorialConfig.RaceAgain.ServerProperty, true)
+			end)
+			if not propOk then
+				self.log:warn("Gamebeast server property not set, the RACE AGAIN test enrols nobody here: " .. tostring(propErr))
+			end
+		end
 	end,
 
 	start = function(self)
 		self._trove:Add(Players.PlayerRemoving:Connect(function(player: Player)
 			local userId = player.UserId
+			self:_onJoinLeft(player)
 			self:_flushPassive(player)
 			self._once[userId] = nil
 			self._ready[userId] = nil
@@ -1364,6 +1447,131 @@ function AnalyticsService._onPageOpened(self, player: Player, page: unknown)
 	seen.count += 1
 	self:Marker(player, "PageOpened", { page = page })
 	self:DesignOnce(player, "UI:Opened:" .. clean(page))
+end
+
+-- === The join funnel ========================================================
+
+local function joinSeconds(join): number
+	return math.floor((os.clock() - join.at) * 10 + 0.5) / 10
+end
+
+--[[ Logs Roblox funnel steps up to `step` for this join, including any between: a screen that
+	recovered from COULDN'T LOAD goes straight to `playing`, and it did pass the steps it skipped
+	reporting. `pcall` for `TutorialService._funnel`'s reason: Roblox analytics may be off or
+	rate limited, and that must never reach the join. ]]
+function AnalyticsService._joinStep(self, player: Player, join, step: number)
+	for index = join.step + 1, step do
+		pcall(function()
+			RobloxAnalytics:LogFunnelStepEvent(player, JOIN_FUNNEL, join.session, index, JOIN_STEP_NAMES[index])
+		end)
+	end
+	join.step = math.max(join.step, step)
+end
+
+function AnalyticsService._onJoined(self, player: Player)
+	if self._joins[player.UserId] then
+		return
+	end
+	local join = { at = os.clock(), session = HttpService:GenerateGUID(false), step = 0, phase = "joined" }
+	self._joins[player.UserId] = join
+	self:_joinStep(player, join, JOIN_STEPS.joined)
+	--- The server's half of the wait, stamped once: `PlotService` loads the character only after the
+	--- profile and the plot, so this is how long the client had nothing to stand on.
+	player.CharacterAdded:Once(function()
+		join.character = joinSeconds(join)
+	end)
+end
+
+--[[ A phase from `JoinScreen` (`JoinProgress`). TRUST: a phase name checked against `JOIN_STEPS`,
+	only ever forward and once each, plus numbers that only ride on the markers; nothing is paid or
+	changed on it, and a join sends at most six. ]]
+function AnalyticsService._onJoinProgress(self, player: Player, phase: unknown, data: unknown)
+	local join = self._joins[player.UserId]
+	if not join or join.done or type(phase) ~= "string" then
+		return
+	end
+	local payload = if type(data) == "table" then data else {}
+	join.memoryMb = clientNumber(payload.memoryMb, 100000) or join.memoryMb
+	local seconds = joinSeconds(join)
+
+	if phase == "failed" then
+		if join.failed then
+			return
+		end
+		join.failed = true
+		local stage = if type(payload.stage) == "string" and JOIN_FAIL_STAGES[payload.stage] then payload.stage else "unknown"
+		self:Marker(player, "JoinFailed", {
+			stage = stage,
+			lastPhase = join.phase,
+			seconds = seconds,
+			character = join.character,
+			memoryMb = join.memoryMb,
+		})
+		self:Design(player, "Join:Failed:" .. beatLabel(stage), seconds)
+		return
+	end
+
+	local step = JOIN_STEPS[phase]
+	if not step or step <= join.step then
+		return
+	end
+	join.phase = phase
+	self:_joinStep(player, join, step)
+	if phase == "started" then
+		--- A module name and a phase, nothing else (`BootGuard.timings` keys), capped for the dashboard.
+		local slowest = payload.slowest
+		if type(slowest) == "string" and #slowest <= 64 and slowest:match("^[%w_]+%.%a+$") then
+			join.slowest = slowest
+			join.slowestSeconds = clientNumber(payload.slowestSeconds, 900)
+		end
+	end
+	if phase ~= "playing" then
+		return
+	end
+
+	join.done = true
+	local Tutorial = Shard.get("TutorialService")
+	self:Marker(player, "JoinFinished", {
+		seconds = seconds,
+		character = join.character,
+		screen = clientNumber(payload.screen, 900),
+		loaded = clientNumber(payload.loaded, 900),
+		started = clientNumber(payload.started, 900),
+		spawned = clientNumber(payload.spawned, 900),
+		assets = clientNumber(payload.assets, 900),
+		assetCount = clientNumber(payload.assetCount, 100000),
+		assetsFetched = clientNumber(payload.assetsFetched, 100000),
+		slowest = join.slowest,
+		slowestSeconds = join.slowestSeconds,
+		memoryMb = join.memoryMb,
+		textureMb = clientNumber(payload.textureMb, 100000),
+		meshMb = clientNumber(payload.meshMb, 100000),
+		partsMb = clientNumber(payload.partsMb, 100000),
+		soundMb = clientNumber(payload.soundMb, 100000),
+		luaMb = clientNumber(payload.luaMb, 100000),
+		recovered = join.failed == true,
+		onboarded = Tutorial ~= nil and Tutorial:isFinished(player),
+	})
+	self:Design(player, "Join:Finished", seconds)
+end
+
+--- Left before the overlay lifted. Sent from `PlayerRemoving`, where the Player still resolves.
+function AnalyticsService._onJoinLeft(self, player: Player)
+	local join = self._joins[player.UserId]
+	self._joins[player.UserId] = nil
+	if not join or join.done then
+		return
+	end
+	local seconds = joinSeconds(join)
+	self:Marker(player, "JoinAbandoned", {
+		lastPhase = join.phase,
+		step = join.step,
+		seconds = seconds,
+		character = join.character,
+		memoryMb = join.memoryMb,
+		failed = join.failed == true,
+	})
+	self:Design(player, "Join:Abandoned:" .. beatLabel(join.phase), seconds)
 end
 
 return AnalyticsService

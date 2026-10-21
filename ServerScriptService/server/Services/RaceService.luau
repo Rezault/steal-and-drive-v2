@@ -2633,8 +2633,42 @@ function RaceService.reviveRace(self, player: Player): boolean
 			end)
 		end
 		self:_deployDriving(car, player)
+		self:_checkOwnerAfterRevive(player, car)
 	end)
 	return true
+end
+
+--[[ DID THE HAND-BACK LAND? (2026-10-21, a phone player busted in the tutorial chase: "everytime I
+	did it kept teleporting me back when I drive ... then my car flung out the map".) Every
+	`SetNetworkOwner` above is in a pcall, and a car the server still owns is exactly that report: the
+	client's rebase (`RoadController._shiftWorld`) moves the car, the server's copy pulls it back, and
+	the road and the car end up a rebase apart. Unconfirmed as the cause, so this LOGS it when it finds
+	it, and gives the car back. A few checks, because `_deployDriving`'s occupant toggle runs the stock
+	`onExitSeat`, which hands ownership to the engine for a moment. ]]
+function RaceService._checkOwnerAfterRevive(self, player: Player, car: Model)
+	task.spawn(function()
+		for _ = 1, 3 do
+			task.wait(1.5)
+			local primary = car.PrimaryPart
+			if self._cars[player] ~= car or self._wrecking[player] or not (primary and primary.Parent) then
+				return
+			end
+			local ok, owner = pcall(function()
+				return primary:GetNetworkOwner()
+			end)
+			if ok and owner ~= player then
+				self.log:warn(string.format("%s's revived car was owned by %s, not them; giving it back.", player.Name, tostring(owner)))
+				local given, err = pcall(function()
+					primary:SetNetworkOwner(player)
+				end)
+				if not given then
+					self.log:warn("Could not give the revived car back: " .. tostring(err))
+				end
+			elseif not ok then
+				self.log:warn(string.format("Could not read the owner of %s's revived car: %s", player.Name, tostring(owner)))
+			end
+		end
+	end)
 end
 
 --[[ Where a revived car is set down: the lane it should have been in, at the point it died, minus

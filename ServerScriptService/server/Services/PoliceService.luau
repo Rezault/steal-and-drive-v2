@@ -217,7 +217,9 @@ end
 --[[ Stamp `SectionAttribute` onto every tile `PoliceConfig.Sections` names.
 
 	Runs against the PUBLISHED roads (`ReplicatedStorage.WorldRoads`), because that is where the
-	tiles are once `RoadService` has moved the authored folders out of Workspace.
+	tiles are once `RoadService` has moved the authored folders out of Workspace. With
+	`RaceConfig.WorldRoadsPerPlayer` on they are in `ServerStorage.WorldRoads` instead, and the
+	attribute reaches a client on the copy of its world it is sent.
 
 	IT WAITS FOR THEM RATHER THAN ASSUMING THEY ARE THERE. See the note beside the service
 	declaration: Shard's start order is not dependency order, so this can and does run before
@@ -232,7 +234,8 @@ end
 	ADDITIVE. A tile that already carries the attribute is left alone and counted, so marking one by
 	hand in Studio is a supported way to test a chase in a world this file says nothing about. ]]
 function PoliceService._markSections(self): number
-	local roads = ReplicatedStorage:WaitForChild(RaceConfig.WorldRoadsName, PUBLISH_WAIT)
+	local home = if RaceConfig.WorldRoadsPerPlayer then ServerStorage else ReplicatedStorage
+	local roads = home:WaitForChild(RaceConfig.WorldRoadsName, PUBLISH_WAIT)
 	if not roads then
 		self.log:warn("No published world roads to mark; the chase will only arm off PoliceConfig.FallbackTile.")
 		return 0

@@ -1007,14 +1007,53 @@ end
 	beat for why. Only an EMPTY bay: a full lot keeps the car in the hands and the beat teaches the
 	drop. `Enabled = false`: PLACE is the player's to do, as it was.
 
-	`After` is the seconds between the car landing in the hands and the park. Never 0 and never a
-	`task.defer`: inside one frame the FirstCarCarried and FirstCarPlaced markers (and BANK done and
-	PLACE done) get the same millisecond stamp, and Gamebeast funnels cannot order a tie, so the
-	onboarding board would show nobody parking. The bank happens out on the road, so nobody sees it. ]]
+	`After` is the seconds between the car landing in the hands and the park. MORE THAN ONE, and never
+	a `task.defer`: Gamebeast keeps a marker's time to the whole SECOND and a funnel cannot order two
+	markers in the same second, so a sooner park puts FirstCarCarried and FirstCarPlaced (and BANK done
+	and PLACE done) in one second for most players, and the onboarding board reads as nobody parking.
+	At 0.1 (build 2647, 2026-10-20) 519 carried and 523 parked, yet the funnel read 11%: the share of
+	players whose tenth of a second happened to cross a second boundary. The bank happens out on the
+	road and the trip home takes about 8 seconds, so nobody sees the wait. ]]
 TutorialConfig.AutoPark = {
 	Enabled = true,
 	Beat = "place",
-	After = 0.1,
+	After = 1.5,
+}
+
+--[[ === RACE AGAIN AFTER THE FIRST GETAWAY: AN A/B (2026-10-20) ============================
+
+	Dylan: "if the player has the option to play again or not during their tutorial ... if they are
+	forced to go back to dealership first car they get away with or they can keep playing". Which one
+	is better for playtime and for getting through the funnel.
+
+	The end panel after a GETAWAY while the tutorial is running (`ReviveController._show`) offers HOME
+	and RACE AGAIN, and its countdown goes home. With `Offered` false the RACE AGAIN button is not there
+	at all: HOME stands alone in the middle of the row and ButtonA does nothing, so the only way on is
+	home, where the parked car and the buyer are. A WRECK in the tutorial keeps both buttons, because
+	there is no car to go home to.
+
+	Before the test (the three days to 2026-10-20) 3,269 players pressed RACE AGAIN on that panel and
+	5,038 pressed HOME, so a lot of first-timers raced on before they had met the buyer.
+
+	EACH PLAYER'S VALUE IS GAMEBEAST'S: experiment 81 "Tutorial: race again after the first getaway",
+	50/50 by player. "live" holds `Tutorial.RaceAgain = true` (group 178, "Race again offered"), and
+	group 179, "Home only", sets it to false. Anything missing or not a boolean is `Offered`, so Studio
+	(its "studio" environment has no "live") and a Gamebeast outage get the panel as it was.
+	`Remote.Path` starts with the configuration's name.
+
+	SHIPPING THE WINNER: terminate experiment 81, set `Tutorial.RaceAgain` in "live" to it, and set
+	`Offered` above to match.
+
+	ONLY A SERVER RUNNING THIS CODE ENROLS ANYBODY. It sets the Gamebeast server property
+	`ServerProperty` to true at boot (`AnalyticsService`), and the experiment targets players on a
+	server that has it, so a build without the switch never puts a player in a group they cannot see. ]]
+TutorialConfig.RaceAgain = {
+	Offered = true,
+	Remote = {
+		Enabled = true,
+		Path = { "live", "Tutorial", "RaceAgain" },
+	},
+	ServerProperty = "tutorialRaceAgainTest",
 }
 
 --[[ THE CAMERA TURNS TO THE BUYER (2026-10-19), on a face carrying `Look = true` (SELL's, once the

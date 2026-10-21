@@ -44,7 +44,9 @@ local NewUIConfig = {}
 	flag that is off costs a player nothing. ]]
 NewUIConfig.Enabled = true
 
---- The authored ScreenGui each answer points at. Both live in `StarterGui`; neither resets on spawn.
+--- The authored ScreenGui each answer points at; neither resets on spawn. Only the new one is in
+--- `StarterGui` now: the old one is parked at `ServerStorage.UIImports.MainUI` (2026-10-20) and has
+--- to go back to `StarterGui` before `false` here, or the tester override, can show it (`UIRoot`).
 NewUIConfig.ScreenGuiName = "MainUIV2"
 NewUIConfig.LegacyScreenGuiName = "MainUI"
 
