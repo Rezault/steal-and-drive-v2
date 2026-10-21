@@ -1079,11 +1079,18 @@ end
 	`b` are the floor's tip bases (`GarageService.getBayTip`) best first, and `customers` is the
 	floor's crowd as the live lot spawns it, min(capacity, cars). Every term only grows when a car is
 	added: the ranking can only move up, and the crowd only grows. Decay makes a big lot level off the
-	way the crowd did, so a full lot earns what it earned before, not the sum of every car.
+	way the crowd did, so a full lot earns a little more than before, not the sum of every car.
 
-	FITTED, NOT GUESSED: the constants are a least-squares fit to the old simulation over 160 random
-	lots (1-6 cars, 2-6 customers, both floors, a 12x spread of car values, the real customer kinds):
-	rms error 13%, worst 33%. The live crowd still walks and reacts exactly as before; a liked look
+	EVERY CAR VISIBLY ADDS (the owner, same day: "a player should see that his income goes up if he
+	places a car"). WAS Decay 0.2 / CrowdPower 0.5, the closest fit to the old crowd (rms 13%), where a
+	4th car added under 1%. IS 0.8 / 0.1, chosen by the owner over a full sum: a 6th car of similar
+	value adds about +10%. The cost, measured against the old simulation: lots of 1-2 cars earn ~16%
+	less and lots of 5-6 ~26% more (rms 23%). Decay 1 with CrowdPower 0 is the plain sum (+20% for a
+	6th car, small lots -21%, full lots +37%).
+
+	FITTED, NOT GUESSED: `Pace` is the least-squares fit to the old simulation for these two numbers,
+	over 160 random lots (1-6 cars, 2-6 customers, both floors, a 12x spread of car values, the real
+	customer kinds). The live crowd still walks and reacts exactly as before; a liked look
 	pays out what the lot has earned since the last one, so the bubbles and bursts are unchanged and
 	the total is the formula's. The HUD's ~$/hr, the offline label and the WELCOME BACK payout all
 	read this same function, so they cannot disagree, and nothing is random any more.
@@ -1091,11 +1098,11 @@ end
 	`Ranked = false`: the crowd simulation and per-look tips, exactly as before this note. ]]
 CustomerConfig.Income = {
 	Ranked = true,
-	Decay = 0.2,
-	CrowdPower = 0.5,
+	Decay = 0.8,
+	CrowdPower = 0.1,
 	--- Liked looks per second the formula pays for, downstairs and upstairs (the stairs walk is why
 	--- upstairs is lower). Multiplies `perLook`, so `Tip.ValueFraction` and `ByWorld` still tune it.
-	Pace = { 0.0283, 0.0173 },
+	Pace = { 0.0269, 0.0150 },
 }
 return CustomerConfig
 
