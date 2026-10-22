@@ -726,6 +726,32 @@ CarryConfig.Guide = {
 	Carrying = "Carrying",
 	Parked = "Parked",
 
+	--[[ THE FIRST CAR PARKS ITSELF (2026-10-19). The `FirstCar` funnel showed 31.6% of players who got
+		their first car into their hands never put it on a podium: the results screen, the NEW BEST
+		cutscene, then a walk across the island holding a car, right after the best moment of the
+		session. So the first car ever banked goes straight onto the lowest free showroom podium
+		(`FirstCarService._autoPark`), through the same `GarageService.placeCarried` a press would
+		use, and the player comes home to it already standing there; the `Parked` card says what it
+		is for. The carry is still taught, by the second car, when there is something to care about.
+
+		A FULL LOT (only possible on a profile that sold everything) falls back to the carry as
+		before. `false`: the walkthrough exactly as it was, card and all. ]]
+	--- 2026-10-19: OFF (Aleafo: "players should learn to press and place it down, it's a movement taught
+	--- in other games with the format"). The carry-and-place beat teaches it again.
+	AutoParkFirst = false,
+	--[[ ...AND THE PLAYER COMES HOME TO IT (2026-10-19). A run returns everybody to their lot's spawn
+		pad, which left a first-timer at the gate while their car and the tutorial's first buyer were
+		at a podium across the showroom. So the trip home after the auto-park ends in front of that
+		podium instead, facing the car (`FirstCarService._standAtCar`), this many studs out from the
+		podium's FRONT EDGE along the aisle it faces (`GarageService` Bay `base`), and `AutoParkSide`
+		studs to their LEFT as they face it (negative: right). Off to the side because the tutorial's
+		buyer stands square in front of the car (`BuyerConfig.Stand.Front`): straight out, the player
+		landed in the buyer (2026-10-19, "make me stand like over there", at the podium's front left
+		corner). Once only, for that one homecoming. `AutoParkStand` 0 or nil: home to the spawn pad
+		as before. ]]
+	AutoParkStand = 6,
+	AutoParkSide = 9,
+
 	--- A boolean on the Player mirroring the profile's `Placed` latch: true once any car of theirs has
 	--- reached a bay. Published whether or not the guide is on, because `Hint.FirstTimeOnly` reads it.
 	ParkedBeforeAttribute = "FirstCarParked",
