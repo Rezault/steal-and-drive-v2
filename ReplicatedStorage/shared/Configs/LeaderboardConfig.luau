@@ -111,6 +111,13 @@ LeaderboardConfig.ReadInterval = 60
 	Hard ceiling is 100 — `GetSortedAsync` will not return a larger page. ]]
 LeaderboardConfig.TopN = 50
 
+--[[ THE DEVELOPERS ARE NOT ON THE BOARD (2026-10-22, the owner: "we shouldnt show up on it"). Everyone
+	`Admins.isAdmin` answers yes for (the `Admins.List` ids, and the place owner on a user-owned place)
+	is never written, has whatever they wrote before removed once a session, and is filtered out of
+	every read, so a rank already in the store disappears at the next refresh rather than whenever the
+	removal lands. `false`: developers rank like anyone else. ]]
+LeaderboardConfig.ExcludeAdmins = true
+
 -- === The boards =============================================================
 
 --[[ One entry per tab, in tab order.

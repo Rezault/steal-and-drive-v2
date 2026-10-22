@@ -74,6 +74,7 @@ local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 -- For `Keys.Found` alone — the catalogue the BIGGEST COLLECTION board counts. See `READERS.Collection`.
 local InventoryConfig = require(ReplicatedStorage.shared.Configs.InventoryConfig)
 local LeaderboardConfig = require(ReplicatedStorage.shared.Configs.LeaderboardConfig)
+local Admins = require(ReplicatedStorage.shared.Configs.Admins)
 
 local Data = require(script.Parent.Parent.Data)
 
@@ -298,6 +299,15 @@ end
 
 	Each `SetAsync` is spawned and `pcall`ed independently: a throttled or failed write costs that
 	board that player's rank until the next tick, and must not take the other four down with it. ]]
+--- Is this user kept off the board (`LeaderboardConfig.ExcludeAdmins`)? The admin ids, and the owner
+--- of a user-owned place, the same people `Admins.isAdmin` lets in.
+local function excluded(userId: number): boolean
+	if not LeaderboardConfig.ExcludeAdmins then
+		return false
+	end
+	return Admins.List[userId] == true or (game.CreatorType == Enum.CreatorType.User and userId == game.CreatorId)
+end
+
 function LeaderboardService._writePlayer(self, player: Player)
 	if STUDIO then
 		return -- header note 4: never write live rankings from a playtest
@@ -308,6 +318,27 @@ function LeaderboardService._writePlayer(self, player: Player)
 	end
 
 	local userId = tostring(player.UserId)
+	--[[ A developer is never written, and what they wrote before this existed is removed, once a
+		session (`ExcludeAdmins`). The read filters them too, so the board is clean either way. ]]
+	if excluded(player.UserId) then
+		if not self._removed[player] then
+			self._removed[player] = true
+			for _, board in LeaderboardConfig.List do
+				local store = self._stores[board.Key]
+				if store then
+					task.spawn(function()
+						local ok, err = pcall(function()
+							store:RemoveAsync(userId)
+						end)
+						if not ok then
+							self.log:warn(string.format("Could not take %s off %s: %s", player.Name, board.Key, tostring(err)))
+						end
+					end)
+				end
+			end
+		end
+		return
+	end
 	for _, board in LeaderboardConfig.List do
 		local value = self:_read(board, player)
 		if value and value > 0 and written[board.Key] ~= value then
@@ -397,7 +428,7 @@ function LeaderboardService._localSnapshot(self): Snapshot
 		local rows: { Row } = {}
 		for _, player in Players:GetPlayers() do
 			local value = self:_read(board, player)
-			if value and value > 0 then
+			if value and value > 0 and not excluded(player.UserId) then
 				table.insert(rows, { Id = player.UserId, Name = player.DisplayName, Value = value })
 			end
 		end
@@ -426,8 +457,9 @@ function LeaderboardService._build(self): Snapshot
 
 	for _, board in LeaderboardConfig.List do
 		local store = self._stores[board.Key]
+		--- A few extra rows, so a board with developers in its top N still shows N once they are filtered.
 		local ok, pages = pcall(function()
-			return store:GetSortedAsync(false, LeaderboardConfig.TopN) -- false = descending
+			return store:GetSortedAsync(false, math.min(100, LeaderboardConfig.TopN + 5)) -- false = descending
 		end)
 		if not (ok and pages) then
 			self.log:warn(string.format("Could not read the %s board: %s", board.Key, tostring(pages)))
@@ -439,7 +471,7 @@ function LeaderboardService._build(self): Snapshot
 		for _, entry in pages:GetCurrentPage() do
 			local userId = tonumber(entry.key)
 			local value = tonumber(entry.value)
-			if userId and value then
+			if userId and value and not excluded(userId) and #rows < LeaderboardConfig.TopN then
 				table.insert(rows, { Id = userId, Name = "", Value = value })
 				table.insert(pending, userId)
 			end
@@ -535,6 +567,7 @@ function LeaderboardService._release(self, player: Player)
 	self:_writePlayer(player)
 	self._profiles[player] = nil
 	self._written[player] = nil
+	self._removed[player] = nil
 	self._sessionStart[player] = nil
 end
 
@@ -543,6 +576,7 @@ LeaderboardService:withLifecycle({
 		self._profiles = {} :: { [Player]: any }
 		self._stores = {} :: { [string]: OrderedDataStore }
 		self._written = {} :: { [Player]: { [string]: number } } -- last value ranked, per board
+		self._removed = {} :: { [Player]: boolean } -- a developer whose old ranks were taken off this session
 		self._sessionStart = {} :: { [Player]: number } -- os.time() of this player's last time flush
 		self._nameCache = {} :: { [number]: string | false } -- false = looked up and unresolved
 		self._snapshot = nil :: Snapshot?
