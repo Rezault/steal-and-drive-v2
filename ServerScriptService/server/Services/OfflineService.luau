@@ -668,14 +668,23 @@ function OfflineService._publishLabelRate(self, player: Player)
 	if Garage and not GarageConfig.Income.Passive then
 		rate = self:_simulate(player, Garage, OfflineConfig.Label.PerSeconds)
 		--- The HUD's income line (`GarageConfig.Hud.TipRate`), an hour of the lot at full strength.
-		--- Cached by the simulation like the offline figure, so this costs nothing while the lot is still.
-		live = self:_simulate(player, Garage, 3600, true)
-		local multiplier = Garage:incomeMultiplier(player)
-		rate = math.floor(rate * multiplier)
-		live = math.floor(live * multiplier)
+		live = self:liveRate(player) * 3600
+		rate = math.floor(rate * Garage:incomeMultiplier(player))
+		live = math.floor(live)
 	end
 	player:SetAttribute(OfflineConfig.Label.Attribute, rate)
 	player:SetAttribute(GarageConfig.Hud.TipRate.Attribute, live)
+end
+
+--[[ PUBLIC (CustomerService): what this player's lot earns per second while they are in the game,
+	passes included. With `CustomerConfig.Income.Ranked` the live crowd is paid exactly this, so the
+	HUD line above and the money cannot disagree. 0 with passive income or no GarageService. ]]
+function OfflineService.liveRate(self, player: Player): number
+	local Garage = Shard.get("GarageService")
+	if not Garage or GarageConfig.Income.Passive then
+		return 0
+	end
+	return self:_simulate(player, Garage, 3600, true) / 3600 * Garage:incomeMultiplier(player)
 end
 
 OfflineService:withLifecycle({

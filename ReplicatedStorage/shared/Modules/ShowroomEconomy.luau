@@ -113,6 +113,26 @@ function ShowroomEconomy.estimate(cfg, values: {number}, slots: number, seconds:
   if type(value)~="number" or value~=value or value<0 or value==math.huge or type(index)~="number" or index<1 or index%1~=0 or type(efficiency)~="number" or efficiency~=efficiency or efficiency<0 or efficiency>1 then return 0,0 end
   table.insert(entries,tostring(value).."@"..tostring(index).."*"..tostring(efficiency))
  end
+ local income=cfg.Income
+ if income and income.Ranked then
+  -- `CustomerConfig.Income`: every car ranked together whatever its floor, decaying weights x crowd^power. Never lower with a car added.
+  local list={}
+  for i,value in values do
+   local efficiency=if efficiencies then efficiencies[i] else cfg.Offline.Efficiency
+   -- A floor with no customers (upstairs before `Floor2`) earns nothing, as it always has.
+   if value>0 and (caps[floorOf(i,indices)] or 0)>0 then table.insert(list,value*efficiency) end
+  end
+  local rate,crowd=0,math.min((caps[1] or 0)+(caps[2] or 0),#list)
+  if crowd>0 then
+   table.sort(list,function(a,b) return a>b end)
+   local weighted,w=0,1
+   for j,b in list do weighted+=w*b;w=if j==1 then income.Second else w*income.Decay end
+   rate=cfg.perLook(weighted)*income.Pace*crowd^income.CrowdPower
+  end
+  if vip then rate*=cfg.vipIncomeMultiplier() end
+  local counted=math.clamp(seconds,0,cfg.Offline.CapSeconds)
+  return math.floor(rate*counted),math.floor(crowd*counted/cfg.Offline.TripSeconds)
+ end
  local key=table.concat(entries,";");local result=cache[key]
  if not result then
   local rate,visitors=0,0

@@ -146,6 +146,9 @@ type Crowd = {
 	leaving: { [any]: boolean },
 	nextSpawn: number,
 	nextSpawnByFloor: {number},
+	--- The lot's earnings not yet paid out, and when they were last added to (`_bank`).
+	bank: number?,
+	bankAt: number?,
 	live: boolean,
 	rayParams: RaycastParams,
 	boxParams: OverlapParams,
@@ -1423,6 +1426,21 @@ function CustomerService._react(self, crowd: Crowd, customer: Customer, bayIndex
  local vip = if passes and passes:owns(crowd.player, "VIP") then CustomerConfig.VIP.TipMultiplier else 1
  local emoji = CustomerConfig.Reactions.Emoji
  self:_emote(customer, if kind.Outfit then emoji.Loved else emoji.Liked)
+ --[[ PAID FROM THE LOT'S EARNINGS (`CustomerConfig.Income.Ranked`, 2026-10-21): a liked look pays out
+  whatever the lot has earned since the last one (`_bank`), so the crowd shows the money and the
+  formula decides it. A profile not loaded yet leaves it banked for the next like. ]]
+ if CustomerConfig.Income.Ranked and not GarageConfig.Income.Passive then
+  local owed = math.floor(crowd.bank or 0)
+  if owed > 0 and Garage:isProfileReady(crowd.player) then
+   crowd.bank -= owed
+   self:_payBanked(crowd, owed, bayIndex, car.Body, customer.root.Position)
+  else
+   owed = 0
+  end
+  self:_say(customer, CustomerConfig.lineFor(CustomerConfig.Lines.Liked, self._rng, car.Body), if owed > 0 then owed else nil)
+  self:_dwell(customer, visit.ReactSeconds)
+  return
+ end
  --[[ PAID AS THEY REACT (`CustomerConfig.Visit.PayOnLike`, 2026-10-20: "an NPC can look at a car and say
   'Take my money!' but not actually tip anything until they leave", and the checkout bubble was up for
   half a second). The first car they like pays its tip with the line; a later, better car pays only the
@@ -1719,8 +1737,37 @@ end
 function CustomerService._wantedCount(self, crowd: Crowd): number
  return self:_wantedFloor(crowd, 1) + self:_wantedFloor(crowd, 2)
 end
+--[[ The lot's earnings since its last paid like (`CustomerConfig.Income.Ranked`): the formula's rate
+	(`OfflineService.liveRate`, the HUD line's own figure) for every second the lot has a crowd, which
+	is when the old crowd could earn at all (no cars, a profile loading, the tutorial's held offer:
+	nothing). Kept on the crowd, paid out by `_react` and, whatever is left, by `_release`. ]]
+function CustomerService._bank(self, crowd: Crowd)
+ local now = os.clock()
+ local since = now - (crowd.bankAt or now)
+ crowd.bankAt = now
+ if not CustomerConfig.Income.Ranked or GarageConfig.Income.Passive then return end
+ local Offline = Shard.get("OfflineService")
+ if Offline and since > 0 and self:_wantedCount(crowd) > 0 then
+  crowd.bank = (crowd.bank or 0) + Offline:liveRate(crowd.player) * since
+ end
+end
+
+--- Pay `amount` of the lot's earnings: the cash, the summary tally, the signal quests and the tutorial
+--- read, and the burst at `at` when there is a customer to burst from.
+function CustomerService._payBanked(self, crowd: Crowd, amount: number, bay: number?, body: string?, at: Vector3?)
+ local Garage = Shard.get("GarageService")
+ if not Garage then return end
+ Garage:addCash(crowd.player, amount)
+ self:_tallyTip(crowd.player, amount)
+ self:getSignal("CustomerPaid"):Fire(crowd.player, amount, bay, body)
+ if at and CustomerConfig.Reactions.Burst.Enabled then
+  Garage:burstCash(crowd.player, amount, at)
+ end
+end
+
 function CustomerService._tend(self, crowd: Crowd)
  if not crowd.live then return end
+ self:_bank(crowd)
  local alive = {0, 0}
  for customer in crowd.customers do
   local floor = customer.floor or 1
@@ -1845,6 +1892,14 @@ function CustomerService._release(self, player: Player)
 		return
 	end
 	self._crowds[player] = nil
+	--- What the lot earned since its last paid like is paid now rather than lost with the crowd.
+	self:_bank(crowd)
+	local owed = math.floor(crowd.bank or 0)
+	local Garage = Shard.get("GarageService")
+	if owed > 0 and Garage and Garage:isProfileReady(player) then
+		crowd.bank = 0
+		self:_payBanked(crowd, owed)
+	end
 	crowd.trove:Destroy()
 end
 
