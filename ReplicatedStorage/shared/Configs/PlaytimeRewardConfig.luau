@@ -67,6 +67,14 @@ PlaytimeRewardConfig.Remotes = {
 PlaytimeRewardConfig.ShowAfterTutorial = true
 PlaytimeRewardConfig.AfterTutorialEvent = "PlaytimeGiftsAfterTutorial"
 
+--[[ ON JOIN, AFTER THE DAILY CALENDAR. A player who joins with a gift already ready (time banked
+	earlier today) gets the panel once a session, queued behind the daily screen's own join open
+	(`DailyRewardConfig.AutoOpen`): it waits for that to open and be closed, then for the screen to be
+	free. `MaxWait` counts from the join, so it must cover the daily screen's own wait (Delay 3 +
+	MaxWait 30) plus the time spent on it; past that, quietly not at all. Nothing ready on join:
+	nothing opens. `Enabled = false`: only the topbar button opens it. ]]
+PlaytimeRewardConfig.JoinOpen = { Enabled = true, MaxWait = 90 }
+
 --- The topbar button (`TopbarController`): after Daily Reward (4), with the shop's bare gift glyph.
 PlaytimeRewardConfig.Topbar = { Order = 5, Caption = "Free Gifts" }
 

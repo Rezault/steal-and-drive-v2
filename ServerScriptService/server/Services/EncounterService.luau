@@ -34,6 +34,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shard = require(ReplicatedStorage.Packages.Shard)
+local ConvoyConfig = require(ReplicatedStorage.shared.Configs.ConvoyConfig)
 local EncounterConfig = require(ReplicatedStorage.shared.Configs.EncounterConfig)
 local PaintConfig = require(ReplicatedStorage.shared.Configs.PaintConfig)
 local PassConfig = require(ReplicatedStorage.shared.Configs.PassConfig)
@@ -81,12 +82,16 @@ type Ledger = {
 	nearMisses: number,
 	total: number, -- cars issued this run
 	capped: boolean?, -- the cap warning has been logged for this run (`_onRequest`)
+	convoyAt: number?, -- os.clock() this run's convoy is due, or nil for none / already sent (`ConvoyConfig`)
 }
 
 EncounterService:withRemoteEvents({
 	--[[ server -> client ({ Car }): cars for your road, in the order to spawn them. Sent in answer to
 		`EncounterRequest` and nothing else. ]]
 	"EncounterBatch",
+	--[[ server -> client ({ Car }, world, run): this run's convoy (`ConvoyConfig`), front car first.
+		Sent at most once a run, riding on an `EncounterRequest`. ]]
+	"EncounterConvoy",
 	{
 		--[[ client -> server (tileIndex, count, rung?, retired?): "I need cars; I am about this far
 			down the road." `rung` is the tutorial's staged steal asking for one particular rung, and is
@@ -132,6 +137,10 @@ function EncounterService._ledger(self, player: Player): Ledger?
 		nearMisses = 0,
 		total = 0,
 	}
+	--- Whether this run gets a convoy, and when, decided once as the run starts. Never the tutorial's.
+	if ConvoyConfig.Enabled and not ledger.tutorial and self._rng:NextNumber() < ConvoyConfig.Chance then
+		ledger.convoyAt = now + self._rng:NextNumber(ConvoyConfig.After[1], ConvoyConfig.After[2])
+	end
 	self._ledgers[player] = ledger
 	return ledger
 end
@@ -240,10 +249,23 @@ function EncounterService._roll(self, ledger: Ledger, luck: number, tileIndex: n
 	if not body then
 		return nil
 	end
+	local tierNumber = tier.Tier
+	--[[ A LIMITED EVENT CAR in its place, at its `SpawnChance`, in any world (`WorldConfig.EventBodies`).
+		The rung stays the rolled one, since on the road a rung is only speed and lane habits; the tier is
+		the event car's own, which is what the steal refills from and what the bank checks the body
+		against (`GarageService.awardCar`). Never on the tutorial's staged road. ]]
+	if not ledger.tutorial and not rung then
+		for name, entry in WorldConfig.EventBodies do
+			if entry.SpawnChance and self._rng:NextNumber() < entry.SpawnChance then
+				body, tierNumber = name, WorldConfig.TierOfBody[name]
+				break
+			end
+		end
+	end
 	return {
 		token = HttpService:GenerateGUID(false),
 		rung = index,
-		tier = tier.Tier,
+		tier = tierNumber,
 		body = body,
 		paint = PaintConfig.roll(self._rng, body),
 		mutation = WeatherConfig.roll(self._rng, event),
@@ -266,6 +288,11 @@ function EncounterService._onRequest(self, player: Player, tileIndex: unknown, c
 	end
 	--- Before the room is counted, so the cars that just left the road are the room this request gets.
 	self:_retire(ledger, retired)
+	--- The client asks every few seconds all run long, so the first ask past the due time carries it.
+	if ledger.convoyAt and os.clock() >= ledger.convoyAt then
+		ledger.convoyAt = nil
+		self:_issueConvoy(player, ledger, run)
+	end
 
 	local want = if type(count) == "number" and count == count then math.clamp(math.floor(count), 1, EncounterConfig.BatchSize) else 1
 	local tile = if type(tileIndex) == "number" and tileIndex == tileIndex then math.max(0, math.floor(tileIndex)) else 0
@@ -314,6 +341,36 @@ function EncounterService._onRequest(self, player: Player, tileIndex: unknown, c
 	if #batch > 0 then
 		self:getRemoteEvent("EncounterBatch"):Fire(player, batch, ledger.world, run)
 	end
+end
+
+--[[ This run's convoy (`ConvoyConfig`): four cars out of the run's world, issued as ordinary tokens so
+	a steal and a bank need nothing new. Outside the bucket and the cap on purpose — it is once a run
+	at most and four cars, and a convoy refused for a full ledger is the rare event silently lost. ]]
+function EncounterService._issueConvoy(self, player: Player, ledger: Ledger, run: unknown)
+	local event = self:_event(ledger)
+	local batch, names = {}, {}
+	for _, choice in ConvoyConfig.pick(self._rng, ledger.tiers) do
+		local car: Issued = {
+			token = HttpService:GenerateGUID(false),
+			rung = choice.rung,
+			tier = choice.tier.Tier,
+			body = choice.body,
+			paint = PaintConfig.roll(self._rng, choice.body),
+			mutation = WeatherConfig.roll(self._rng, event),
+			expiresAt = os.clock() + EncounterConfig.Lifetime,
+			spent = false,
+			passed = false,
+		}
+		ledger.issued[car.token] = car
+		table.insert(batch, { token = car.token, rung = car.rung, tier = car.tier, body = car.body, paint = car.paint, mutation = car.mutation })
+		table.insert(names, car.body)
+	end
+	if #batch == 0 then
+		return
+	end
+	ledger.total += #batch
+	self.log:info(string.format("%s's convoy: %s.", player.Name, table.concat(names, ", ")))
+	self:getRemoteEvent("EncounterConvoy"):Fire(player, batch, ledger.world, run)
 end
 
 -- === Redeeming ==============================================================

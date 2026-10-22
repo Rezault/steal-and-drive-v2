@@ -111,39 +111,52 @@ function DailyRewardController._autoOpen(self)
 	if not cfg.Enabled then
 		return
 	end
+	self._autoOpening = true
 	task.wait(cfg.Delay)
 	self:_openWhenFree(cfg.MaxWait)
+	self._autoOpening = false
 end
 
---[[ Open the page the first second nothing else is in the way: no run, no tutorial, no page, no modal
-	and no NEW BEST stage. Up to `maxWait` seconds, then quietly not at all. Only with a claim. ]]
-function DailyRewardController._openWhenFree(self, maxWait: number, anyway: boolean?)
+--[[ Public (`PlaytimeRewardController`): is this session's join open still to come? True until the
+	calendar has landed and, if it brought a claim, until the page has opened or given up waiting.
+	The gifts panel queues behind it, so a returning player sees the calendar first. ]]
+function DailyRewardController.joinOpenPending(self): boolean
+	return self._state == nil or self._autoOpening == true
+end
+
+--[[ Public (`PlaytimeRewardController` too): why a screen must not pop up right now, or nil when
+	nothing is in the way: no run, no tutorial, no page, no modal and no NEW BEST stage. ]]
+function DailyRewardController.busy(self): string?
 	local player = Players.LocalPlayer
-	local playerGui = player:WaitForChild("PlayerGui")
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	local step = player:GetAttribute(TutorialConfig.StepAttribute)
+	local UIController = Shard.get("UIController")
+	local showcase = Shard.get("ShowcaseController")
+	return if self._racing then "racing"
+		elseif type(step) == "string" and step ~= "" then "in the tutorial"
+		elseif UIController and UIController.currentPage ~= nil then "page " .. tostring(UIController.currentPage)
+		elseif playerGui and playerGui:GetAttribute(GamepadConfig.ModalAttribute) == true then "a modal"
+		--- Holding a car: the CUSTOMIZE IT carry card is up in the left lane, under where this page opens.
+		elseif (player:GetAttribute(CarryConfig.Attribute) or "") ~= "" then "still holding a car"
+		elseif showcase ~= nil and showcase:busy() then "the NEW BEST stage"
+		else nil
+end
+
+--[[ Open the page the first second nothing else is in the way (`busy`). Up to `maxWait` seconds,
+	then quietly not at all. Only with a claim. ]]
+function DailyRewardController._openWhenFree(self, maxWait: number, anyway: boolean?)
+	Players.LocalPlayer:WaitForChild("PlayerGui")
 	local deadline = os.clock() + maxWait
 	local why = "never free"
 	while os.clock() < deadline do
-		local step = player:GetAttribute(TutorialConfig.StepAttribute)
-		local inTutorial = type(step) == "string" and step ~= ""
-		local UIController = Shard.get("UIController")
-		local pageOpen = UIController and UIController.currentPage ~= nil
-		local modal = playerGui:GetAttribute(GamepadConfig.ModalAttribute) == true
-		local showcase = Shard.get("ShowcaseController")
-		local staged = showcase ~= nil and showcase:busy()
-		--- Holding a car: the CUSTOMIZE IT carry card is up in the left lane, under where this page opens.
-		local carrying = (player:GetAttribute(CarryConfig.Attribute) or "") ~= ""
-		if not (self._racing or inTutorial or pageOpen or modal or staged or carrying) then
+		local reason = self:busy()
+		if not reason then
 			if self._state and (anyway or self._state.claimable) then
 				self:open()
 			end
 			return
 		end
-		why = if self._racing then "racing"
-			elseif inTutorial then "in the tutorial"
-			elseif pageOpen then "page " .. tostring(UIController.currentPage)
-			elseif modal then "a modal"
-			elseif carrying then "still holding a car"
-			else "the NEW BEST stage"
+		why = reason
 		task.wait(1)
 	end
 	if anyway then
@@ -206,6 +219,7 @@ DailyRewardController:withLifecycle({
 	init = function(self)
 		self._state = nil
 		self._autoOpened = false
+		self._autoOpening = false
 		self._racing = false
 		self._armedFor = nil :: number?
 		--- `AfterTutorialRun`: seen in the tutorial this session, armed once it ends, done once shown.

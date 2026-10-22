@@ -85,6 +85,7 @@ local IndexRewardConfig = require(ReplicatedStorage.shared.Configs.IndexRewardCo
 local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
 --- Whether cars are issued by the server rather than rolled here (`_takeEncounter`'s block).
 local EncounterConfig = require(ReplicatedStorage.shared.Configs.EncounterConfig)
+local ConvoyConfig = require(ReplicatedStorage.shared.Configs.ConvoyConfig)
 local BrakeLightConfig = require(ReplicatedStorage.shared.Configs.BrakeLightConfig)
 local UpgradeConfig = require(ReplicatedStorage.shared.Configs.UpgradeConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
@@ -528,6 +529,10 @@ function TrafficController._encounterMatchesWorld(self, car): boolean
  if type(car) ~= "table" or type(car.token) ~= "string"
   or type(car.rung) ~= "number" or car.rung % 1 ~= 0 then return false end
  local tier = self._tiers[car.rung]
+ -- A limited event car rides any world's rung at its own tier (`EncounterService._roll`).
+ if tier ~= nil and type(car.body) == "string" and WorldConfig.EventBodies[car.body] then
+  return car.tier == WorldConfig.TierOfBody[car.body]
+ end
  return tier ~= nil and car.tier == tier.Tier and type(car.body) == "string"
   and table.find(tier.Bodies or TrafficConfig.bodiesFor(self._weatherWorld), car.body) ~= nil
 end
@@ -559,6 +564,12 @@ end
 	none. `rung` asks for one on that rung, which only the tutorial does. The queue is topped up as it
 	drains, so the next batch is on its way long before it is needed. ]]
 function TrafficController._takeEncounter(self, rung: number?)
+	--- A convoy car being put on the road (`_stepConvoy`) is the one this spawn is for.
+	local convoy = self._convoyNext
+	if convoy then
+		self._convoyNext = nil
+		return convoy
+	end
 	local queue = self._encounters
 	local found = nil
 	for index, car in queue do
@@ -578,9 +589,197 @@ function TrafficController._takeEncounter(self, rung: number?)
 	return found
 end
 
+-- === The convoy (`ConvoyConfig`) ============================================
+
+--- The server's convoy for this run: held until `_stepConvoy` finds a moment to put it on the road.
+function TrafficController._onConvoy(self, batch: unknown, world: unknown, run: unknown)
+	if not (self._active and type(batch) == "table") then
+		return
+	end
+	local fresh = world == self._weatherWorld and run == self._encounterRun
+	local cars = {}
+	for _, car in batch do
+		if fresh and self:_encounterMatchesWorld(car) then
+			car.convoy = true
+			table.insert(cars, car)
+		elseif type(car) == "table" and type(car.token) == "string" then
+			self:_retire(car.token)
+		end
+	end
+	if #cars > 0 then
+		self._convoyQueue = cars
+		self._convoyUntil = os.clock() + ConvoyConfig.SpawnWithin
+	end
+end
+
+--[[ Put the queued convoy on the road behind the player: two lanes on the far side of the road from
+	them, alternating, `Spacing` apart, front car `Behind` back. All in one frame so the line arrives
+	whole; a car that cannot be placed this frame is tried again on the next, from where the player
+	is then. Runs behind the same gates as the ordinary spawner (`_loop`). ]]
+function TrafficController._stepConvoy(self)
+	local queue = self._convoyQueue
+	if not queue then
+		return
+	end
+	if os.clock() > self._convoyUntil then
+		for _, car in queue do
+			self:_retire(car.token)
+		end
+		self._convoyQueue = nil
+		return
+	end
+	local lanes = #TrafficConfig.Lanes
+	local player = self:playerLane() or math.ceil(lanes / 2)
+	--- The pair of lanes furthest from the player's, so the line passes on their far side.
+	local first = if player > lanes / 2 then 1 else math.max(1, lanes - 1)
+	local pair = { first, math.min(lanes, first + 1) }
+	local pace = ConvoyConfig.PassSpeed / math.max(self:_weatherTraffic().Speed, 0.05)
+	local placed = self._convoyPlaced or 0
+	while #queue > 0 do
+		local slot = placed + 1
+		local car = queue[1]
+		self._convoyNext = car
+		local rec = self:_spawn(
+			self._playerAlong - ConvoyConfig.Behind - (slot - 1) * ConvoyConfig.Spacing,
+			pair[(slot - 1) % 2 + 1],
+			nil,
+			ConvoyConfig.Spacing,
+			nil,
+			pace
+		)
+		local taken = self._convoyNext == nil
+		self._convoyNext = nil
+		if not taken then
+			break -- refused before it took the car (no lane here this frame): try again next frame
+		end
+		table.remove(queue, 1)
+		if rec then
+			placed = slot
+		end
+	end
+	self._convoyPlaced = placed
+	if placed > 0 and not self._convoyAnnounced then
+		self._convoyAnnounced = true
+		--- Shown off the best car in the line: the last one, Legendary by `ConvoyConfig.Bands`.
+		local best, bestBand = nil, -1
+		for _, rec in self._cars do
+			local _, band = CarRarity.of(rec.body)
+			if rec.convoy and band > bestBand then
+				best, bestBand = rec.body, band
+			end
+		end
+		self._lastAnnounce = os.clock()
+		Dispatcher:Publish(ConvoyConfig.Event, best, bestBand)
+	end
+	if #queue == 0 then
+		self._convoyQueue = nil
+	end
+end
+
+--[[ One convoy car's frame, before `_steer`. Until it is `SettleAhead` past the player it keeps out
+	of their lane — over to a free neighbour that is not the player's, or held at the player's speed
+	if there is none — because traffic otherwise never looks at the player and this is the one car
+	that catches them up. Past that it settles to `SettleSpeed` and is ordinary traffic from then on. ]]
+function TrafficController._convoyStep(self, rec, now: number)
+	local ahead = rec.along - self._playerAlong
+	if ahead > ConvoyConfig.SettleAhead then
+		rec.convoy = false
+		rec.convoyCap = nil
+		rec.convoyGhost = false
+		rec.cruise = self:_playerCruise() * ConvoyConfig.SettleSpeed
+		return
+	end
+	rec.convoyCap = nil
+	local car = self._playerCar
+	if not (car and car.PrimaryPart and self._info) then
+		return
+	end
+	--[[ Paced off how fast the player is ACTUALLY going, every frame, not their nominal cruise: held
+		throttle or nitro runs well past cruise, and a convoy paced off cruise fell behind and was
+		recycled without ever reaching them (playtest, 2026-10-22). ]]
+	local playerSpeed = car.PrimaryPart.AssemblyLinearVelocity:Dot(self._info.forward)
+	rec.cruise = math.max(self:_playerCruise(), playerSpeed) * ConvoyConfig.PassSpeed
+	local playerCross = car.PrimaryPart.Position:Dot(self._info.cross) - self._info.driveCenter
+	local playerLane = self:playerLane()
+	local away = if playerCross > rec.cross then -1 else 1
+	--- Behind or overlapping the player (a car is ~22 long) in their lane, close enough to matter.
+	local inLane = math.abs(rec.targetCross - playerCross) < TrafficConfig.SideClearance
+	if inLane and ahead <= 25 and ahead >= -ConvoyConfig.YieldGap then
+		if not self:_convoyChangeLane(rec, away, playerLane, now) then
+			rec.convoyCap = math.max(0, playerSpeed)
+		end
+		return
+	end
+	--[[ OVERTAKE slower traffic (playtest, 2026-10-22: convoy cars sat behind cars the player had
+		already passed and were never seen). Routine lane changes are off for a passing convoy car
+		(`_steer`), so this is the only way it leaves a lane; if no lane is clear it brakes and waits
+		like any car (`_headway`), and tries again next frame. ]]
+	--[[ ...AND IS NEVER HELD FOR LONG (`Overtake.Patience` / `GhostAfter`). Blocked past Patience, it
+		takes any neighbour with room alongside, or failing that the car in its way pulls over for it;
+		blocked past GhostAfter while still behind the player, it drives through the blocker rather than
+		miss the player altogether — only behind them, where the chase camera is not looking. ]]
+	local blocker = self:_convoySlowerAhead(rec, rec.cross, ConvoyConfig.Overtake.Look)
+	if not blocker then
+		rec.convoyBlockedSince = nil
+		rec.convoyGhost = false
+		return
+	end
+	rec.convoyBlockedSince = rec.convoyBlockedSince or now
+	local waited = now - rec.convoyBlockedSince
+	if rec.warningMoving then
+		return
+	end
+	if self:_convoyChangeLane(rec, away, playerLane, now, waited < ConvoyConfig.Overtake.Patience) then
+		return
+	end
+	if waited >= ConvoyConfig.Overtake.Patience and not blocker.physical and not blocker.frozen and not blocker.convoy then
+		self:_avoid(blocker, now)
+	end
+	--- Both behind the player, so the pass-through happens out of the chase camera's view.
+	rec.convoyGhost = waited >= ConvoyConfig.Overtake.GhostAfter and ahead < 0 and blocker.along < self._playerAlong
+end
+
+--- The nearest car slower than this convoy car within `look` studs ahead of it at cross position
+--- `cross`, or nil.
+function TrafficController._convoySlowerAhead(self, rec, cross: number, look: number)
+	local found, foundGap = nil, math.huge
+	for _, other in self._cars do
+		local gap = other.along - rec.along
+		if other ~= rec and gap > 0 and gap < look and gap < foundGap
+			and math.abs(other.cross - cross) < TrafficConfig.SideClearance
+			and self:_roadSpeed(other) < rec.cruise * 0.9 then
+			found, foundGap = other, gap
+		end
+	end
+	return found
+end
+
+--[[ Move a convoy car one lane over, `first` side tried first: never into the player's lane, only
+	into a lane with room alongside (`LaneChangeGap`) and, when `strict`, no slower car just ahead
+	(`Overtake.Clear`) so an overtake does not swap one blocker for another. ]]
+function TrafficController._convoyChangeLane(self, rec, first: number, playerLane: number?, now: number, strict: boolean?): boolean
+	local lanes = TrafficConfig.Lanes
+	for _, step in { first, -first } do
+		local index = rec.lane + step
+		local offset = lanes[index]
+		if offset and index ~= playerLane
+			and self:_laneFree(rec.along, offset, TrafficConfig.LaneChangeGap, rec)
+			and not (strict ~= false and self:_convoySlowerAhead(rec, offset, ConvoyConfig.Overtake.Clear)) then
+			rec.lane = index
+			rec.targetCross = offset
+			self:_cancelLanePlan(rec)
+			rec.warningMoving = true
+			self:_setWarningVisible(rec, true)
+			self:_armLaneTimer(rec, now)
+			return true
+		end
+	end
+	return false
+end
+
 --- A published shell in this race's world by body name, or nil.
 function TrafficController._templateNamed(self, name: string): Model?
-	if not table.find(TrafficConfig.bodiesFor(self._weatherWorld), name) then return nil end
+	if not (table.find(TrafficConfig.bodiesFor(self._weatherWorld), name) or WorldConfig.EventBodies[name]) then return nil end
 	-- Publication can finish after RaceStart; validate the world before checking the live list.
 	for _, template in self._templates do
 		if template.Name == name then
@@ -632,7 +831,8 @@ end
 	car from `MutationMinBand`, never on the tutorial's run, at most once per `Cooldown`. ]]
 function TrafficController._announceRare(self, rec)
 	local cfg = TrafficConfig.Announce
-	if not cfg.Enabled or self._tutorialRun then
+	--- A convoy car is announced as the convoy (`_stepConvoy`), not one at a time over it.
+	if not cfg.Enabled or self._tutorialRun or rec.convoy then
 		return
 	end
 	local _, band = CarRarity.of(rec.body)
@@ -640,7 +840,8 @@ function TrafficController._announceRare(self, rec)
 		return
 	end
 	local now = os.clock()
-	if now - (self._lastAnnounce or -math.huge) < cfg.Cooldown then
+	-- A limited event car is always announced: it is the thing the player was told to hunt.
+	if now - (self._lastAnnounce or -math.huge) < cfg.Cooldown and not WorldConfig.EventBodies[rec.body] then
 		return
 	end
 	self._lastAnnounce = now
@@ -906,7 +1107,8 @@ function TrafficController._spawn(
 	speedScale: number?,
 	paceFraction: number?
 )
-	if #self._cars >= self:_maxCars() then
+	--- A convoy is four cars at most, once a run, and is not refused for a busy road.
+	if #self._cars >= self:_maxCars() and not self._convoyNext then
 		return nil
 	end
 	local lane = nil
@@ -997,6 +1199,11 @@ function TrafficController._spawn(
 	end
 	--- The token a steal and a near miss past this car will name (`EncounterConfig`); nil with it off.
 	rec.token = if encounter then encounter.token else nil
+	--- Reset on every spawn because records are pooled (`ConvoyConfig`, `_convoyStep`).
+	rec.convoy = encounter ~= nil and encounter.convoy == true
+	rec.convoyCap = nil
+	rec.convoyGhost = false
+	rec.convoyBlockedSince = nil
 
 	local now = os.clock()
 	rec.tier = tier
@@ -1646,6 +1853,7 @@ end
 	debris has nothing to do with (the same trap `_laneFree` documents at length). ]]
 function TrafficController._sharesLane(self, rec, other): boolean
  if rec.ghostImpact or other.ghostImpact then return false end -- Visual debris does not brake live traffic.
+ if rec.convoyGhost or other.convoyGhost then return false end -- A convoy car stuck too long passes through (`_convoyStep`).
  local _, aWidth = trafficHalfExtents(rec)
  local _, bWidth = trafficHalfExtents(other)
  local clearance = math.max(TrafficConfig.SideClearance, aWidth + bWidth + 1)
@@ -1682,6 +1890,8 @@ end
 function TrafficController._headway(self, rec, dt: number)
  local cfg = TrafficConfig.Headway
  local target = if rec.avoidBlocked then 0 else rec.cruise
+ -- A convoy car boxed in behind the player holds at their speed (`_convoyStep`).
+ if rec.convoyCap then target = math.min(target, rec.convoyCap) end
  if cfg.Enabled then
   local leader, leaderGap
   for _, other in self._cars do
@@ -1736,7 +1946,8 @@ function TrafficController._steer(self, rec, dt: number, now: number)
 	-- Routine: personality, on the tier's own cadence. Most of those ticks are meant to come to
 	-- nothing (`RoutineLaneChangeChance`), and the timer is re-armed either way, so a boxed-in car
 	-- isn't left retrying every frame.
-	if not self._stealLaneChangesLocked and not rec.plannedLane and now >= rec.laneAt then
+	--- Not a convoy car still passing the player: its lane is `_convoyStep`'s to choose until then.
+	if not self._stealLaneChangesLocked and not rec.convoy and not rec.plannedLane and now >= rec.laneAt then
 		local allowed = self._rng:NextNumber() < TrafficConfig.RoutineLaneChangeChance
 			and (not protected or self._rng:NextNumber() < zone.Chance)
 		if not allowed or not self:_planLane(rec, now) then
@@ -1841,10 +2052,13 @@ function TrafficController._updateCars(self, dt: number)
 			(`_knock` refuses one too, so being rear-ended mid-steal can't hand your prize to physics.) ]]
 		if rec.frozen then
 			self:_place(rec)
-		elseif rec.along < behind or rec.along > ahead then
+		elseif rec.along < (if rec.convoy then self._playerAlong - ConvoyConfig.DespawnBehind else behind) or rec.along > ahead then
 			table.remove(self._cars, i)
 			self:_release(rec)
 		elseif not rec.physical then
+			if rec.convoy then
+				self:_convoyStep(rec, now)
+			end
 			self:_steer(rec, dt, now)
 			local debug = TrafficConfig.Debug
 			if debug.Enabled and now >= (rec.debugAt or 0) then
@@ -2455,6 +2669,7 @@ function TrafficController._loop(self, dt: number)
 		--- `_prime`), so a road closed to traffic must not go on filling itself from a booking made
 		--- before it closed.
 		self:_stepPrime()
+		self:_stepConvoy()
 		self:_maybeSpawn(now)
 	end
 	-- Slow motion (Modules/TimeScale). This is where most of the EFFECT of slow-mo actually lives:
@@ -3197,6 +3412,8 @@ function TrafficController._teardown(self)
 	--- moment (`EncounterService`, `RaceLeft`), so a leftover token here would name nothing.
 	table.clear(self._encounters)
 	table.clear(self._retired)
+	--- A convoy belongs to its run, like every issued car.
+	self._convoyQueue, self._convoyNext, self._convoyPlaced, self._convoyAnnounced = nil, nil, nil, nil
 	self._encounterPendingUntil = 0
 	self._rungPendingUntil = 0
 	self._rungWanted = nil
@@ -3302,6 +3519,10 @@ TrafficController:withRemoteEvents({
 		--- The server's answer to `EncounterRequest`: cars for this road (`EncounterConfig`).
 		EncounterBatch = function(batch, world, run)
 			TrafficController:_onEncounters(batch, world, run)
+		end,
+		--- This run's convoy, if it gets one (`ConvoyConfig`).
+		EncounterConvoy = function(batch, world, run)
+			TrafficController:_onConvoy(batch, world, run)
 		end,
 	},
 	"TrafficHit",

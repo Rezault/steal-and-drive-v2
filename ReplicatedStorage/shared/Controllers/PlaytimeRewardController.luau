@@ -342,6 +342,25 @@ function PlaytimeRewardController._onTutorialDone(self)
 	end
 end
 
+--[[ `PlaytimeRewardConfig.JoinOpen`: a gift was ready on join, so open the panel once the daily
+	screen has had its turn (`DailyRewardController.joinOpenPending`) and nothing else is up (its
+	`busy`). Re-checks the gift at the moment of opening; a claim from the button meanwhile is fine. ]]
+function PlaytimeRewardController._joinOpen(self)
+	local Daily = Shard.get("DailyRewardController")
+	local deadline = os.clock() + PlaytimeRewardConfig.JoinOpen.MaxWait
+	while os.clock() < deadline do
+		local waiting = Daily ~= nil and (Daily:joinOpenPending() or Daily:busy() ~= nil)
+		if not waiting and self._gui and not self._gui.Enabled then
+			local _, ready = self:_label()
+			if ready then
+				self:open()
+			end
+			return
+		end
+		task.wait(1)
+	end
+end
+
 -- === The server's word ======================================================
 
 function PlaytimeRewardController._onState(self, payload: unknown)
@@ -370,6 +389,14 @@ function PlaytimeRewardController._onState(self, payload: unknown)
 	end
 	self:_paint()
 	self:_publish()
+	--- The first ladder of the session is the join: one panel, only if a gift is already waiting.
+	if not self._joinChecked then
+		self._joinChecked = true
+		local _, ready = self:_label()
+		if ready and PlaytimeRewardConfig.JoinOpen.Enabled then
+			task.spawn(self._joinOpen, self)
+		end
+	end
 end
 
 PlaytimeRewardController:withRemoteEvents({
@@ -395,6 +422,7 @@ PlaytimeRewardController:withLifecycle({
 		self._lastLabel = nil :: string?
 		self._lastReady = nil :: boolean?
 		self._tiles = {}
+		self._joinChecked = false
 	end,
 	start = function(self)
 		if not PlaytimeRewardConfig.Enabled then

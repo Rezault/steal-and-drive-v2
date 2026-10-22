@@ -18,6 +18,7 @@ local TweenService = game:GetService("TweenService")
 
 local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local Shard = require(ReplicatedStorage.Packages.Shard)
+local ConvoyConfig = require(ReplicatedStorage.shared.Configs.ConvoyConfig)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
 local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
@@ -100,8 +101,21 @@ function RareCarBannerController._show(self, body: unknown, mutation: unknown, b
 	local cfg = TrafficConfig.Announce
 	local word = CarRarity.of(body)
 	local lead = if type(mutation) == "string" then string.upper(WeatherConfig.nameOf(mutation)) else string.upper(word)
-	self._kicker.Text = string.format(cfg.Kicker, lead)
-	self._name.Text = string.upper(GarageConfig.displayName(body))
+	self:_present(string.format(cfg.Kicker, lead), string.upper(GarageConfig.displayName(body)), body, band)
+end
+
+--- The convoy (`ConvoyConfig`): the same card, the line's best car on it and the message as the big line.
+function RareCarBannerController._showConvoy(self, body: unknown, band: unknown)
+	if type(body) ~= "string" or not self._gui or not self._racing then
+		return
+	end
+	self:_present(ConvoyConfig.Kicker, ConvoyConfig.Title, body, band)
+end
+
+function RareCarBannerController._present(self, kicker: string, title: string, body: string, band: unknown)
+	local cfg = TrafficConfig.Announce
+	self._kicker.Text = kicker
+	self._name.Text = title
 	ArcadeKit.paint(self._face, ArcadeKit.rarityFace(band))
 	CarViewport.set(self._view, body, { aspect = CAR_W * ASPECT / 0.92 })
 
@@ -160,6 +174,9 @@ RareCarBannerController:withLifecycle({
 		end)
 		Dispatcher:Subscribe(TrafficConfig.Announce.Event, function(body, mutation, band)
 			self:_show(body, mutation, band)
+		end)
+		Dispatcher:Subscribe(ConvoyConfig.Event, function(body, band)
+			self:_showConvoy(body, band)
 		end)
 	end,
 })

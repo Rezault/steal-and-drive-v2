@@ -39,6 +39,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
 local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
+local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
 local CarCollision = require(ReplicatedStorage.shared.Modules.CarCollision)
 local CarDoorRig = require(ReplicatedStorage.shared.Modules.CarDoorRig)
 local CarRoster = require(ReplicatedStorage.shared.Modules.CarRoster)
@@ -353,6 +354,9 @@ function TrafficService._buildShell(self, source: Model): Model?
 	hitWeld.Part0, hitWeld.Part1 = root, hit
 	hitWeld.Parent = hit
 
+	--- A limited event car keeps its authored effects (the Rocket Edition's thrusters), which then ride
+	--- along as its traffic look and as the dress a steal or a start car puts on.
+	local keepFx = WorldConfig.EventBodies[source.Name] ~= nil
 	for _, part in visuals do
 		local clone = part:Clone()
 		-- Drop the rig's joints (each mesh carries the WeldConstraint that tied it to the
@@ -365,6 +369,8 @@ function TrafficService._buildShell(self, source: Model): Model?
 				or child:IsA("Texture")
 				or child:IsA("SurfaceAppearance")
 				or child:IsA("SurfaceGui")
+				or (keepFx and (child:IsA("Attachment") or child:IsA("ParticleEmitter") or child:IsA("Beam")
+					or child:IsA("Trail") or child:IsA("Light") or child:IsA("Fire")))
 			if not render then
 				child:Destroy()
 			end

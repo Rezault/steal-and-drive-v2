@@ -331,6 +331,25 @@ ShopConfig.Bundles = {
 		Cars = { "Lambo", "F40", "918" },
 		Cash = 0,
 	},
+	--[[ The Roadster Limited Event's paid half (2026-10-22): the Rocket Edition, which never drives as
+		traffic (`WorldConfig.EventBodies`, `Paid`). Hidden until the `FloaterRocketBundle` product exists
+		and is synced into `GameIds`. ]]
+	{
+		Key = "FloaterRocketBundle",
+		Title = "Floater Rocket Edition",
+		Subtitle = "Limited: Floater Rocket",
+		Blurb = "Body kit, live thrusters, sharper handling, and it hops.",
+		Price = 399,
+		PartsPrice = 0,
+		Wired = true,
+		Seam = "BundleService.grantBundle",
+		Featured = false,
+		ProductId = 0,
+		IconId = 140540156188789,
+		Cars = { "Tesla Roadster Rocket" },
+		Cash = 0,
+		OncePerPlayer = true,
+	},
 } :: { Bundle }
 
 for _, bundle in ShopConfig.Bundles do

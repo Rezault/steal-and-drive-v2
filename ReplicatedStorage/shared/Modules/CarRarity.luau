@@ -92,6 +92,11 @@ end
 	The EMPTY STRING rather than a word, so a caller can hide the line instead of printing a rarity
 	this game does not have; the band still answers 1 so `colourOf` is safe to call unconditionally. ]]
 function CarRarity.of(body: unknown): (string, number)
+	--- A limited event car (`WorldConfig.EventBodies`) says so, in the top band's gold, so it shines,
+	--- glows and gets the road banner like the best car of a world.
+	if type(body) == "string" and WorldConfig.EventBodies[body] then
+		return "Limited", #CarRarity.Colours
+	end
 	local resolved = type(body) == "string" and (WorldConfig.LegacyBodies[body] or body)
 	local entry = resolved and BY_BODY[resolved]
 	if not entry then

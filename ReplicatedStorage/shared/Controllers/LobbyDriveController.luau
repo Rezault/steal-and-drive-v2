@@ -575,6 +575,11 @@ function LobbyDriveController._teardown(self)
 	self._rack, self._rackWas = nil, nil
 end
 
+--- PUBLIC (HopController): the lobby car the local player is driving right now, or nil.
+function LobbyDriveController.getCar(self): Model?
+	return self._car
+end
+
 --- Follow one character's seat: install on the driver's seat of a lobby car, tear down on leaving.
 function LobbyDriveController._watch(self, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)

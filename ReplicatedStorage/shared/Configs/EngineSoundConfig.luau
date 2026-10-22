@@ -192,6 +192,8 @@ EngineSoundConfig.Cars = {
 	["i8"] = "ThreeCyl",
 	["Gemera"] = "ThreeCyl",
 	["Roadster 2.0"] = "Electric",
+	["Tesla Roadster"] = "Electric",
+	["Tesla Roadster Rocket"] = "Electric",
 }
 
 --[[ === THE MIX ==============================================================================

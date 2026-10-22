@@ -465,6 +465,23 @@ end
 -- Removed from spawning, retained as separate owned bodies and visual shells.
 -- This maps pricing/world/rank without changing saved body names, IDs, paint or XP.
 WorldConfig.LegacyBodies = { ["Model 3"] = "S15", ["M3 GTR"] = "M4", ["SUPRA MK4"] = "Supra MK4", ["EVO 10"] = "BRZ/FRS/GT86", ["F&F EVO"] = "BRZ/FRS/GT86" }
+
+--[[ LIMITED EVENT CARS (2026-10-22, the Roadster Limited Event). Off every ladder, so they ride the
+	legacy path just above: priced, ranked and stat-resolved as `PricedAs` (a fixed world-3 top car,
+	whatever world it was found in), published as a shell, never in a dealer or ladder pool.
+	  • `SpawnChance`: per traffic car, in ANY world (`EncounterService._roll`). Repeatable.
+	  • `Paid`: never on the road; only its shop bundle grants it (`ShopConfig.Bundles`).
+	  • `Hop`: driving it gives the in-run hop (`HopController`, `DriveConfig.Hop`).
+	Its rarity word is "Limited" (`CarRarity.of`); its on-screen name is `CarNameConfig`'s. ]]
+WorldConfig.EventBodies = {
+	["Tesla Roadster"] = { PricedAs = "F40", SpawnChance = 1 / 300, Hop = true },
+	--- The Rocket Edition: its own model in Studio (body kit, thruster FX under `Body/`).
+	["Tesla Roadster Rocket"] = { PricedAs = "F40", Paid = true, Hop = true },
+}
+for body, event in WorldConfig.EventBodies do
+	WorldConfig.LegacyBodies[body] = event.PricedAs
+end
+
 for body, replacement in WorldConfig.LegacyBodies do
 	assert(WorldConfig.TierOfBody[replacement], "Missing legacy replacement: " .. replacement)
 	WorldConfig.TierOfBody[body] = WorldConfig.TierOfBody[replacement]

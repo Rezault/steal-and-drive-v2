@@ -111,7 +111,9 @@ PaintConfig.Palette = {
 
 	For a car that must never be repainted at all, use `KeepLivery` below rather than writing `{ 1 }`
 	here — it says WHY. ]]
-PaintConfig.Pools = {}
+PaintConfig.Pools = {
+	["Tesla Roadster"] = { 2 }, -- the Floater: white only (2026-10-22)
+}
 
 --[[ === Cars that must never be repainted ====================================================
 

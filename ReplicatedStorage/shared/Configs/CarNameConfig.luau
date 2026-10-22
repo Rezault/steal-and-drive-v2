@@ -90,6 +90,8 @@ CarNameConfig.Names = {
 	["NewSports11"] = "Ferro Apex",
 	["NewSports31"] = "Meron GT",
 	["Lambo"] = "Aventra",
+	["Tesla Roadster"] = "Floater",
+	["Tesla Roadster Rocket"] = "Floater Rocket",
 }
 
 --- The display name for a body, or nil when it has none (or the table is switched off).

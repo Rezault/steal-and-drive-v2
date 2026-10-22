@@ -1,42 +1,47 @@
 # Graph Report - steal and drive TS  (2026-10-22)
 
 ## Corpus Check
-- Large corpus: 379 files · ~1,537,345 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
+- 388 files · ~1,551,306 words
+- Verdict: corpus is large enough that graph structure adds value.
+- Unclassified: 1 file(s) not represented in the graph (top: (none) 1)
 
 ## Summary
-- 992 nodes · 2255 edges · 88 communities (27 shown, 61 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 42 edges (avg confidence: 0.85)
+- 1017 nodes · 2304 edges · 99 communities (32 shown, 67 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 45 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
+## Graph Freshness
+- Built from commit: `786f2a27`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
+
 ## Community Hubs (Navigation)
-- Audio & Settings Config
-- First-Person Cockpit Camera
+- StealTagController.luau
+- FirstPersonCabin.luau
 - Car Lights & Claim Badges
-- Engine Audio & Seller
-- Paint, Start Car & Dealership UI
-- Notice Lane Controllers
+- TestEngineController.luau
+- CarViewportGrid.luau
+- NoticeLane.luau
+- StealNudgeController.luau
 - Iris Widget Core
-- Shop, Codes & Passes
-- Race Config & Interface
-- Sell Lot & Market Value
+- ShopConfig.luau
 - ProfileStore (Packages)
+- TrafficController.luau
 - ProfileStore (Libraries)
-- Plot & Dealership Markers
+- c_users_razvan_documents_robloxprojects_steal_and_drive_ts_replicatedstorage_packages_trove_luau
+- ArcadeKit.luau
 - Basic Page & Upgrades
 - ReplicaServer
 - Iris Input & Plot
-- Car Stats Config
-- Plates & Showcase
+- AudioConfig.luau
+- TutorialController.luau
 - Player Profile
-- Carry & Upgrade Nudge
 - Group Rewards
 - Guide Trail
 - Arcade Traffic Impact
-- Traffic Collection Cue
-- Live Price & Rename
-- Tutorial Control Highlight
-- Reward Levels
-- Steal Nudge
+- CodesService.luau
+- TutorialControlHighlight.luau
+- SellConfig.luau
 - ReplicaClient
 - Tips
 - Gameplay Feedback
@@ -44,83 +49,92 @@
 - VIP Tags
 - Iris Interaction Handlers
 - Signal
-- Steal Reminder Schedule
-- Pickup Controller
-- Sale Tag
+- InterfaceConfig.luau
+- InventoryConfig.luau
+- PickupController.luau
+- SaleTagController.luau
 - Mobile Menu Sizing
-- Star Controller
+- CarStats.luau
+- RadioPanelController.luau
 - Gift Picker
 - Showroom Economy
-- NPC Friends
-- Shell Doors
+- StarController.luau
 - Profile Reset
-- Car Rarity Label
-- Hitch Probe
+- FirstPersonCockpit.luau
+- CarRarity.luau
+- CarPlate.luau
+- convoy/run.sh
+- HopController.luau
+- NpcFriends.luau
+- ShellDoors.luau
+- RareCarBannerController.luau
+- LobbyDriveController.luau
+- run.sh
 
 ## God Nodes (most connected - your core abstractions)
 1. `TestEngineController._sync()` - 6 edges
 2. `paint()` - 6 edges
 3. `widgets.getMouseLocation()` - 6 edges
 4. `BuyerOfferSign.build()` - 6 edges
-5. `FirstPersonCockpit.update()` - 6 edges
-6. `CarLightsController._step()` - 5 edges
-7. `StealTagController._show()` - 5 edges
-8. `TestEngineController._attach()` - 5 edges
-9. `widgets.applyInteractionHighlights()` - 5 edges
-10. `widgets.applyInteractionHighlightsWithMultiHighlightee()` - 5 edges
+5. `CarStats.bodyOf()` - 6 edges
+6. `FirstPersonCockpit.update()` - 6 edges
+7. `CarLightsController._step()` - 5 edges
+8. `StealTagController._show()` - 5 edges
+9. `TestEngineController._attach()` - 5 edges
+10. `widgets.applyInteractionHighlights()` - 5 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `UIRoot.wait()` --calls--> `claim()`  [INFERRED]
+  ReplicatedStorage/shared/Modules/UIRoot.luau → tests/playtime/harness.luau
+- `UIRoot.find()` --calls--> `claim()`  [INFERRED]
+  ReplicatedStorage/shared/Modules/UIRoot.luau → tests/playtime/harness.luau
+- `Cue.describe()` --calls--> `RewardConfig.levelOf()`  [INFERRED]
+  ReplicatedStorage/shared/Modules/TrafficCollectionCue.luau → ReplicatedStorage/shared/Configs/RewardConfig.luau
 - `CarLightsController._step()` --calls--> `CarHeadlights.set()`  [INFERRED]
   ReplicatedStorage/shared/Controllers/CarLightsController.luau → ReplicatedStorage/shared/Modules/CarHeadlights.luau
 - `hex()` --calls--> `CarStats.bodyOf()`  [INFERRED]
   ReplicatedStorage/shared/Controllers/StealNudgeController.luau → ReplicatedStorage/shared/Modules/CarStats.luau
-- `CarBrakeLights.off()` --calls--> `paint()`  [INFERRED]
-  ReplicatedStorage/shared/Modules/CarBrakeLights.luau → ReplicatedStorage/shared/Controllers/UIController/Components/HudClaimBadges.luau
-- `relocateTooltips()` --calls--> `widgets.getMouseLocation()`  [INFERRED]
-  ReplicatedStorage/shared/Libraries/iris/widgets/Window.luau → ReplicatedStorage/shared/Libraries/iris/widgets/init.luau
-- `FirstPersonCabin.update()` --calls--> `CarStats.bodyOf()`  [INFERRED]
-  ReplicatedStorage/shared/Modules/FirstPersonCabin.luau → ReplicatedStorage/shared/Modules/CarStats.luau
 
 ## Import Cycles
 - None detected.
 
-## Communities (88 total, 61 thin omitted)
+## Communities (99 total, 67 thin omitted)
 
-### Community 0 - "Audio & Settings Config"
-Cohesion: 0.05
-Nodes (14): AudioConfig.clamp(), AudioConfig.isSet(), InterfaceConfig.isVisibility(), InterfaceConfig.resolve(), InterfaceConfig.statusFor(), hitBoxOf(), roofOf(), screenScale() (+6 more)
+### Community 0 - "StealTagController.luau"
+Cohesion: 0.26
+Nodes (9): hitBoxOf(), roofOf(), screenScale(), StealTagController._build(), StealTagController._clear(), StealTagController._show(), banner(), UpgradeCelebrationController._play() (+1 more)
 
-### Community 1 - "First-Person Cockpit Camera"
-Cohesion: 0.07
-Nodes (11): LobbyDriveController._teardown(), LobbyDriveController._watch(), FirstPersonCabin.destroy(), FirstPersonCabin._teardown(), FirstPersonCabin.update(), FirstPersonCockpit._health(), FirstPersonCockpit._placeArms(), FirstPersonCockpit._placeWheel() (+3 more)
+### Community 1 - "FirstPersonCabin.luau"
+Cohesion: 0.26
+Nodes (3): FirstPersonCabin.destroy(), FirstPersonCabin._teardown(), FirstPersonCabin.update()
 
 ### Community 2 - "Car Lights & Claim Badges"
 Cohesion: 0.07
 Nodes (19): IndexRewardConfig.bonusFor(), IndexRewardConfig.parseClaimed(), IndexRewardConfig.percentFor(), CarLightsController._bind(), CarLightsController._onRaceEnd(), CarLightsController._onRaceStart(), CarLightsController._step(), CarLightsController._unbind() (+11 more)
 
-### Community 4 - "Engine Audio & Seller"
-Cohesion: 0.09
-Nodes (19): approach(), TestEngineController._attach(), TestEngineController._bodyOf(), TestEngineController._clearTails(), TestEngineController._detach(), TestEngineController._driveSound(), TestEngineController._mute(), TestEngineController._replaceEngine() (+11 more)
+### Community 4 - "TestEngineController.luau"
+Cohesion: 0.08
+Nodes (21): approach(), TestEngineController._attach(), TestEngineController._bodyOf(), TestEngineController._clearTails(), TestEngineController._detach(), TestEngineController._driveSound(), TestEngineController._mute(), TestEngineController._replaceEngine() (+13 more)
 
-### Community 5 - "Paint, Start Car & Dealership UI"
-Cohesion: 0.12
+### Community 5 - "CarViewportGrid.luau"
+Cohesion: 0.47
 Nodes (3): CarViewportGrid:_drain(), CarViewportGrid:refresh(), CarViewportGrid:_release()
 
-### Community 6 - "Notice Lane Controllers"
-Cohesion: 0.09
-Nodes (17): DiscoveryController._build(), DiscoveryController._next(), InventoryLimitController._build(), InventoryLimitController._fit(), InventoryLimitController._refresh(), InventoryLimitController._show(), LuckProgressController._advance(), LuckProgressController._hide() (+9 more)
+### Community 6 - "NoticeLane.luau"
+Cohesion: 0.10
+Nodes (10): InventoryLimitController._build(), InventoryLimitController._fit(), InventoryLimitController._refresh(), InventoryLimitController._show(), inLane(), OfflineLabelController._apply(), OfflineLabelController._watchRival(), OfflineLabelController._yielding() (+2 more)
+
+### Community 7 - "StealNudgeController.luau"
+Cohesion: 0.10
+Nodes (13): CarConfig.maxSpeedOf(), hex(), StealNudgeController._niceCarLine(), StealNudgeController._onRaceStart(), StealNudgeController._reset(), StealNudgeController._step(), Schedule.canShow(), Schedule.claim() (+5 more)
 
 ### Community 8 - "Iris Widget Core"
 Cohesion: 0.07
 Nodes (4): widgets.applyFrameStyle(), widgets.UICorner(), widgets.UIPadding(), widgets.UIStroke()
 
-### Community 11 - "Shop, Codes & Passes"
+### Community 11 - "ShopConfig.luau"
 Cohesion: 0.12
-Nodes (8): PassConfig.ownedAttribute(), ShopConfig.isSellable(), ShopConfig.visibleBundles(), ShopConfig.visiblePasses(), priceLabel(), amountFor(), CodesService._redeem(), CodesService._reply()
-
-### Community 13 - "Sell Lot & Market Value"
-Cohesion: 0.13
-Nodes (4): GarageConfig.decodeConditions(), MarketValueConfig.broadcastRecord(), SellConfig.lotPriceForOwner(), SellConfig.lotPriceOf()
+Nodes (5): PassConfig.ownedAttribute(), ShopConfig.isSellable(), ShopConfig.visibleBundles(), ShopConfig.visiblePasses(), priceLabel()
 
 ### Community 15 - "ProfileStore (Packages)"
 Cohesion: 0.13
@@ -130,6 +144,14 @@ Nodes (7): AcquireRunnerThreadAndCallEventHandler(), Profile:EndSession(), Profi
 Cohesion: 0.14
 Nodes (5): Profile:EndSession(), Profile:IsActive(), Profile:MessageHandler(), ProfileStore:VersionQuery(), ProfileVersionQuery.New()
 
+### Community 20 - "c_users_razvan_documents_robloxprojects_steal_and_drive_ts_replicatedstorage_packages_trove_luau"
+Cohesion: 0.15
+Nodes (3): DealershipMarkerController._build(), UpgradeNudgeController._build(), UpgradeNudgeController._machine()
+
+### Community 21 - "ArcadeKit.luau"
+Cohesion: 0.17
+Nodes (6): DiscoveryController._build(), DiscoveryController._next(), LuckProgressController._advance(), LuckProgressController._hide(), LuckProgressController._pause(), LuckProgressController._step()
+
 ### Community 26 - "Basic Page & Upgrades"
 Cohesion: 0.18
 Nodes (6): findCloseButton(), Page.new(), KitPage.scaleTextCaps(), Page.initialize(), Page:_repaint(), Page:StartOpenThread()
@@ -137,14 +159,6 @@ Nodes (6): findCloseButton(), Page.new(), KitPage.scaleTextCaps(), Page.initiali
 ### Community 28 - "Iris Input & Plot"
 Cohesion: 0.21
 Nodes (9): UpdateComboState(), widgets.getMouseLocation(), widgets.isPosInsideRect(), SliderMouseDown(), updateActiveSlider(), clearBlock(), clearLine(), updateBlock() (+1 more)
-
-### Community 30 - "Car Stats Config"
-Cohesion: 0.27
-Nodes (8): CarConfig.maxHealthOf(), CarConfig.statsFor(), CarStats.apply(), CarStats.bodyOf(), CarStats.maxHealthOf(), CarStats.reapply(), stamp(), FirstPersonCockpit.setCar()
-
-### Community 33 - "Plates & Showcase"
-Cohesion: 0.22
-Nodes (4): PlateConfig.roll(), CarPlate.roll(), tiesToAnotherPart(), step()
 
 ### Community 35 - "Player Profile"
 Cohesion: 0.25
@@ -158,25 +172,17 @@ Nodes (7): claimed(), GroupRewardController._bind(), GroupRewardController._danc
 Cohesion: 0.27
 Nodes (4): ArcadeTrafficImpact.step(), fade(), overlaps(), reach()
 
-### Community 41 - "Traffic Collection Cue"
+### Community 41 - "CodesService.luau"
 Cohesion: 0.28
-Nodes (4): Cue.new(), Cue.step(), label(), oneLine()
+Nodes (3): amountFor(), CodesService._redeem(), CodesService._reply()
 
-### Community 42 - "Live Price & Rename"
-Cohesion: 0.28
-Nodes (3): keyOf(), LivePrice.fetch(), LivePrice.peek()
-
-### Community 43 - "Tutorial Control Highlight"
+### Community 42 - "TutorialControlHighlight.luau"
 Cohesion: 0.28
 Nodes (4): ButtonScale.ensure(), ButtonScale.set(), Highlight.new(), Highlight.step()
 
-### Community 44 - "Reward Levels"
-Cohesion: 0.29
-Nodes (6): BalanceConfig.roadValue(), CarConfig.maxSpeedOf(), RewardConfig.decodeLevels(), RewardConfig.levelOf(), RewardConfig.perStudFor(), Cue.describe()
-
-### Community 45 - "Steal Nudge"
-Cohesion: 0.36
-Nodes (5): hex(), StealNudgeController._niceCarLine(), StealNudgeController._onRaceStart(), StealNudgeController._reset(), StealNudgeController._step()
+### Community 44 - "SellConfig.luau"
+Cohesion: 0.22
+Nodes (4): GarageConfig.decodeConditions(), MarketValueConfig.broadcastRecord(), SellConfig.lotPriceForOwner(), SellConfig.lotPriceOf()
 
 ### Community 51 - "Iris Window Layout"
 Cohesion: 0.33
@@ -190,27 +196,55 @@ Nodes (6): widgets.applyInputBegan(), widgets.applyInputEnded(), widgets.applyIn
 Cohesion: 0.33
 Nodes (3): AcquireRunnerThreadAndCallEventHandler(), RunEventHandlerInFreeThread(), RunEventHandlerInFreeThread()
 
+### Community 57 - "InterfaceConfig.luau"
+Cohesion: 0.38
+Nodes (3): InterfaceConfig.isVisibility(), InterfaceConfig.resolve(), InterfaceConfig.statusFor()
+
+### Community 58 - "InventoryConfig.luau"
+Cohesion: 0.13
+Nodes (4): BalanceConfig.roadValue(), RewardConfig.decodeLevels(), RewardConfig.levelOf(), RewardConfig.perStudFor()
+
+### Community 63 - "CarStats.luau"
+Cohesion: 0.33
+Nodes (6): CarConfig.maxHealthOf(), CarConfig.statsFor(), CarStats.apply(), CarStats.maxHealthOf(), CarStats.reapply(), stamp()
+
+### Community 64 - "RadioPanelController.luau"
+Cohesion: 0.28
+Nodes (3): keyOf(), LivePrice.fetch(), LivePrice.peek()
+
 ### Community 67 - "Showroom Economy"
 Cohesion: 1.00
 Nodes (3): floorOf(), sample(), ShowroomEconomy.estimate()
 
+### Community 77 - "FirstPersonCockpit.luau"
+Cohesion: 0.36
+Nodes (6): FirstPersonCockpit._health(), FirstPersonCockpit._placeArms(), FirstPersonCockpit._placeWheel(), FirstPersonCockpit._showArms(), FirstPersonCockpit._showDash(), FirstPersonCockpit.update()
+
+### Community 90 - "HopController.luau"
+Cohesion: 0.43
+Nodes (6): HopController._bind(), HopController._setRacing(), HopController._step(), HopController._unbind(), CarStats.bodyOf(), FirstPersonCockpit.setCar()
+
+### Community 94 - "RareCarBannerController.luau"
+Cohesion: 0.60
+Nodes (5): RareCarBannerController._build(), RareCarBannerController._fit(), RareCarBannerController._present(), RareCarBannerController._show(), RareCarBannerController._showConvoy()
+
 ## Knowledge Gaps
-- **61 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **67 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `widgets.getMouseLocation()` connect `Iris Input & Plot` to `Iris Widget Core`, `Iris Window Layout`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
-- **Should `Audio & Settings Config` be split into smaller, more focused modules?**
-  _Cohesion score 0.054693877551020405 - nodes in this community are weakly interconnected._
-- **Why does `widgets.getScreenSizeForWindow()` connect `Iris Window Layout` to `Iris Widget Core`?**
-  _High betweenness centrality (0.012) - this node is a cross-community bridge._
-- **Should `First-Person Cockpit Camera` be split into smaller, more focused modules?**
-  _Cohesion score 0.06755260243632337 - nodes in this community are weakly interconnected._
-- **Why does `Feedback.play()` connect `Gameplay Feedback` to `Daily Rewards`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
 - **Should `Car Lights & Claim Badges` be split into smaller, more focused modules?**
-  _Cohesion score 0.06852497096399536 - nodes in this community are weakly interconnected._
-- **Should `Passes, Obstacles & Teleport` be split into smaller, more focused modules?**
-  _Cohesion score 0.10084033613445378 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07073170731707316 - nodes in this community are weakly interconnected._
+- **Why does `UpdateComboState()` connect `Iris Input & Plot` to `Iris Widget Library`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **Should `TestEngineController.luau` be split into smaller, more focused modules?**
+  _Cohesion score 0.07823613086770982 - nodes in this community are weakly interconnected._
+- **Why does `Feedback.play()` connect `Gameplay Feedback` to `ArcadeKit.luau`?**
+  _High betweenness centrality (0.014) - this node is a cross-community bridge._
+- **Should `NoticeLane.luau` be split into smaller, more focused modules?**
+  _Cohesion score 0.0960591133004926 - nodes in this community are weakly interconnected._
+- **Should `StealNudgeController.luau` be split into smaller, more focused modules?**
+  _Cohesion score 0.1 - nodes in this community are weakly interconnected._
