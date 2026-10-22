@@ -115,23 +115,19 @@ function ShowroomEconomy.estimate(cfg, values: {number}, slots: number, seconds:
  end
  local income=cfg.Income
  if income and income.Ranked then
-  -- `CustomerConfig.Income`: per floor, ranked bases with decaying weights x crowd^power. Never lower with a car added.
-  local bases={{},{}}
+  -- `CustomerConfig.Income`: every car ranked together whatever its floor, decaying weights x crowd^power. Never lower with a car added.
+  local list={}
   for i,value in values do
    local efficiency=if efficiencies then efficiencies[i] else cfg.Offline.Efficiency
-   if value>0 then table.insert(bases[floorOf(i,indices)],value*efficiency) end
+   -- A floor with no customers (upstairs before `Floor2`) earns nothing, as it always has.
+   if value>0 and (caps[floorOf(i,indices)] or 0)>0 then table.insert(list,value*efficiency) end
   end
-  local rate,crowd=0,0
-  for floor=1,2 do
-   local list=bases[floor]
-   local customers=math.min(caps[floor] or 0,#list)
-   if customers>0 then
-    table.sort(list,function(a,b) return a>b end)
-    local weighted,w=0,1
-    for _,b in list do weighted+=w*b;w*=income.Decay end
-    rate+=cfg.perLook(weighted)*income.Pace[floor]*customers^income.CrowdPower
-    crowd+=customers
-   end
+  local rate,crowd=0,math.min((caps[1] or 0)+(caps[2] or 0),#list)
+  if crowd>0 then
+   table.sort(list,function(a,b) return a>b end)
+   local weighted,w=0,1
+   for j,b in list do weighted+=w*b;w=if j==1 then income.Second else w*income.Decay end
+   rate=cfg.perLook(weighted)*income.Pace*crowd^income.CrowdPower
   end
   if vip then rate*=cfg.vipIncomeMultiplier() end
   local counted=math.clamp(seconds,0,cfg.Offline.CapSeconds)

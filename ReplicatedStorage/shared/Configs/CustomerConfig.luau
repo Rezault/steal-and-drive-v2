@@ -1072,12 +1072,12 @@ end
 	another car should never make the income go down", and "do not change the economy so players earn
 	a crazy amount more money".
 
-	IS: a formula, per floor, paid as a rate (`ShowroomEconomy.estimate`, `CustomerService._bank`):
+	IS: a formula over the whole lot, paid as a rate (`ShowroomEconomy.estimate`, `CustomerService._bank`):
 
-	    per second = perLook(b1 + Decay*b2 + Decay^2*b3 + ...) x Pace[floor] x customers^CrowdPower
+	    per second = perLook(b1 + Second*b2 + Second*Decay*b3 + ...) x Pace x customers^CrowdPower
 
-	`b` are the floor's tip bases (`GarageService.getBayTip`) best first, and `customers` is the
-	floor's crowd as the live lot spawns it, min(capacity, cars). Every term only grows when a car is
+	`b` are the lot's tip bases (`GarageService.getBayTip`) best first, both floors together, and `customers`
+	is the crowd as the live lot spawns it, min(capacity, cars) over both floors. Every term only grows when a car is
 	added: the ranking can only move up, and the crowd only grows. Decay makes a big lot level off the
 	way the crowd did, so a full lot earns a little more than before, not the sum of every car.
 
@@ -1089,6 +1089,14 @@ end
 	6th, so every car still moves the number. Against the old simulation: lots of 1-2 cars x1.00, 3-4
 	x0.97, 5-6 x1.16. Higher Decay makes later cars count more and full lots earn more.
 
+	BOTH FLOORS PAY THE SAME (2026-10-22, the owner and Aleafo: "we wanna make all floors equal, but
+	dont make it too overpowered"). WAS one ranking per floor and upstairs at 63% of downstairs' pace
+	(`Pace = { 0.0329, 0.0208 }`, the old crowd's stair climb). Giving upstairs the downstairs pace
+	would have been +58% on that floor for every late lot. IS one ranking over every car on the lot,
+	whatever its floor, with the crowd being both floors' customers: weights 1, `Second` (0.5), then
+	x`Decay` (0.7) per car. Against the per-floor formula it replaces, by number of cars (filled
+	downstairs first): 1-2 x1.00, 3 x1.02, 4 x1.05, 5 x1.07, 6 x1.09, 7 x1.02, 8 x0.99, 9-12 x0.96-0.98.
+
 	FITTED, NOT GUESSED: `Pace` is set so lots of 1-2 cars earn exactly what the old simulation paid
 	(geometric mean over 160 random lots: 1-6 cars, 2-6 customers, both floors, a 12x spread of car
 	values, the real customer kinds). The live crowd still walks and reacts exactly as before; a liked look
@@ -1099,11 +1107,13 @@ end
 	`Ranked = false`: the crowd simulation and per-look tips, exactly as before this note. ]]
 CustomerConfig.Income = {
 	Ranked = true,
-	Decay = 0.5,
+	--- The 2nd best car's weight, then each car after it this times the one before.
+	Second = 0.5,
+	Decay = 0.7,
 	CrowdPower = 0.1,
-	--- Liked looks per second the formula pays for, downstairs and upstairs (the stairs walk is why
-	--- upstairs is lower). Multiplies `perLook`, so `Tip.ValueFraction` and `ByWorld` still tune it.
-	Pace = { 0.0329, 0.0208 },
+	--- Liked looks per second the formula pays for. Multiplies `perLook`, so `Tip.ValueFraction` and
+	--- `ByWorld` still tune it. One number: the floor a car is on no longer matters.
+	Pace = 0.0329,
 }
 return CustomerConfig
 
