@@ -1,0 +1,6 @@
+# Graph covers live game code only: no vendored deps, SDK, or ServerStorage backups.
+ReplicatedStorage/Packages/
+ReplicatedStorage/Gamebeast/
+ServerStorage/
+.claude/
+/CLAUDE.md

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_replicatedstorage_shared_configs_carryconfig_luau", "label": "CarryConfig.luau", "file_type": "code", "source_file": "ReplicatedStorage/shared/Configs/CarryConfig.luau", "source_location": "L1"}], "edges": [], "raw_calls": [], "parse_errors": {"first_error_line": 220, "multiline_error": true}}

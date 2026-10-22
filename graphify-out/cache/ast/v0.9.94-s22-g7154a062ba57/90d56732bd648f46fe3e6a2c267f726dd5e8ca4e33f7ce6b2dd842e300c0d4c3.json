@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_replicatedstorage_shared_configs_cabinskinconfig_luau", "label": "CabinSkinConfig.luau", "file_type": "code", "source_file": "ReplicatedStorage/shared/Configs/CabinSkinConfig.luau", "source_location": "L1"}], "edges": [], "raw_calls": [], "parse_errors": {"first_error_line": 75, "multiline_error": true}}

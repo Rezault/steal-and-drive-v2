@@ -309,11 +309,14 @@ PoliceConfig.StealHeat = {
 	No value yet (configs not loaded, Gamebeast unreachable, or Studio, whose "studio" environment has
 	no "live"): `Remote.Fallback`, which should match the base configuration's value, or
 	`Remote.StudioFallback` in Studio so playtests keep the heat. SHIPPING THE WINNER: end the
-	experiment, set "live" `Heat.Enabled` to it, and set `Fallback` to match. ]]
+	experiment, set "live" `Heat.Enabled` to it, and set `Fallback` to match.
+
+	2026-10-22: SHIPPED NO HEAT. The heat arm lost on banked runs, so the kill switch is off for
+	everybody and `Remote` stops asking Gamebeast. Everything below is kept as the A/B. ]]
 PoliceConfig.Heat = {
-	Enabled = true,
+	Enabled = false,
 	Remote = {
-		Enabled = true,
+		Enabled = false,
 		Path = { "live", "Heat", "Enabled" },
 		Attribute = "HeatOn",
 		Fallback = false,

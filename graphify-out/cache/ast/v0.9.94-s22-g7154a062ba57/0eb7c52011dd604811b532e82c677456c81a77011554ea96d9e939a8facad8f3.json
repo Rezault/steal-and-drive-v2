@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_replicatedstorage_shared_modules_buttonbeckon_luau", "label": "ButtonBeckon.luau", "file_type": "code", "source_file": "ReplicatedStorage/shared/Modules/ButtonBeckon.luau", "source_location": "L1"}], "edges": [], "raw_calls": [], "parse_errors": {"first_error_line": 35, "multiline_error": true}}
