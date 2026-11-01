@@ -145,17 +145,17 @@ TipsConfig.Tips = {
 	"Tap the brake to slip into a gap. Let go and you speed back up.",
 }
 
--- Open-world collector (2026-11-01): the tips above teach the race, which is now the side mode, so
--- the chat line teaches the on-foot loop instead. CollectorConfig.Enabled = false brings them back.
+-- Car collector (2026-11-01): the road is the steal now and Steal Power trains on the kiddie ride, so
+-- the chat line teaches that loop. CollectorConfig.Enabled = false brings the race tips back.
 if require(game:GetService("ReplicatedStorage").shared.Configs.CollectorConfig).Enabled then
 	TipsConfig.Tips = {
-		"Walk into a roaming car and stay close to steal it. Your STEAL POWER has to beat its number.",
+		"Press PLAY, catch a car and press SPACE to jump into it. It's yours, keep driving!",
 		"Park stolen cars on your podiums. They earn cash every second. Walk over the pad to collect.",
-		"Tap the + on your power meter to buy STEAL POWER. More power opens new zones.",
-		"Every few minutes the zones reset with fresh cars. Watch for SECRET cars.",
+		"Every car shows the STEAL POWER it needs. Green means you can take it.",
+		"Sit on the kiddie ride at your plot to train STEAL POWER.",
+		"Tap the + on your power meter to upgrade the kiddie ride and train faster.",
 		"Same car, new colour? That's a new car for your collection.",
-		"Rarer cars roam deeper in. Each zone gate shows the power you need.",
-		"Want to drive instead? Press PLAY to race on the highway.",
+		"Rarer cars drive further down the road. Keep going!",
 	}
 end
 

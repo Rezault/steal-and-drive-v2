@@ -37,8 +37,9 @@ local StealConfig = require(ReplicatedStorage.shared.Configs.StealConfig)
 local CarConfig = require(ReplicatedStorage.shared.Configs.CarConfig)
 --- Whether a steal redeems a server-issued token (`_onLanded`'s dated block).
 local EncounterConfig = require(ReplicatedStorage.shared.Configs.EncounterConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 
-local StealService = Shard.new("StealService"):withDependencies({ "ObstacleService", "RaceService" })
+local StealService = Shard.new("StealService"):withDependencies({ "ObstacleService", "RaceService", "RoamingCarService" })
 
 StealService:withSignals({
 	--[[ (player: Player, tier: number) — a steal was ratified. Fired from `_onLanded` only after the
@@ -139,6 +140,13 @@ function StealService._onLanded(self, player: Player, tier: unknown)
 		self._lastSteal[player] = now
 		self:getSignal("CarStolen"):Fire(player, index)
 		self.log:info(string.format("%s stole a Tier %d.", player.Name, index))
+		--[[ THE COLLECTOR (`CollectorConfig.RoadSteal`): the car is yours the moment you land in it,
+			no truck. Only with encounters on, because only then is `stolen` the server's own roll —
+			the tier-only path has no body to award and nothing a client could not have made up. ]]
+		local stolen = EncounterConfig.Enabled and body and Shard.get("EncounterService"):stolenCar(player)
+		if CollectorConfig.Enabled and CollectorConfig.RoadSteal and stolen then
+			Shard.get("RoamingCarService"):awardRoadSteal(player, stolen)
+		end
 	end
 end
 

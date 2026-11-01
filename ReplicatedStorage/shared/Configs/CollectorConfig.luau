@@ -22,6 +22,20 @@ local CollectorConfig = {}
 
 CollectorConfig.Enabled = true
 
+--[[ WHERE THE CARS ARE (2026-11-01, owner after the first playtest: "one wide road with cars spawning
+	from the start of the road, and I need to drive and catch and jump into them"; "I'm not able to do
+	the satisfying jump and land in a car").
+
+	`RoadSteal`: the race highway is the collector. Its traffic is what you steal, with the existing
+	jump-and-land, and a landed car is YOURS on the spot (`StealService` -> `RoamingCarService.
+	awardRoadSteal`): straight to the hotbar, no getaway truck, keep driving it to the next one. A car
+	whose ⚡ requirement you do not meet cannot be locked or taken.
+
+	`Roaming`: the first build's on-foot herds in the canyon south of the plots. Off; kept because it
+	works and the corridor may come back as a lobby feature. ]]
+CollectorConfig.RoadSteal = true
+CollectorConfig.Roaming = false
+
 -- === The corridor ============================================================
 --[[ Measured in the place, 2026-11-01: the canyon south of the plots is flat at Y = -90 from the
 	RACE gate (Z ~ -1000) to the end of the floor (Z ~ -2900), between walls at X ~ 7200 and 7780.
@@ -73,31 +87,63 @@ end
 CollectorConfig.StudsPerMeter = 1.5
 
 -- === Steal Power =============================================================
---[[ ONE NUMBER, ONE LADDER. Every car has a REQUIRED power fixed by its tier (`GarageConfig.
-	TierOfBody`, 1..50 across the five worlds), and the `Power` upgrade's level L is worth exactly the
-	requirement of tier L+1. So level 0 steals the Civic, each level unlocks the next car on the
-	ladder, and level 49 steals everything. The board can then say exactly what the next level buys.
+--[[ A STAT YOU TRAIN, NOT A LEVEL YOU BUY (2026-11-01, owner: "steal power should be able to train
+	passively, like the other game has a toy horse you ride for energy"). ⚡ is a number on the
+	profile that only goes up, while you sit on the KIDDIE RIDE at your plot (`Trainer` below). Cash
+	buys Trainer levels, which make the ride pay faster. Every car has a REQUIRED power fixed by its
+	tier (`GarageConfig.TierOfBody`, 1..50 across the five worlds); you can only steal a car whose
+	requirement you meet.
 
 	THE CURVE IS GEOMETRIC (x`Growth` per tier) so the number reads like the reference's ⚡ — 10, 11,
 	13 … ~4,000 — and later worlds look harder at a glance, not by a constant. ]]
 CollectorConfig.Power = {
 	Base = 10,
 	Growth = 1.13,
-	MaxLevel = 49,
-	UpgradeKey = "Power",
-	--[[ What level L+1 costs, as a multiple of the market value of the car it unlocks. A stolen car
-		sells for its value, so this is "how many of the next car would you have to sell" — about four,
-		which keeps the ladder at roughly a couple of minutes a level with a full showroom and active
-		stealing. The first levels are cheaper so a new player's first upgrade is one or two Civics
-		away, and every price is at least `MinStep` x the one before, so the ladder never dips where a
-		new world's first car is worth less than the last world's top car. ]]
-	CostFactor = 4,
-	-- Level 1 unlocks the Golf GTI ($6,000, ten Civics' worth). Priced at ONE Civic ($600): at power 10
-	-- only Civics are stealable (~30% of spawns), and 2.5 Civics was an 8-minute wait on one bay
-	-- (Studio play, 2026-11-01). Three parked Civics earn it in about a minute.
-	EarlyFactors = { 0.1, 0.8, 1.4, 2.2, 3 },
-	MinStep = 1.12,
+	Attribute = "StealPower", -- server-written, replicated to the owner
+	ProfileKey = "StealPower", -- under the profile's Garage table; absent reads as `Start`
+	Start = 10, -- exactly the Civic's requirement, so a new player can steal from the first second
 }
+
+--[[ The kiddie ride: the coin-op bouncing car outside a supermarket, one per plot. Sit on it and ⚡
+	rises by `rateAt(level)` every second, AFK included — that is the point of the reference's horse.
+
+	THE RATE TRACKS THE LADDER. Requirements grow x1.13 a tier, so x1.277 is two tiers; each Trainer
+	level multiplies the rate by that, and level L is "the ride for tier ~2L". Level 0 trains the
+	Civic -> Golf step (10 -> 11) in five seconds and world 1's top car (30) in under two minutes.
+	PRICES follow the car the level is for, like the old Power ladder: `factor` x the market value of
+	tier 2L, never less than `MinStep` x the previous price. The first level costs one Civic. ]]
+CollectorConfig.Trainer = {
+	UpgradeKey = "Trainer",
+	MaxLevel = 24,
+	BaseRate = 0.2, -- ⚡ per second at level 0
+	RateGrowth = 1.277,
+	TickSeconds = 1,
+	EarlyFactors = { 0.1, 0.25, 0.4, 0.6 },
+	CostFactor = 0.8,
+	MinStep = 1.15,
+}
+
+--- ⚡ per second on the ride at Trainer `level`.
+function CollectorConfig.rateAt(level: number): number
+	local t = CollectorConfig.Trainer
+	return t.BaseRate * t.RateGrowth ^ math.clamp(level, 0, t.MaxLevel)
+end
+
+--- A player's ⚡ (server: the authoritative attribute it wrote; client: the replicated copy).
+function CollectorConfig.powerOf(player: Player): number
+	local value = player:GetAttribute(CollectorConfig.Power.Attribute)
+	return if type(value) == "number" then value else CollectorConfig.Power.Start
+end
+
+--- How ⚡ is shown: whole numbers, then 1.2K / 3.4M.
+function CollectorConfig.formatPower(value: number): string
+	if value >= 1e6 then
+		return string.format("%.1fM", value / 1e6)
+	elseif value >= 1e4 then
+		return string.format("%.1fK", value / 1e3)
+	end
+	return tostring(math.floor(value))
+end
 
 local _required = {}
 --- The steal power a car of `tier` needs.
@@ -115,21 +161,17 @@ function CollectorConfig.requiredFor(tier: number): number
 	return cached
 end
 
---- Steal power at upgrade `level` (0 = a brand new profile).
-function CollectorConfig.powerAt(level: number): number
-	return CollectorConfig.requiredFor(math.clamp(level, 0, CollectorConfig.Power.MaxLevel) + 1)
-end
-
---- Steal power from a profile's `Upgrades` table (or the decoded attribute).
-function CollectorConfig.powerOf(upgrades: unknown): number
-	local UpgradeConfig = require(script.Parent.UpgradeConfig)
-	return CollectorConfig.powerAt(UpgradeConfig.levelOf(upgrades, CollectorConfig.Power.UpgradeKey))
+--- The steal power a body needs, by its place on the world ladders (`WorldConfig.TierOfBody`), or
+--- nil for a body on no ladder. By BODY because the road's own records carry a rung table, not a tier.
+function CollectorConfig.requiredForBody(body: unknown): number?
+	local tier = type(body) == "string" and require(script.Parent.WorldConfig).TierOfBody[body]
+	return if tier then CollectorConfig.requiredFor(tier) else nil
 end
 
 local _prices: { number }? = nil
---- What buying level `level + 1` costs, or nil at the top. Read through `UpgradeConfig.costOf`.
-function CollectorConfig.powerCost(level: number): number?
-	local p = CollectorConfig.Power
+--- What buying Trainer level `level + 1` costs, or nil at the top. Read through `UpgradeConfig.costOf`.
+function CollectorConfig.trainerCost(level: number): number?
+	local p = CollectorConfig.Trainer
 	if level >= p.MaxLevel then
 		return nil
 	end
@@ -139,8 +181,8 @@ function CollectorConfig.powerCost(level: number): number?
 		local previous = 0
 		for l = 1, p.MaxLevel do
 			local factor = p.EarlyFactors[l] or p.CostFactor
-			local unlocks = l + 1 -- level l lets you steal tier l + 1
-			local price = factor * (GarageConfig.valueOf(unlocks) or 0)
+			local forTier = math.min(50, 2 * l) -- level l is the ride for tier ~2l
+			local price = factor * (GarageConfig.valueOf(forTier) or 0)
 			price = math.max(price, previous * p.MinStep, 100)
 			-- Round to 2 significant figures: prices are read, not computed with.
 			local unit = 10 ^ math.max(0, math.floor(math.log10(price)) - 1)

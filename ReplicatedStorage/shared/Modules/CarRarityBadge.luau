@@ -66,6 +66,10 @@ local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
 local CarMutation = require(ReplicatedStorage.shared.Modules.CarMutation)
 local CarRarity = require(ReplicatedStorage.shared.Modules.CarRarity)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
+local Players = game:GetService("Players")
+local NEED_OK = Color3.fromRGB(90, 230, 80)
+local NEED_SHORT = Color3.fromRGB(255, 70, 70)
 
 local CarRarityBadge = {}
 
@@ -445,8 +449,16 @@ function CarRarityBadge.set(car: Instance?, tier: any, body: unknown, world: unk
 	local cue = badge:FindFirstChild("Cue")
 	if cue then cue.Visible = false; write(cue, "") end
 	local oddsText = CarRarityBadge.oddsText(body, world, luck)
+	--[[ THE COLLECTOR (`CollectorConfig.RoadSteal`, 2026-11-01): the second line is what the car NEEDS,
+		the reference's "Required: ⚡N", green when your Steal Power meets it and red when not. Every car
+		shows it, commons included: the requirement is the decision now, not the odds. ]]
+	local need = CollectorConfig.Enabled and CollectorConfig.RoadSteal and CollectorConfig.requiredForBody(body)
+	if need then
+		oddsText = "Required: ⚡" .. CollectorConfig.formatPower(need)
+		quiet = false
+	end
 	local wantRarity = cfg.Lines ~= "Odds" and word ~= ""
-	local wantOdds = cfg.Lines ~= "Rarity" and oddsText ~= ""
+	local wantOdds = (cfg.Lines ~= "Rarity" or need) and oddsText ~= ""
 
 	--[[ THE BAND'S COLOUR GOES IN THE LETTERS. That is the whole advert, and with no panel it is the
 		only place left to put it. The number stays white under it so the two lines separate into
@@ -461,7 +473,10 @@ function CarRarityBadge.set(car: Instance?, tier: any, body: unknown, world: unk
 		write(odds, oddsText)
 		--- White when the word is there to carry the band, the band's own colour when it is not:
 		--- a lone number in white would say nothing about the car at all.
-		odds.TextColor3 = if wantRarity then cfg.OddsColour else colour
+		odds.TextColor3 = if need
+			then (if CollectorConfig.powerOf(Players.LocalPlayer) >= need then NEED_OK else NEED_SHORT)
+			elseif wantRarity then cfg.OddsColour
+			else colour
 		odds.Visible = wantOdds
 	end
 

@@ -46,6 +46,13 @@ Controller:withRemoteEvents({
 		[CollectorConfig.Remotes.Announce] = function(payload)
 			Controller:_onAnnounce(payload)
 		end,
+		-- The SECURED tray is per run on the road: a new run starts it empty.
+		RaceStart = function()
+			if Controller._secured and #Controller._secured > 0 then
+				table.clear(Controller._secured)
+				Controller:_refreshTray()
+			end
+		end,
 	},
 })
 
@@ -133,7 +140,7 @@ end
 
 function Controller._level(self): number
 	local upgrades = UpgradeConfig.decode(self._player:GetAttribute(UpgradeConfig.Attribute))
-	return UpgradeConfig.levelOf(upgrades, CollectorConfig.Power.UpgradeKey)
+	return UpgradeConfig.levelOf(upgrades, CollectorConfig.Trainer.UpgradeKey)
 end
 
 function Controller._buildPower(self)
@@ -179,7 +186,7 @@ function Controller._buildPanel(self)
 	aspect.Parent = panel
 	corner(panel, 0.08)
 	stroke(panel, 4, NAVY)
-	text(panel, "STEAL POWER", GOLD, { Position = UDim2.fromScale(0.05, 0.04), Size = UDim2.fromScale(0.9, 0.15) })
+	text(panel, "⚡ KIDDIE RIDE", GOLD, { Position = UDim2.fromScale(0.05, 0.04), Size = UDim2.fromScale(0.9, 0.15) })
 	self._panelFrom = text(panel, "", Color3.new(1, 1, 1), { Position = UDim2.fromScale(0.05, 0.22), Size = UDim2.fromScale(0.9, 0.16) })
 	self._panelUnlock = text(panel, "", Color3.new(1, 1, 1), { Position = UDim2.fromScale(0.05, 0.4), Size = UDim2.fromScale(0.9, 0.11) })
 	self._panelZone = text(panel, "", GOLD, { Position = UDim2.fromScale(0.05, 0.52), Size = UDim2.fromScale(0.9, 0.09) })
@@ -189,7 +196,7 @@ function Controller._buildPanel(self)
 		Size = UDim2.fromScale(0.62, 0.2),
 	})
 	buy.Activated:Connect(function()
-		self:getRemoteEvent("RequestUpgrade"):Fire(CollectorConfig.Power.UpgradeKey)
+		self:getRemoteEvent("RequestUpgrade"):Fire(CollectorConfig.Trainer.UpgradeKey)
 	end)
 	self._buy = buy
 	local close = button(panel, "X", Color3.fromRGB(230, 60, 60), {
@@ -217,28 +224,32 @@ end
 
 function Controller._refreshPower(self)
 	local level = self:_level()
-	local power = CollectorConfig.powerAt(level)
-	self._powerText.Text = "⚡ " .. GarageConfig.formatCash(power):gsub("^%$", "")
+	local power = CollectorConfig.powerOf(self._player)
+	self._powerText.Text = "⚡ " .. CollectorConfig.formatPower(power)
 	if not self._panel.Visible then
 		return
 	end
-	local cost = UpgradeConfig.costOf(CollectorConfig.Power.UpgradeKey, level)
+	-- The next car your ⚡ has not reached yet: what training is for.
+	local nextTier
+	for tier = 1, 50 do
+		if CollectorConfig.requiredFor(tier) > power then
+			nextTier = tier
+			break
+		end
+	end
+	local body = nextTier and bodyOfTier(nextTier)
+	self._panelUnlock.Text = if body
+		then string.format("Next: %s at ⚡%s", nameOf(body), CollectorConfig.formatPower(CollectorConfig.requiredFor(nextTier)))
+		else "Every car in the game is yours to steal"
+	self._panelZone.Text = "Sit on the kiddie ride at your plot to train"
+	local rate = CollectorConfig.rateAt(level)
+	local cost = UpgradeConfig.costOf(CollectorConfig.Trainer.UpgradeKey, level)
 	if not cost then
-		self._panelFrom.Text = string.format("⚡%d  MAXED", power)
-		self._panelUnlock.Text = "Every car in the game is yours to steal"
-		self._panelZone.Text = ""
+		self._panelFrom.Text = string.format("+%.1f ⚡/s  MAXED", rate)
 		self._buy.Visible = false
 		return
 	end
-	local nextPower = CollectorConfig.powerAt(level + 1)
-	self._panelFrom.Text = string.format("⚡%d  →  ⚡%d", power, nextPower)
-	local body = bodyOfTier(level + 2)
-	local rarity = body and CarRarity.labelOf(body) or ""
-	self._panelUnlock.Text = if body then string.format("Unlocks: %s (%s)", nameOf(body), rarity) else ""
-	local zone = (level + 1) // 10 + 1
-	self._panelZone.Text = if (level + 1) % 10 == 0 and WorldConfig.Worlds[zone]
-		then "Opens " .. zoneName(zone) .. "!"
-		else ""
+	self._panelFrom.Text = string.format("+%.1f ⚡/s  →  +%.1f ⚡/s", rate, CollectorConfig.rateAt(level + 1))
 	self._buy.Visible = true
 	local cash = self._player:GetAttribute(GarageConfig.CashAttribute) or 0
 	self._buy.Text = GarageConfig.formatCash(cost)
@@ -288,7 +299,10 @@ function Controller._buildStrip(self)
 end
 
 function Controller._refreshStrip(self)
-	local power = CollectorConfig.powerAt(self:_level())
+	if not self._strip then
+		return -- the corridor strip is the Roaming mode's; the road has its own progress bar
+	end
+	local power = CollectorConfig.powerOf(self._player)
 	for zone, tile in self._tiles do
 		tile.BackgroundTransparency = if power >= CollectorConfig.zoneMinimum(zone) then 0 else 0.65
 	end
@@ -554,7 +568,9 @@ Controller:withLifecycle({
 
 		self:_buildPower()
 		self:_buildPanel()
-		self:_buildStrip()
+		if CollectorConfig.Roaming then
+			self:_buildStrip()
+		end
 		self:_buildToast()
 		self:_buildBanner()
 
@@ -571,6 +587,7 @@ Controller:withLifecycle({
 			self._lastLevel = level
 		end)
 		self._player:GetAttributeChangedSignal(GarageConfig.CashAttribute):Connect(refresh)
+		self._player:GetAttributeChangedSignal(CollectorConfig.Power.Attribute):Connect(refresh)
 		self._lastLevel = self:_level()
 		refresh()
 

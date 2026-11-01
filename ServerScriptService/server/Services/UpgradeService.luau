@@ -958,8 +958,8 @@ end
 function UpgradeService._onRequest(self, player: Player, key: unknown)
 	-- `isOnBoard` rather than `isKey` — see its own note. A key this file still knows about but no
 	-- longer sells is refused here, not merely absent from the UI.
-	-- Steal Power is sold off the HUD, not the board, so it is let through by name (`CollectorConfig`).
-	local isPower = CollectorConfig.Enabled and key == CollectorConfig.Power.UpgradeKey
+	-- The kiddie ride is sold off the HUD, not the board, so it is let through by name (`CollectorConfig`).
+	local isPower = CollectorConfig.Enabled and key == CollectorConfig.Trainer.UpgradeKey
 	if not (UpgradeConfig.Enabled and (UpgradeConfig.isOnBoard(key) or isPower)) then
 		return
 	end

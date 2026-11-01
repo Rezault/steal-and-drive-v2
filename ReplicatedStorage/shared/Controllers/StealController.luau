@@ -110,6 +110,7 @@ local StealConfig = require(ReplicatedStorage.shared.Configs.StealConfig)
 local StealJuiceConfig = require(ReplicatedStorage.shared.Configs.StealJuiceConfig)
 --- Whether a steal reports the car's issued token rather than its tier (`EncounterConfig`).
 local EncounterConfig = require(ReplicatedStorage.shared.Configs.EncounterConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local UpgradeConfig = require(ReplicatedStorage.shared.Configs.UpgradeConfig)
@@ -1089,7 +1090,7 @@ function StealController._predictedTarget(self, along: number, cross: number, t:
 	--- `prefer` (`StealConfig.Lock.Stick`): the car the lock already holds, and its surface distance.
 	local preferSurface: number? = nil
 	for _, rec in traffic:getCars() do
-		if not rec.physical and rec.hit and rec.hit.Parent then
+		if not rec.physical and rec.hit and rec.hit.Parent and self:_canTake(rec) then
 			-- A lane change that was already visibly underway is allowed to finish during the flight.
 			-- Predict that committed lateral travel at TrafficController's same bounded rate.
 			local lateralStep = TrafficConfig.LaneChangeSpeed * t
@@ -1315,6 +1316,19 @@ end
 	`Stick` studs, so steering toward another car moves the lock and drifting between two does not.
 	Behind comes last of all: with nothing in front or beside, a car behind is still a target.
 	Road frame throughout, the same `along`/`cross` the flight and the traffic records are kept in. ]]
+--[[ The collector's ⚡ gate (`CollectorConfig.RoadSteal`, 2026-11-01): a car above your Steal Power
+	is never locked, aimed at or offered, so the jump only ever goes for one you can keep. A courtesy,
+	not the rule — `RoamingCarService.awardRoadSteal` re-checks on the server. The LANDING is not
+	gated (`_landingTarget`): coming down on a car you cannot keep still lands you in it, and the server
+	answers "weak" instead of wrecking you for a jump the lock never offered. ]]
+function StealController._canTake(self, rec): boolean
+	local required = CollectorConfig.Enabled and CollectorConfig.RoadSteal and CollectorConfig.requiredForBody(rec.body)
+	if not required then
+		return true
+	end
+	return CollectorConfig.powerOf(Players.LocalPlayer) >= required
+end
+
 function StealController._pickLock(self, f, steering: boolean?)
 	local traffic = self._traffic
 	if not (traffic and f) then
@@ -1328,7 +1342,7 @@ function StealController._pickLock(self, f, steering: boolean?)
 	local best, bestGroup, bestDist
 	local held, heldDist
 	for _, rec in traffic:getCars() do
-		if not rec.physical and rec.hit and rec.hit.Parent then
+		if not rec.physical and rec.hit and rec.hit.Parent and self:_canTake(rec) then
 			local ahead = rec.along - f.along
 			local side = rec.cross - aimCross
 			if ahead >= -cfg.Behind and ahead <= cfg.Ahead * (self._jumpRange or 1) and math.abs(side) <= cfg.Side then
@@ -1358,7 +1372,7 @@ function StealController._pickLock(self, f, steering: boolean?)
 		end
 		local nearest, nearestDist = held, heldDist
 		for _, rec in traffic:getCars() do
-			if rec ~= held and not rec.physical and rec.hit and rec.hit.Parent then
+			if rec ~= held and not rec.physical and rec.hit and rec.hit.Parent and self:_canTake(rec) then
 				local ahead = rec.along - f.along
 				local side = rec.cross - aimCross
 				if ahead >= -cfg.Behind and ahead <= cfg.Ahead * (self._jumpRange or 1) and math.abs(side) <= cfg.Side then
@@ -1821,7 +1835,7 @@ function StealController._findCandidate(self, pos: Vector3)
 		drop. Before the arc's apex check below, which the lock does not use. ]]
 	if StealConfig.Lock.Enabled then
 		local locked, f = self._lockRec, self._flight
-		if traffic and f and locked and not locked.physical and locked.hit and locked.hit.Parent then
+		if traffic and f and locked and not locked.physical and locked.hit and locked.hit.Parent and self:_canTake(locked) then
 			local surface = self:_roadSurfaceDistance(f.cross - locked.cross, f.along - locked.along, locked.hit.Size)
 			if surface <= self:_reach() then
 				return locked, surface
@@ -1839,7 +1853,7 @@ function StealController._findCandidate(self, pos: Vector3)
 		local hit = rec.hit
 		-- `physical` is a car that has been knocked out of the lane system and is falling over; it is
 		-- not a thing you can stand on, which is the same exclusion `_landingTarget` makes.
-		if not rec.physical and hit and hit.Parent then
+		if not rec.physical and hit and hit.Parent and self:_canTake(rec) then
 			local surface = self:_surfaceDistance(pos, hit)
 			if surface <= range then
 				local local_ = hit.CFrame:PointToObjectSpace(pos)
@@ -1858,7 +1872,7 @@ function StealController._findCandidate(self, pos: Vector3)
 	--- Sticky like the lock (`StealConfig.Lock.Stick`): the car E would already take keeps the offer
 	--- unless another is clearly nearer, so two cars side by side do not trade it back and forth.
 	local held = self._candidate
-	if StealConfig.Lock.Enabled and held and held ~= best and held.hit and held.hit.Parent and not held.physical then
+	if StealConfig.Lock.Enabled and held and held ~= best and held.hit and held.hit.Parent and not held.physical and self:_canTake(held) then
 		local heldSurface = self:_surfaceDistance(pos, held.hit)
 		if heldSurface <= range and heldSurface - (bestSurface or math.huge) < StealConfig.Lock.Stick then
 			best, bestSurface = held, heldSurface

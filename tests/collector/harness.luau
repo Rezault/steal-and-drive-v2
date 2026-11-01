@@ -70,10 +70,11 @@ local values = {}
 for t = 1, 50 do
 	values[t] = math.round(600 * 1.25 ^ (t - 1) * (if t % 10 == 1 and t > 1 then 0.6 else 1))
 end
-local upgradesOf = {} -- [player] = { Power = level }
+local upgradesOf = {} -- [player] = { Trainer = level }
 modules["ReplicatedStorage.shared.Configs.UpgradeConfig"] = {
 	levelOf = function(upgrades, key) return (type(upgrades) == "table" and upgrades[key]) or 0 end,
 }
+modules["ReplicatedStorage.shared.Configs.WorldConfig"] = { TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 } }
 modules["ReplicatedStorage.shared.Configs.GarageConfig"] = {
 	valueOf = function(tier) return values[tier] end,
 	TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 },
@@ -87,24 +88,32 @@ modules["ReplicatedStorage.shared.Configs.CollectorConfig"] = Collector
 -- === Config: the ladders ===================================================
 do
 	check(Collector.requiredFor(1) == 10, "tier 1 needs 10")
+	check(Collector.Power.Start == Collector.requiredFor(1), "a new player can steal the first car")
 	local previous = 0
 	for tier = 1, 50 do
 		local r = Collector.requiredFor(tier)
 		check(r > previous, "requirement rises at tier " .. tier)
 		previous = r
 	end
-	for level = 0, Collector.Power.MaxLevel do
-		check(Collector.powerAt(level) == Collector.requiredFor(level + 1), "level " .. level .. " steals exactly tier " .. (level + 1))
+	check(Collector.requiredForBody("M5") == Collector.requiredFor(10), "a body needs its tier's power")
+	check(Collector.requiredForBody("NotACar") == nil and Collector.requiredForBody(5) == nil, "no ladder, no requirement")
+	local lastRate = 0
+	for level = 0, Collector.Trainer.MaxLevel do
+		local rate = Collector.rateAt(level)
+		check(rate > lastRate, "the ride trains faster at level " .. level)
+		lastRate = rate
 	end
-	check(Collector.powerAt(999) == Collector.requiredFor(Collector.Power.MaxLevel + 1), "power clamps at the top")
+	check(Collector.rateAt(999) == Collector.rateAt(Collector.Trainer.MaxLevel), "rate clamps at the top")
+	check(Collector.requiredFor(10) / Collector.rateAt(0) <= 180, "world 1's top car trains in under 3 minutes at level 0")
 	local last = 0
-	for level = 0, Collector.Power.MaxLevel - 1 do
-		local cost = Collector.powerCost(level)
+	for level = 0, Collector.Trainer.MaxLevel - 1 do
+		local cost = Collector.trainerCost(level)
 		check(type(cost) == "number" and cost >= last, "price never dips at level " .. level)
 		last = cost or last
 	end
-	check(Collector.powerCost(Collector.Power.MaxLevel) == nil, "no price past the top")
-	check(Collector.powerCost(0) <= 1000, "first upgrade is a couple of Civics away")
+	check(Collector.trainerCost(Collector.Trainer.MaxLevel) == nil, "no price past the top")
+	check(Collector.trainerCost(0) <= 1000, "first ride upgrade is about one Civic")
+	check(Collector.formatPower(15100) == "15.1K" and Collector.formatPower(42.7) == "42", "power reads like the reference")
 	check(Collector.zoneMinimum(2) == Collector.requiredFor(11), "zone 2 opens at tier 11")
 end
 
@@ -160,7 +169,7 @@ modules["ReplicatedStorage.Packages.Shard"] = {
 	end,
 	get = function(n) return registry[n] end,
 }
-for _, name in { "WorldConfig", "WeatherConfig", "PaintConfig", "TrafficConfig" } do
+for _, name in { "WeatherConfig", "PaintConfig", "TrafficConfig" } do
 	modules["ReplicatedStorage.shared.Configs." .. name] = {}
 end
 modules["ServerScriptService.server.Services.RoamingCarService.CollectorWorld"] = { build = function() end }
@@ -177,7 +186,9 @@ local function player(name, x, z)
 		FindFirstChildOfClass = function(_, c) return if c == "Humanoid" then humanoid else nil end,
 		FindFirstChild = function(_, n) return if n == "HumanoidRootPart" then root else nil end,
 	}
-	return { Name = name, DisplayName = name, Character = character, root = root, humanoid = humanoid }
+	local attrs = {}
+	return { Name = name, DisplayName = name, Character = character, root = root, humanoid = humanoid, attrs = attrs,
+		GetAttribute = function(_, key) return attrs[key] end }
 end
 
 local destroyed = {}
@@ -234,7 +245,7 @@ check(#awards == 3, "a moving car allows its speed x latency of slack")
 addCar("5", 12, spot)
 capture(alice, "5")
 check(#awards == 3 and lastReply().reason == "weak" and s._cars["5"] ~= nil, "too weak is refused and the car stays")
-upgradesOf[alice] = { Power = 11 }
+alice.attrs.StealPower = Collector.requiredFor(12)
 capture(alice, "5")
 check(#awards == 4 and awards[4].tier == 12, "with the power, the same car is awarded")
 
@@ -262,5 +273,22 @@ ready = true
 addCar("8", 1, spot, true)
 capture(alice, "8")
 check(announces[#announces] and announces[#announces].kind == "stolen", "stealing a secret is announced")
+
+
+-- === Service: road steals (the jump-and-land path) ===========================
+do
+	local rider = player("Rider", 0, 0)
+	local n = #awards
+	rider.attrs.StealPower = Collector.requiredFor(10) - 1
+	check(s:awardRoadSteal(rider, { tier = 10, body = "M5", paint = 2 }) == false, "a weak landing is refused")
+	check(#awards == n and lastReply().reason == "weak" and lastReply().required == Collector.requiredFor(10), "the refusal says what is needed")
+	rider.attrs.StealPower = Collector.requiredFor(10)
+	check(s:awardRoadSteal(rider, { tier = 10, body = "M5", paint = 2 }) == true, "enough power takes the car")
+	check(#awards == n + 1 and awards[#awards].body == "M5" and awards[#awards].source == Collector.Capture.Source, "the car goes to the garage")
+	check(lastReply().ok == true and lastReply().carId == "M5#1", "the toast gets the car")
+	ready = false
+	check(s:awardRoadSteal(rider, { tier = 1, body = "Civic", paint = 1 }) == false and #awards == n + 1, "no award before the profile loads")
+	ready = true
+end
 
 print(string.format("%d passed, %d failed", passes, failures))

@@ -28,7 +28,6 @@ local TweenService = game:GetService("TweenService")
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
-local UpgradeConfig = require(ReplicatedStorage.shared.Configs.UpgradeConfig)
 local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
 local CarNameConfig = require(ReplicatedStorage.shared.Configs.CarNameConfig)
@@ -71,7 +70,7 @@ function Controller.displayName(body: string): string
 end
 
 function Controller._power(self): number
-	return CollectorConfig.powerOf(UpgradeConfig.decode(self._player:GetAttribute(UpgradeConfig.Attribute)))
+	return CollectorConfig.powerOf(self._player)
 end
 
 -- === Shells ==================================================================
@@ -342,7 +341,7 @@ function Controller._hintWeak(self, required: number)
 		return
 	end
 	self._lastWeakHint = now
-	Dispatcher:Publish("CollectorHint", string.format("You need ⚡%s to steal this car — upgrade Steal Power!", tostring(required)))
+	Dispatcher:Publish("CollectorHint", string.format("You need ⚡%s to steal this car — train on the kiddie ride!", tostring(required)))
 end
 
 -- === Results =================================================================
@@ -482,7 +481,9 @@ Controller:withLifecycle({
 	end,
 
 	start = function(self)
-		if not CollectorConfig.Enabled then
+		-- Road mode: no herds to draw, but `_onResult` (the Captured remote) still runs, and it is
+		-- what turns a highway steal into the toast.
+		if not (CollectorConfig.Enabled and CollectorConfig.Roaming) then
 			return
 		end
 		local world = Instance.new("Folder")
@@ -501,7 +502,7 @@ Controller:withLifecycle({
 		end
 		refreshFound()
 		self._player:GetAttributeChangedSignal(CarCatalogue.FoundAttribute):Connect(refreshFound)
-		self._player:GetAttributeChangedSignal(UpgradeConfig.Attribute):Connect(function()
+		self._player:GetAttributeChangedSignal(CollectorConfig.Power.Attribute):Connect(function()
 			self:_onPowerChanged()
 		end)
 		self:_onPowerChanged()

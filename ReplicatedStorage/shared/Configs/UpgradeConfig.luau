@@ -631,7 +631,7 @@ UpgradeConfig.Order = { "Luck", "Customers", "Jump", "Floor2" }
 
 	Anything added to `Upgrades` belongs here too; a key that is in neither list is invisible to the
 	client and nothing warns about it. ]]
-UpgradeConfig.Keys = { "Luck", "Customers", "Floor2", "Jump", "MythicalLuck", "Income", "Storage", "AutoCollect", "Power" }
+UpgradeConfig.Keys = { "Luck", "Customers", "Floor2", "Jump", "MythicalLuck", "Income", "Storage", "AutoCollect", "Trainer" }
 
 --[[ Each entry:
 
@@ -951,23 +951,25 @@ UpgradeConfig.Upgrades = {
 		end,
 	},
 
-	--[[ STEAL POWER (the 2026-11 collector rework) — the ⚡ number every roaming car is gated on.
-		Level L is worth exactly the requirement of tier L+1, so each level unlocks one more car; the
-		ladder and its prices live in `CollectorConfig.Power`, not here, because they are derived
-		from the car value curve rather than tuned as a tile. Bought from the ⚡ button on the HUD,
-		not the board (it is not in `Order`); `UpgradeService` lets it through when the collector is
-		on. Required lazily, like `Customers.Headline`, so no config cycle can form. ]]
-	Power = {
-		Title = "STEAL POWER",
-		Detail = "Steal rarer cars",
-		MaxLevel = 49,
+	--[[ KIDDIE RIDE (the 2026-11 collector rework) — how fast ⚡ Steal Power trains while you sit on
+		the coin-op ride at your plot. ⚡ itself is a stat on the profile, not a level
+		(`CollectorConfig.Power`); this is the multiplier on earning it, priced and rated in
+		`CollectorConfig.Trainer` because both are derived from the car value curve rather than tuned
+		as a tile. Bought from the ⚡ button on the HUD, not the board (it is not in `Order`);
+		`UpgradeService` lets it through when the collector is on. Required lazily, like
+		`Customers.Headline`, so no config cycle can form. Was `Power` (bought ⚡ directly) before
+		the owner asked for training; that key never shipped. ]]
+	Trainer = {
+		Title = "KIDDIE RIDE",
+		Detail = "Train Steal Power faster",
+		MaxLevel = 24,
 		BaseCost = 0, -- unused: `PriceOf` wins in `costOf`
 		CostGrowth = 1,
 		PriceOf = function(level: number): number?
-			return require(script.Parent.CollectorConfig).powerCost(level)
+			return require(script.Parent.CollectorConfig).trainerCost(level)
 		end,
 		Headline = function(level: number): string
-			return tostring(require(script.Parent.CollectorConfig).powerAt(level))
+			return string.format("+%.1f/s", require(script.Parent.CollectorConfig).rateAt(level))
 		end,
 	},
 

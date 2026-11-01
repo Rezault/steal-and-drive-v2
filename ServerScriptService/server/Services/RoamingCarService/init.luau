@@ -420,7 +420,7 @@ function Service._onCapture(self, player: Player, id: unknown)
 	if not (Garage and Garage:isProfileReady(player)) then
 		return
 	end
-	local power = CollectorConfig.powerOf(Garage:getUpgrades(player))
+	local power = CollectorConfig.powerOf(player)
 	if power < car.required then
 		self:_reply(player, { ok = false, reason = "weak", id = id, required = car.required })
 		return
@@ -463,6 +463,42 @@ end
 
 -- === Players: world follows the zone you stand in ============================
 
+--[[ Public: a highway steal landed (`StealService._onLanded`, `CollectorConfig.RoadSteal`). `car` is
+	`EncounterService`'s record of the token the client redeemed — the SERVER's roll, never the
+	client's word — so tier, body, paint and mutation are trusted as they stand.
+
+	THE ⚡ GATE IS RE-CHECKED HERE. The client refuses to lock a car you cannot take
+	(`StealController`), but a client is not a trust boundary: a forged landing on a car above your
+	power is answered "weak" and banks nothing. Returns whether the car was awarded. ]]
+function Service.awardRoadSteal(self, player: Player, car: { tier: number, body: string, paint: number?, mutation: string? }): boolean
+	local Garage = Shard.get("GarageService")
+	if not (Garage and Garage:isProfileReady(player)) then
+		return false
+	end
+	local required = CollectorConfig.requiredForBody(car.body) or CollectorConfig.requiredFor(car.tier)
+	if CollectorConfig.powerOf(player) < required then
+		self:_reply(player, { ok = false, reason = "weak", required = required })
+		return false
+	end
+	local outcome, amount, carId = Garage:awardCar(player, car.tier, car.body, car.paint, car.mutation, CollectorConfig.Capture.Source)
+	if outcome == "rejected" then
+		self.log:warn(string.format("%s's road steal of %s was rejected by GarageService.", player.Name, car.body))
+		return false
+	end
+	self:_reply(player, {
+		ok = true,
+		body = car.body,
+		tier = car.tier,
+		paint = car.paint,
+		mutation = car.mutation,
+		outcome = outcome,
+		amount = amount,
+		carId = carId,
+	})
+	self:getSignal("CarCaptured"):Fire(player, car.body, car.tier, car.mutation, false)
+	return true
+end
+
 --[[ Two pieces of existing state are kept in step with the collector so the systems that read
 	them (music, customer tip scale, the Index, upgrade gates) keep working without knowing it exists:
 	  • `WorldsUnlocked` rises when your Steal Power first reaches a zone's cheapest car, and
@@ -474,7 +510,7 @@ function Service._syncPlayer(self, player: Player)
 	if not (Garage and World and Garage:isProfileReady(player)) then
 		return
 	end
-	local power = CollectorConfig.powerOf(Garage:getUpgrades(player))
+	local power = CollectorConfig.powerOf(player)
 	local highest = World:highestUnlocked(player)
 	local reach = highest
 	for zone = highest + 1, #CollectorConfig.Zones do
@@ -510,7 +546,8 @@ Service:withLifecycle({
 	end,
 
 	start = function(self)
-		if not CollectorConfig.Enabled then
+		-- Road steals (`awardRoadSteal`) need nothing started; the herds below are the Roaming mode.
+		if not (CollectorConfig.Enabled and CollectorConfig.Roaming) then
 			return
 		end
 		local folder = ReplicatedStorage:FindFirstChild(CollectorConfig.FolderName)

@@ -1,100 +1,92 @@
-# Open-World Collector Rework — Progress
+# Car Collector Rework — Progress
 
 Branch: `feature/open-world-collector-rework` · remote `v2` = https://github.com/Rezault/steal-and-drive-v2
 Studio place used for build/test: "steal car v2" (placeId 103274860383115) — owner confirmed safe to edit.
 Studio playtests use the ProfileStore mock (`Data/Components/Settings.luau` `DEBUG_MOCK = true`), so no production saves are touched.
+Nothing was published. Originals of every Studio script that was overwritten are in `ServerStorage.CollectorReworkBackup_2026_11_01`.
+
+## Design now (owner direction, 2026-11-01)
+
+The first build (walk into roaming herds on foot) was rejected in playtest: "nothing like the game in the
+video". The loop was rebuilt around the existing race highway:
+
+1. **Press PLAY.** Traffic spawns ahead on the one wide highway and drives straight.
+2. **Catch a car and press SPACE.** The existing jump-and-land steal flies you into it. The car is yours
+   instantly: "IT'S YOURS!" toast, SECURED tray, into the hotbar (`GarageService.awardCar`). You keep driving
+   the stolen car. There is no getaway truck (`GetawayConfig.Enabled` is off while `RoadSteal` is on).
+3. **Steal Power (⚡) gates which cars you can take.** Every traffic car shows "Required: ⚡N", green if you
+   can, red if not. Cars above your ⚡ are never locked or offered as a jump target. The server re-checks.
+4. **Train ⚡ on the kiddie ride** (our take on the reference's toy horse). Each plot has a coin-op kiddie
+   ride car. Sit on it and ⚡ rises every second, with a bounce and "+0.2" pops. The **+** on the ⚡ pill buys
+   kiddie ride levels (24) for a faster rate: 0.2 ⚡/s at level 0, ×1.277 per level.
+5. **Park cars on podiums** for $/s (unchanged from the first build). Wrecking ends the run and returns home.
+
+On-foot roaming herds are switched off (`CollectorConfig.Roaming = false`) but kept in code.
 
 ## Reference video analysis (Screen Recording 2026-11-01 113528.mp4, 26 s, 1 fps frames)
 
 Confirmed from footage:
-- Third-person follow camera, slightly high, ~15–20 studs back; bright saturated greens, blocky low-poly terrain, canyon walls bounding a long corridor.
-- Base: fenced pen next to spawn; creatures stand on it with floating `$N/s` labels (passive income). "Upgrade Pen Level 2→3 $75M" and "Upgrade Machine" signs at the base.
-- Leaving the base you cross a painted "START ZONE" line into a single linear corridor. Top-centre HUD: strip of 10 zone tiles (Plains, Forest, Desert, Jungle, Snow, …, Volcano, …, Cosmic) with a player marker and distance in metres (189 m → 1,079 m over ~15 s).
-- Collectibles roam in small herds kicking up dust clouds, running across the corridor.
-- Overhead label (scales with distance, visible ~150 studs): size tag (TINY / BIG / HUGE / GIANT) + mutation tag (GOLDEN / SILVER) + red "new!" when not yet in the Index; rarity line in rarity colour (Common grey-white, Uncommon green, Epic magenta); name; "Required: ⚡N" (green when you meet it).
-- Player stat ⚡ (15.1K) bottom-left above cash ($3.1M), each with a green "+" (shop shortcut).
-- Capture: the player runs into / alongside the creature; a green ring reticle sits ahead of the player; on success heart particles burst, a toast slides in top-left "IT'S YOURS! — GIANT Dilophosaurus — Keep going!", and a "N SECURED" tray under it lists this trip's captures with icons. The captured unit appears in the next free hotbar slot immediately.
-- Hotbar: bottom-centre, ~7 square slots with portrait + short name; "Q" key slot on the left.
-- World event: "ALL HERDS RESET!" banner + 3 lines "A Secret <name> spawned in <Zone>!" with zone names in zone colours; bottom-right moon icon countdown "in 4m 57s".
-- Left rail: Shop, Index buttons with red "!" badges.
-
-Assumptions (not determinable from 26 s of footage):
-- Capture is effectively instant on contact when ⚡ ≥ Required (no visible progress bar). We use a short (0.45 s) stay-in-range capture with a fill bar, so it reads as an action on mobile but keeps the pace. No button: walking into the car is the input on every device.
-- "SECURED" = captures made since leaving the base this trip; we use it purely as session feedback (cars are owned immediately, never lost).
-- Herd reset cadence ≈ 5 min (countdown started at 4m57s).
-- Size tags scale value; we map them onto the existing mutation/paint system rather than adding a new stat.
+- Third-person follow camera; a long corridor split into zones with a top-centre zone strip and distance in metres.
+- Overhead label per collectible: tags, rarity line in rarity colour, name, "Required: ⚡N" (green when you meet it).
+- ⚡ stat bottom-left above cash, each with a green "+".
+- Capture → heart burst, toast "IT'S YOURS! — <name> — Keep going!", "N SECURED" tray, unit in the hotbar at once.
+- Base pen with `$N/s` labels (passive income). Players train ⚡ on a toy horse.
+- World event: "ALL HERDS RESET!" banner with secret spawns.
 
 ## Status (2026-11-01)
 
 | Milestone | State |
 |---|---|
 | 1. Audit | Done. 2,097 scripts mirrored from Studio; graphify graph built. |
-| 2. Vertical slice (roam → capture → hotbar) | Done, verified in Studio play. |
-| 3. Dealership (park → $/s → collect) | Done, reuses the existing podiums. Verified in Studio play. |
-| 4. Progression (Steal Power, 5 zones) | Done for the core ladder. Power purchase verified in play; the deeper zones were not playtested one by one. |
-| 5. Events & polish | Partly done: 5-min reset with secret cars, Rush mutation event, announcements, toast/tray, lobby tips. See "Not done". |
-| 6. Testing & hardening | Headless harness 178/178. Single-player Studio play only. |
-
-### What the loop is now
-1. Spawn at your plot. Walk south over the START ZONE line into a long corridor split into 5 zones (City, Desert, Forest Mountains, Arctic, Futuristic City), each with its own floor and a gate arch showing "⚡ N+ TO STEAL".
-2. Herds of 2–4 cars roam each zone (14 per zone). Each car has a label: tags (SECRET / mutation / "new!"), rarity, name, "Required: ⚡N" (green if you can, red if not).
-3. Stay next to a car for 0.45 s with enough ⚡ and it is yours: burst + "IT'S YOURS!" toast + SECURED tray, and it lands in the hotbar via `GarageService.awardCar` (source `"Capture"`).
-4. Carry it home and park it on a podium: it earns value/240 $/s into the bay's pad; walk over the pad to collect.
-5. Spend cash on STEAL POWER (+ on the ⚡ pill). Each level unlocks the next car tier; crossing a zone's minimum unlocks that zone (`WorldsUnlocked`) and drops its barrier.
-6. Every 5 min every herd re-rolls and 1–3 SECRET cars (rung 9–10, Charged/Molten/Ghost) spawn, announced to everyone. A Rush event every 150 s gives one zone a mutation for 60 s.
-7. Driving/racing is untouched and still starts from the PLAY button.
+| 2. Vertical slice (road → steal → hotbar) | Done, verified in Studio play. |
+| 3. Dealership (park → $/s → collect) | Done (first build), reuses the podiums. |
+| 4. Progression (⚡ gate + kiddie ride) | Done, verified in Studio play. |
+| 5. Events & polish | Toast/tray, tips, red/green labels. Herd reset/secret events belong to the off Roaming mode. |
+| 6. Testing & hardening | Headless harness 139/139. Single-player Studio play only. |
 
 ### Files
 New:
-- `ReplicatedStorage/shared/Configs/CollectorConfig.luau`: every number (corridor, zones, power ladder, spawn, movement, capture, events). `Enabled` turns the whole rework off.
-- `ServerScriptService/server/Services/RoamingCarService/init.luau`: server authority for spawning, moving (deterministic legs), capture validation, resets and events.
-- `ServerScriptService/server/Services/RoamingCarService/CollectorWorld.luau`: builds the zone floors, gates and start line at boot.
-- `ReplicatedStorage/shared/Controllers/RoamingCarController.luau`: renders cars near the camera, labels, capture input, local zone barriers.
-- `ReplicatedStorage/shared/Controllers/CollectorHudController.luau`: ⚡ pill + power panel, zone strip, toast/tray, announcements, reset timer, hints.
-- `tests/collector/`: headless Luau harness (`sh tests/collector/run.sh`).
+- `ServerScriptService/server/Services/PowerTrainerService.luau`: builds the kiddie rides, loads/saves ⚡ (`StealPower` profile key), pays riders each second.
+- `ReplicatedStorage/shared/Controllers/PowerTrainerController.luau`: ride bounce and "+⚡" pops (cosmetic).
+- From the first build: `CollectorConfig`, `RoamingCarService` (+ `CollectorWorld`), `RoamingCarController`, `CollectorHudController`, `tests/collector/`.
 
-Changed (each is a small, flag-gated edit):
-- `UpgradeConfig`: `Power` upgrade (priced by `CollectorConfig.powerCost`); `costOf` honours a `PriceOf`.
-- `UpgradeService`: accepts `Power` even though it is not on the upgrade board.
-- `GarageConfig.Income.Passive = CollectorConfig.Enabled`: bays pay $/s again.
-- `TutorialConfig.Enabled = not CollectorConfig.Enabled`: the driving tutorial is off.
-- `ShowcaseConfig.Sources.Capture = false`: no "NEW BEST!" cutscene on every steal.
-- `TipsConfig`: collector tips replace the driving tips while the flag is on.
+Changed:
+- `CollectorConfig`: `RoadSteal = true`, `Roaming = false`; ⚡ is now a stored stat (`Power`), trained by `Trainer` (rate, price ladder); `requiredForBody`.
+- `StealController`: `_canTake` keeps cars above your ⚡ out of the lock and the jump target.
+- `StealService`: after a successful steal, `RoamingCarService:awardRoadSteal` awards the car (server ⚡ check).
+- `CarRarityBadge`: "Required: ⚡N" line, green/red, in road-steal mode.
+- `GetawayConfig.Enabled = not (Collector.Enabled and Collector.RoadSteal)`: no truck.
+- `UpgradeConfig`/`UpgradeService`: the `Trainer` upgrade ("KIDDIE RIDE"). The earlier `Power` key never shipped.
+- `CollectorHudController`: ⚡ pill and kiddie ride panel; SECURED tray clears when a run starts.
+- `TipsConfig`: tips teach the road + kiddie ride loop.
 
 ### Decisions
-- **Passive income over tips.** Matches the reference's $/s pen, and `GarageService` already had the passive path behind a flag.
-- **One Power level per car tier.** `requiredFor(tier)` is a smooth curve; price = factor × the value of the tier it unlocks, never less than 1.12× the previous price. Level 1 costs $600 (one Civic): the first playtest at $1,500 meant an 8-minute wait.
-- **Zones are physically open.** The barrier is client-side; the server re-checks power on every capture, so walking past a barrier gains nothing.
-- **`World`/`WorldsUnlocked` kept in sync** from the zone you stand in and your power, so existing systems (weather, Index, analytics) keep working.
-- **Luck does not affect roaming spawns.** Spawns are shared by everyone on the server, so a per-player stat cannot weight them.
-- **Size tags (video) mapped onto mutations** instead of a new stat.
-- **Capture has no idempotency in `awardCar`**, so `RoamingCarService` claims and removes the car before any yield; the replay and two-player races are covered in the harness.
+- **⚡ is its own saved number, not an upgrade level**, because it now grows continuously (riding), not in steps. New and old profiles start at 10, enough for every tier-1 car.
+- **The landing is not gated.** Coming down on a car you are too weak for still puts you in it (no wreck), but the server does not award it and you get "You need ⚡N". The lock and jump target never offer such a car, so this only happens when one drifts under you.
+- **Rates:** world 1's best car (tier 10, ⚡30) is about 100 s of riding at level 0; level 1 costs $600.
 
 ### Test results
-- Headless harness: **178 passed, 0 failed**. Covers power ladder and price monotonicity, movement maths, zone lookup, and capture validation (happy path, replay, two players racing, too far, moving slack, weak then upgraded, malformed input, dead player, cooldown, profile not ready, secret announce).
+- Headless harness (`sh tests/collector/run.sh`): **139 passed, 0 failed**. Covers the ⚡ ladder, ride rates and prices, `requiredForBody`, road-steal awards (weak, enough power, profile not ready), and the Roaming-mode capture validation.
 - Studio play (single player, mock profile), all observed:
-  - Boot clean; ~72 cars across 5 zones; zone floors and gates built.
-  - 3 Civics captured in 5 s; each landed in the hotbar and the Index.
-  - First car parked through the first-placement flow, three more through the podium prompt: $/s went 3.1 → 11.25.
-  - Collected from the pads; bought Power 1 for $600; ⚡ pill shows 11 and labels re-coloured.
-  - 5-min reset banner with secret-car lines fired; weak-power hint shows.
+  - Boot clean; 6 kiddie rides built.
+  - Sat on the ride: ⚡ 10 → 11 in 5 s (0.2/s), "+0.2" pops, prompt hidden while seated.
+  - Bought kiddie ride level 1 for $600: rate rose to 0.255/s.
+  - PLAY → drove → SPACE at a Civic 59 studs ahead: flew in, "Rezault banked a Red Civic (Tier 1) into their inventory", now driving it, tray "1 SECURED".
+  - ⚡ forced to 5: every label turned red, the jump had no target (red reticle).
+  - Driving into traffic wrecks; the run ends and returns home.
 
 ### Bugs found and fixed during play
-- Car labels never drew: the billboard was created before its car was parented to the workspace. Now built after parenting and adorned to the car body.
-- Zone strip overlapped the "earn while offline" line; moved below it.
-- City floor (light concrete) read as snow; now asphalt grey.
-- Old lobby tips taught the truck/race loop; replaced while the flag is on.
+- `PowerTrainerController` failed to load (Luau "ambiguous syntax" on a line starting with `(`).
+- `StealController` is over Studio's 200K `Source` limit; synced with `ScriptEditorService:UpdateSourceAsync`.
 
 ### Not done / known gaps
-- Multiplayer not playtested (two-player capture races are covered only by the harness).
-- Rejoin persistence not playtested in Studio (mock store). `Power` is a normal upgrade key, so old profiles read it as level 0.
-- Zones 2–5 not walked one by one in play, and a zone unlock (barrier dropping at the zone minimum) has not been seen in play yet.
-- Mobile layout not checked on a device emulator.
-- The Daily Rewards popup still opens on join over the HUD (existing behaviour, untouched).
-- Labels are depth-tested (hidden behind walls). Billboards set to always-on-top did not show in the Studio capture tool, so the always-on-top look could not be checked.
+- A weak landing (see Decisions) still refills health like any steal.
+- The ⚡ pill overlaps the CONTROLS card for the first seconds of a run.
+- The "+0.2 ⚡" pop drops the ⚡ glyph in Fredoka One.
+- The wreck panel still shows the race payout line ("+$56 · kept 25%").
+- Multiplayer, rejoin persistence of ⚡ (mock store), and mobile layout not checked in play.
 
 ### Next steps
-1. Two-player Studio test (Test → Clients and Servers) for capture races and announcements.
-2. Walk each zone at its minimum power; tune `Power.EarlyFactors` and `Spawn.RungWeights` against a real session.
-3. Mobile emulator pass on the HUD.
-4. Decide whether the Daily Rewards popup should wait until after the first capture.
+1. Two-player Studio test (Test → Clients and Servers).
+2. Tune `Trainer.BaseRate`/`RateGrowth` and prices against a real session.
+3. Decide whether a weak landing should refuse the refill, and what the wreck panel should show.
