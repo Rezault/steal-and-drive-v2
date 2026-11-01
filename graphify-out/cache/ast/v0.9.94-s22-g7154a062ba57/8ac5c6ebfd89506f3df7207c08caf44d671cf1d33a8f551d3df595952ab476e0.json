@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_replicatedstorage_shared_libraries_iris_widgettypes_luau", "label": "WidgetTypes.luau", "file_type": "code", "source_file": "ReplicatedStorage/shared/Libraries/iris/WidgetTypes.luau", "source_location": "L1"}], "edges": [], "raw_calls": [], "parse_errors": {"first_error_line": 5, "multiline_error": true}}

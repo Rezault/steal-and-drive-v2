@@ -70,6 +70,10 @@ ShowcaseConfig.ProfileKey = "BestCarValue"
 ShowcaseConfig.Sources = {
 	Bank = true,
 	Pull = false,
+	--[[ Off for the collector's steals (2026-11): early on nearly every steal is a new best, and a
+		click-to-continue cutscene every few seconds is the opposite of the reference's pace. The
+		"IT'S YOURS!" toast is that beat (`CollectorHudController`). ]]
+	Capture = false,
 	Other = true, -- any source not named above, and no source at all
 }
 

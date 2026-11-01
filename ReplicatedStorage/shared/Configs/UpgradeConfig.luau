@@ -631,7 +631,7 @@ UpgradeConfig.Order = { "Luck", "Customers", "Jump", "Floor2" }
 
 	Anything added to `Upgrades` belongs here too; a key that is in neither list is invisible to the
 	client and nothing warns about it. ]]
-UpgradeConfig.Keys = { "Luck", "Customers", "Floor2", "Jump", "MythicalLuck", "Income", "Storage", "AutoCollect" }
+UpgradeConfig.Keys = { "Luck", "Customers", "Floor2", "Jump", "MythicalLuck", "Income", "Storage", "AutoCollect", "Power" }
 
 --[[ Each entry:
 
@@ -951,6 +951,26 @@ UpgradeConfig.Upgrades = {
 		end,
 	},
 
+	--[[ STEAL POWER (the 2026-11 collector rework) — the ⚡ number every roaming car is gated on.
+		Level L is worth exactly the requirement of tier L+1, so each level unlocks one more car; the
+		ladder and its prices live in `CollectorConfig.Power`, not here, because they are derived
+		from the car value curve rather than tuned as a tile. Bought from the ⚡ button on the HUD,
+		not the board (it is not in `Order`); `UpgradeService` lets it through when the collector is
+		on. Required lazily, like `Customers.Headline`, so no config cycle can form. ]]
+	Power = {
+		Title = "STEAL POWER",
+		Detail = "Steal rarer cars",
+		MaxLevel = 49,
+		BaseCost = 0, -- unused: `PriceOf` wins in `costOf`
+		CostGrowth = 1,
+		PriceOf = function(level: number): number?
+			return require(script.Parent.CollectorConfig).powerCost(level)
+		end,
+		Headline = function(level: number): string
+			return tostring(require(script.Parent.CollectorConfig).powerAt(level))
+		end,
+	},
+
 	--[[ EXPAND BASE — the storey that is not in Workspace until it is paid for.
 
 		THE KEY IS STILL `Floor2` AND MUST STAY THAT WAY. The tile was called SECOND FLOOR until
@@ -1028,6 +1048,9 @@ function UpgradeConfig.costOf(key: string, level: number): number?
 		return nil
 	end
 	-- `level` is how many are already owned, so level 0 pays `BaseCost` for the first one.
+	if spec.PriceOf then
+		return spec.PriceOf(level)
+	end
 	return if spec.Prices then spec.Prices[level + 1] else math.round(spec.BaseCost * spec.CostGrowth ^ level)
 end
 

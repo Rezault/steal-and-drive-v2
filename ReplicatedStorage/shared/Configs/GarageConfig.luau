@@ -153,7 +153,11 @@ GarageConfig.Income = {
 
 		`Passive = true` puts every piece of the old income back, exactly: accrual, mats, labels, the
 		sweeps, the HUD line and the welcome-back payout. ]]
-	Passive = false,
+	--[[ ON WHEN THE COLLECTOR IS (2026-11). The open-world rework's base is the reference's pen: cars
+		on display print $/s and the number over each podium IS the reward for having stolen it.
+		Customers stay, tipping off the bay's rate (`CustomerService` already reads both modes).
+		`CollectorConfig` requires nothing at its top, so this cannot cycle. ]]
+	Passive = require(ReplicatedStorage.shared.Configs.CollectorConfig).Enabled,
 
 	Base = 2, -- tier 1 — the bottom car of world 1 — in dollars per second
 	--[[ The top of world 1, i.e. what `Base` grows to over that world's eight rungs. Not read

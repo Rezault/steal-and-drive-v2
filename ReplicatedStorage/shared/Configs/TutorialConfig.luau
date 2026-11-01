@@ -122,7 +122,8 @@ local TutorialConfig = {}
 	binds nothing at all. Every beat it would have watched is either a signal some other service
 	fires for its own reasons or an input the client was going to receive anyway, so turning this
 	off cannot affect a single thing about how the game plays. ]]
-TutorialConfig.Enabled = true
+-- Off under the collector rework: every beat of it teaches the road run (`CollectorConfig`).
+TutorialConfig.Enabled = not require(ReplicatedStorage.shared.Configs.CollectorConfig).Enabled
 
 --[[ ...and the DEVELOPER's switch, which is the same result and nowhere near the same decision.
 

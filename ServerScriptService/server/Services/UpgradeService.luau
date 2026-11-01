@@ -84,6 +84,7 @@ local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local PlotConfig = require(ReplicatedStorage.shared.Configs.PlotConfig)
 local UpgradeConfig = require(ReplicatedStorage.shared.Configs.UpgradeConfig)
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 --- The board's discovery and drawing, shared with the client's Upgrades page (`PagesV2/Upgrades`).
 local UpgradeBoardFace = require(ReplicatedStorage.shared.Modules.UpgradeBoardFace)
 
@@ -957,7 +958,9 @@ end
 function UpgradeService._onRequest(self, player: Player, key: unknown)
 	-- `isOnBoard` rather than `isKey` — see its own note. A key this file still knows about but no
 	-- longer sells is refused here, not merely absent from the UI.
-	if not (UpgradeConfig.Enabled and UpgradeConfig.isOnBoard(key)) then
+	-- Steal Power is sold off the HUD, not the board, so it is let through by name (`CollectorConfig`).
+	local isPower = CollectorConfig.Enabled and key == CollectorConfig.Power.UpgradeKey
+	if not (UpgradeConfig.Enabled and (UpgradeConfig.isOnBoard(key) or isPower)) then
 		return
 	end
 
