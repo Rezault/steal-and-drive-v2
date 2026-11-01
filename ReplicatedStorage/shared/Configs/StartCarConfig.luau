@@ -42,6 +42,15 @@ StartCarConfig.Enabled = true
 	two are one flow — and neither of those files should be hard-coding the other's name. ]]
 StartCarConfig.PageName = "StartCar"
 
+--[[ PLAY ON ONE SCREEN (2026-10-25): Play opens `PlayMenu`, where the world and the car are picked
+	side by side and DRIVE starts the run, instead of Play -> Worlds -> Select Car. New UI only; the
+	old UI keeps its two screens. Off = the two-screen flow everywhere, unchanged. The Select Car
+	page stays either way: the lobby car pad and Sell borrow it. ]]
+StartCarConfig.OneScreenPlay = true
+StartCarConfig.PlayPageName = "PlayMenu"
+--- Published by `StartCarController.choose` on the one screen, carrying the world index picked.
+StartCarConfig.WorldChosenEvent = "PlayMenuWorldChosen"
+
 --[[ What the page publishes on Dispatcher when a card is pressed, carrying the car key. Same shape
 	as the SPAWN CARS screen's `SpawnCarPick`: the page decides nothing, it says which card was
 	pressed and `StartCarController` decides what that means. ]]

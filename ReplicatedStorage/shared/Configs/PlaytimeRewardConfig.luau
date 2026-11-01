@@ -70,7 +70,7 @@ PlaytimeRewardConfig.AfterTutorialEvent = "PlaytimeGiftsAfterTutorial"
 --[[ ON JOIN, AFTER THE DAILY CALENDAR. A player who joins with a gift already ready (time banked
 	earlier today) gets the panel once a session, queued behind the daily screen's own join open
 	(`DailyRewardConfig.AutoOpen`): it waits for that to open and be closed, then for the screen to be
-	free. `MaxWait` counts from the join, so it must cover the daily screen's own wait (Delay 3 +
+	free. `MaxWait` counts from the first playtime state reaching the client (about the join), so it must cover the daily screen's own wait (Delay 3 +
 	MaxWait 30) plus the time spent on it; past that, quietly not at all. Nothing ready on join:
 	nothing opens. `Enabled = false`: only the topbar button opens it. ]]
 PlaytimeRewardConfig.JoinOpen = { Enabled = true, MaxWait = 90 }
@@ -85,8 +85,34 @@ PlaytimeRewardConfig.Text = {
 	Done = "Come back tomorrow",
 	--- The panel (`PlaytimeRewardController`): its title, the line under it, and a tile's words.
 	Title = "FREE GIFTS",
-	Subtitle = "Keep playing to unwrap them all!",
+	Minutes = "%d MIN",
+	PlayedToday = "%s / %d:00 PLAYED TODAY",
+	NextIn = "NEXT GIFT IN %s",
+	GiftReady = "GIFT READY TO OPEN!",
+	AllOpened = "ALL GIFTS OPENED",
+	Opened = "OPENED",
+	Available = "READY",
+	FinalGift = "FINAL GIFT",
+	Wrapped = "WRAPPED",
+	MysteryGift = "MYSTERY GIFT",
+	FinalTitle = "FREE CAR",
+	FinalDetail = "YOUR 30-MINUTE REWARD",
+	Surprise = "SURPRISE INSIDE",
+	CashAdded = "CASH ADDED",
+	CarAdded = "ADDED TO YOUR CARS",
+	ReviveAdded = "EXTRA CHANCE",
+	OpensIn = "OPENS IN %s",
+	ClaimEarlier = "CLAIM EARLIER GIFTS",
+
+	Subtitle = "FREE CAR AT 30 MINUTES",
 	Claim = "CLAIM",
+	Unwrapped = "UNWRAPPED!",
+	Converted = "CONVERTED TO CASH",
+	InventoryFull = "INVENTORY FULL",
+	Duplicate = "DUPLICATE CAR",
+	ConvertedTile = "%s → CASH",
+	ConvertedFull = "Inventory full — %s was converted.",
+	ConvertedDuplicate = "Duplicate %s was converted.",
 	--- A gift that is due but waits for the one before it: they open in order (header note 3).
 	Next = "NEXT",
 	Cash = "+%s",

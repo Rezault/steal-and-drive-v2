@@ -305,6 +305,9 @@ return {
 			migrating. ]]
 		PlaytimeGifts = { Day = -1, Seconds = 0, Claimed = 0 },
 
+		-- Server UTC deadline for the next convoy; independent of the current run or daily reset.
+		ConvoyNextAt = 0,
+
 		--[[ EVERY CODE THIS PLAYER HAS REDEEMED, `{ [CODE] = true }`. Key name comes from
 			`CodesConfig.ProfileKey`; `CodesService` owns every write. Empty is "none yet". ]]
 		RedeemedCodes = {},

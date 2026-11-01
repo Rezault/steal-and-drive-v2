@@ -154,15 +154,26 @@
 	`memoryMb` is the client's own total (`Stats:GetTotalMemoryUsageMb`) at its latest report: the
 	number to read beside the Creator Dashboard's "Unexpected out of memory exits". The `...Mb`
 	fields are its `DeveloperMemoryTag`s as the game appears.
+
+=== ROBLOX'S OWN CUSTOM EVENTS, A THIRD SINK (2026-10-28) ====================================
+
+	Gamebeast's marker quota ran out that day, and over quota it drops custom markers until the quota
+	resets, so a chosen set of markers is also logged as Roblox custom events under the same names
+	(`ROBLOX_EVENTS` below, switched by `AnalyticsConfig.RobloxMirror`, whose header has the why and
+	Roblox's limits). Roblox already counted the tutorial, the Join, FirstCar and FirstPlacement
+	funnels, sessions and retention; the mirror adds the races, race loading, join timings, the end
+	panel's answer, the market and the shop, each as one number and at most three banded breakdowns.
 ]]
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
---- Roblox's own, for the "Join" funnel; `FirstCarService` names it the same way.
+--- Roblox's own, for the "Join" funnel and the custom events mirror; `FirstCarService` names it the same way.
 local RobloxAnalytics = game:GetService("AnalyticsService")
 
+--- `RobloxMirror`, the switch for Roblox's copy of the markers (`ROBLOX_EVENTS`).
+local AnalyticsConfig = require(ReplicatedStorage.shared.Configs.AnalyticsConfig)
 local GameAnalytics = require(ReplicatedStorage.Packages["gameanalytics-sdk"])
 local Gamebeast = require(ReplicatedStorage:WaitForChild("Gamebeast"))
 local GameIds = require(ReplicatedStorage.shared.GameIds)
@@ -170,6 +181,8 @@ local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 --- For `Remote` and `Style`, the guide trail A/B the first-car markers are tagged with.
 local GuideTrailConfig = require(ReplicatedStorage.shared.Configs.GuideTrailConfig)
 local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
+--- `EnterReadyTimeout`, where Roblox's race loading bands end (`loadBand`).
+local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
 local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local Trove = require(ReplicatedStorage.Packages.Trove)
@@ -461,6 +474,19 @@ AnalyticsService:withLifecycle({
 			self.log:warn("Gamebeast did not start, its markers are off: " .. tostring(err))
 		end
 
+		--[[ The Roblox mirror's live switch (`AnalyticsConfig.RobloxMirror.Remote`): a boolean at its
+			path wins over `Enabled`, and anything else, a missing key included, leaves `Enabled` in
+			charge. Not gated on `_gamebeast`, whose markers the mirror stands in for, and its own pcall,
+			so a configs failure costs only the override. ]]
+		local mirrorRemote = AnalyticsConfig.RobloxMirror.Remote
+		if mirrorRemote.Enabled then
+			pcall(function()
+				self._trove:Add(Gamebeast:GetService("Configs"):Observe(mirrorRemote.Path, function(value: unknown)
+					self._robloxRemote = if type(value) == "boolean" then value else nil
+				end))
+			end)
+		end
+
 		--[[ What this build can show an experiment, as a Gamebeast server property the experiment
 			targets: the tutorial's RACE AGAIN A/B enrols only players on a server that says it has the
 			switch (`TutorialConfig.RaceAgain`). Its own pcall, so a failure here costs that test and
@@ -472,6 +498,24 @@ AnalyticsService:withLifecycle({
 			if not propOk then
 				self.log:warn("Gamebeast server property not set, the RACE AGAIN test enrols nobody here: " .. tostring(propErr))
 			end
+		end
+
+		--[[ ...and the first join A/B/C (`TutorialConfig.FirstJoin`) the same way, then each player's
+			arm, put on them for the client to act on. Hooked here and not in `_onJoined`, which the
+			PlayerAdded above can reach before `_gamebeast` is set. ]]
+		if self._gamebeast and TutorialConfig.FirstJoin.Remote.Enabled then
+			local propOk, propErr = pcall(function()
+				Gamebeast:GetService("Experiments"):SetServerProperty(TutorialConfig.FirstJoin.ServerProperty, true)
+			end)
+			if not propOk then
+				self.log:warn("Gamebeast server property not set, the first join test enrols nobody here: " .. tostring(propErr))
+			end
+		end
+		self._trove:Add(Players.PlayerAdded:Connect(function(player: Player)
+			self:_resolveFirstJoin(player)
+		end))
+		for _, player in Players:GetPlayers() do
+			self:_resolveFirstJoin(player)
 		end
 	end,
 
@@ -641,17 +685,174 @@ function AnalyticsService.Progression(
 	end)
 end
 
---[[ A Gamebeast marker for one player. See the header for the taxonomy.
+--- `runNumber` (this session's runs) as a breakdown: "1", "2", "3-4", "5+". From 5 a run is past the tutorial's.
+local function runBand(runNumber: unknown): string
+	local n = if type(runNumber) == "number" then runNumber else 0
+	return if n <= 1 then "1" elseif n == 2 then "2" elseif n < 5 then "3-4" else "5+"
+end
+
+--[[ A race's `loadingSeconds` as a breakdown. The last band starts where a client stops waiting for
+	its road (`RaceConfig.EnterReadyTimeout - 0.5`, `RoadController`), so it holds the entries that
+	failed or only just made it. ]]
+local LOAD_GIVE_UP = RaceConfig.EnterReadyTimeout - 0.5
+local function loadBand(seconds: unknown): string
+	local s = if type(seconds) == "number" then seconds else 0
+	if s < 5 then
+		return "<5s"
+	elseif s < 8 then
+		return "5-8s"
+	elseif s < LOAD_GIVE_UP then
+		return "8-" .. LOAD_GIVE_UP .. "s"
+	end
+	return LOAD_GIVE_UP .. "s+"
+end
+
+--- A breakdown that can be missing reads "none" rather than blank.
+local function orNone(value: unknown): string
+	return if value == nil then "none" else tostring(value)
+end
+
+--[[ WHAT ROBLOX'S OWN CUSTOM EVENTS GET (`AnalyticsConfig.RobloxMirror`; header). A marker type here
+	is also logged under the same name with `LogCustomEvent`. Each entry turns the marker's properties
+	into the number Roblox sums and averages (1 for a plain count) and up to three breakdowns, in
+	`CustomField01..03` order, or returns nothing to skip that one.
+
+	BREAKDOWNS ARE LOW-VARIETY ON PURPOSE. The experience gets 8,000 distinct field values in all, past
+	which Roblox lumps the rest into "Other", so a car body, a price, an id or a raw number never goes
+	in one; a banded number does. A marker with no entry is Gamebeast's alone: the tutorial's beats,
+	the first car and its placement are already Roblox funnels, and the rest are detail or volume. ]]
+local ROBLOX_EVENTS: { [string]: (data: { [string]: any }) -> (number?, { any }?) } = {
+	RunStarted = function(data)
+		return 1, { data.world, runBand(data.runNumber), if data.heat then "heat" else "noHeat" }
+	end,
+	--- `outcome` is `cause`, except that a quit which never covered a stud is "neverMoved": an entry
+	--- that fell over before the car went live ("Couldn't load the world"), the number build 2655 broke.
+	RunEnded = function(data)
+		local moved = type(data.distance) == "number" and data.distance >= 1
+		local outcome = if data.cause == "quit" and not moved then "neverMoved" else data.cause
+		return data.distance, { outcome, runBand(data.runNumber), data.world }
+	end,
+	--- Race summaries only; the lobby's has no loading time.
+	PerformanceSummary = function(data)
+		if data.kind ~= "run" then
+			return nil
+		end
+		return data.loadingSeconds, { loadBand(data.loadingSeconds), orNone(data.inputMethod), runBand(data.runNumber) }
+	end,
+	RunEndChoice = function(data)
+		return 1, { data.choice, data.how, if data.tutorial then "tutorial" else "game" }
+	end,
+	JoinFinished = function(data)
+		return data.seconds,
+			{
+				if data.onboarded then "onboarded" else "new",
+				orNone(data.slowest),
+				if data.recovered then "recovered" else "clean",
+			}
+	end,
+	JoinFailed = function(data)
+		return data.seconds, { data.stage, orNone(data.lastPhase) }
+	end,
+	JoinAbandoned = function(data)
+		return data.seconds, { orNone(data.lastPhase), if data.failed then "afterFail" else "noFail" }
+	end,
+	FirstCarAbandoned = function(_data)
+		return 1, {}
+	end,
+	CarSold = function(data)
+		return data.cash, { data.source, orNone(data.tier) }
+	end,
+	CarBought = function(data)
+		return data.price, { data.source, orNone(data.tier), orNone(data.band) }
+	end,
+	SellerResolved = function(data)
+		return data.price, { data.outcome, orNone(data.tier), if data.first then "first" else "later" }
+	end,
+	BuyerOfferResolved = function(data)
+		return data.amount, { data.outcome, data.kind, data.source }
+	end,
+	UpgradeBought = function(data)
+		return data.cost, { data.upgrade }
+	end,
+	WorkshopBought = function(data)
+		return data.cost, { data.kind, orNone(data.part) }
+	end,
+	WorldUnlocked = function(data)
+		return data.cost, { data.world }
+	end,
+	PurchasePrompted = function(data)
+		return 1, { data.product, orNone(data.context) }
+	end,
+	PageOpened = function(data)
+		return 1, { data.page }
+	end,
+}
+
+--- `CustomField01..03`, the only keys Roblox's charts break down by.
+local ROBLOX_FIELD_KEYS = {
+	Enum.AnalyticsCustomFieldKeys.CustomField01.Name,
+	Enum.AnalyticsCustomFieldKeys.CustomField02.Name,
+	Enum.AnalyticsCustomFieldKeys.CustomField03.Name,
+}
+
+--[[ A Gamebeast marker for one player, and its Roblox copy if it has one (`_robloxMirror`). See the
+	header for the taxonomy.
 
 	Players only: every marker in this game is about somebody, and a userId whose player has left
-	would be resolved by the SDK to nothing. A dropped marker is the right failure, so it is quiet. ]]
+	would be resolved by the SDK to nothing. A dropped marker is the right failure, so it is quiet.
+	The Roblox copy does not wait on Gamebeast having started: it stands in for Gamebeast. ]]
 function AnalyticsService.Marker(self, player: Player?, markerType: string, data: { [string]: any }?)
-	if not (self._gamebeast and typeof(player) == "Instance" and player:IsA("Player")) then
+	if not (typeof(player) == "Instance" and player:IsA("Player")) then
 		return
 	end
+	local props = data or {}
+	self:_robloxMirror(player :: Player, markerType, props)
+	if self._gamebeast then
+		pcall(function()
+			self._gamebeast:SendPlayerMarker(player, markerType, props)
+		end)
+	end
+end
+
+--[[ A marker's Roblox copy, if it has one (`ROBLOX_EVENTS`) and the mirror is on: the live override
+	(`_robloxRemote`, set in `init`) when "live" has one, else `AnalyticsConfig.RobloxMirror.Enabled`.
+	Quiet on failure, as `Marker` is. In Studio, where Roblox ignores custom events, the last twenty
+	are kept on `_robloxRecent` so a playtest can read what would have gone. ]]
+function AnalyticsService._robloxMirror(self, player: Player, markerType: string, data: { [string]: any })
+	local shape = ROBLOX_EVENTS[markerType]
+	if not shape then
+		return
+	end
+	local on = self._robloxRemote
+	if on == nil then
+		on = AnalyticsConfig.RobloxMirror.Enabled
+	end
+	if not on then
+		return
+	end
+	local ok, value, fields = pcall(shape, data)
+	if not ok or fields == nil then
+		return
+	end
+	local amount = if type(value) == "number" and value == value and math.abs(value) ~= math.huge then value else 0
+	local custom = {}
+	for index, key in ROBLOX_FIELD_KEYS do
+		local field = fields[index]
+		if field ~= nil then
+			custom[key] = string.sub(tostring(field), 1, 50)
+		end
+	end
 	pcall(function()
-		self._gamebeast:SendPlayerMarker(player, markerType, data or {})
+		RobloxAnalytics:LogCustomEvent(player, markerType, amount, custom)
 	end)
+	if RunService:IsStudio() then
+		local recent = self._robloxRecent or {}
+		self._robloxRecent = recent
+		table.insert(recent, { event = markerType, value = amount, fields = custom })
+		if #recent > 20 then
+			table.remove(recent, 1)
+		end
+	end
 end
 
 --- Tips and bay collections, summed per session. See `PassiveIncome` in the header.
@@ -857,6 +1058,66 @@ function AnalyticsService.FirstCarAbandoned(self, player: Player)
 	self:Marker(player, "FirstCarAbandoned", { guideStyle = self:_guideStyle(player) })
 	self:DesignOnce(player, "FirstCar:Abandoned")
 	self:Progression(player, "Fail", "FirstCar")
+end
+
+-- === The first join A/B/C ==================================================
+
+--[[ This player's arm (`TutorialConfig.FirstJoin`), put on them as its `Attribute` for
+	`TutorialController._firstJoin`. Every player gets one, whatever beat they are on: the client is
+	what knows whether PLAY is live, and an attribute costs nothing.
+
+	READ ONLY ONCE GAMEBEAST HAS THIS PLAYER'S GROUPS. Before that `GetForPlayer` answers with the
+	base configuration, which is the lobby arm, so a read on join would put every new player in C.
+	`ObserveAssignmentsForPlayer` calls back when the first answer is in (at once when no player
+	experiment is running), and the SDK rebuilds the player's view of "live" right after that in the
+	same frame, hence the `task.wait` before the read.
+
+	`ResolveTimeout` puts `Default` on a player Gamebeast has not answered for, and whichever writes
+	first wins: a late answer never changes an arm the client may already have acted on. ]]
+function AnalyticsService._resolveFirstJoin(self, player: Player)
+	local firstJoin = TutorialConfig.FirstJoin
+	local function settle(arm: unknown)
+		if not player.Parent or player:GetAttribute(firstJoin.Attribute) ~= nil then
+			return
+		end
+		local known = type(arm) == "string" and firstJoin.Arms[arm] == true
+		player:SetAttribute(firstJoin.Attribute, if known then arm else firstJoin.Default)
+	end
+
+	if RunService:IsStudio() and firstJoin.StudioArm ~= nil then
+		settle(firstJoin.StudioArm)
+		return
+	end
+	if not (self._gamebeast and firstJoin.Remote.Enabled) then
+		settle(firstJoin.Default)
+		return
+	end
+
+	task.delay(firstJoin.ResolveTimeout, settle, firstJoin.Default)
+	local connection: RBXScriptConnection? = nil
+	local answered = false
+	local ok, err = pcall(function()
+		connection = Gamebeast:GetService("Experiments"):ObserveAssignmentsForPlayer(player, function()
+			if answered then
+				return
+			end
+			answered = true
+			task.wait()
+			--- Only once: by now `connection` is set, since the call above has returned.
+			if connection then
+				connection:Disconnect()
+			end
+			local value: unknown = nil
+			pcall(function()
+				value = Gamebeast:GetService("Configs"):GetForPlayer(player, firstJoin.Remote.Path)
+			end)
+			settle(value)
+		end)
+	end)
+	if not ok then
+		self.log:warn("Gamebeast groups unavailable, the first join test serves " .. firstJoin.Default .. ": " .. tostring(err))
+		settle(firstJoin.Default)
+	end
 end
 
 -- === PUBLIC (ReviveService) =================================================

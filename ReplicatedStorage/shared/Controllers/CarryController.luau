@@ -744,7 +744,20 @@ end
 	silently dropped the ones over the far side of the lot would answer nothing at all on a player
 	who landed facing away. ]]
 function CarryController.getFreeDecks(self): { BasePart }
-	return self:_decks(false, true)
+	local decks = self:_decks(false, true)
+	local player = Players.LocalPlayer
+	if player:GetAttribute("FirstPlacementActive") == true then
+		local assigned = player:GetAttribute("FirstPlacementBay")
+		for _, deck in decks do
+			local node: Instance? = deck
+			while node and node ~= workspace do
+				if node:GetAttribute(GarageConfig.SlotIndexAttribute) == assigned and assigned ~= nil then return { deck } end
+				node = node.Parent
+			end
+		end
+		return {} -- Wait for the assigned bay to stream in; do not point somewhere else.
+	end
+	return decks
 end
 
 --[[ PUBLIC (`GuideTrailController`) - the decks the guide line may end at. The CUSTOMIZE podium alone
@@ -869,7 +882,9 @@ function CarryController._litDecks(self): { BasePart }
 	local lit = {}
 	local tutorialPlace = TutorialConfig.isOn()
 		and Players.LocalPlayer:GetAttribute(TutorialConfig.StepAttribute) == "place"
-	for _, deck in self:_decks(glow.OccupiedToo, tutorialPlace) do
+	local decks = if Players.LocalPlayer:GetAttribute("FirstPlacementActive") == true
+		then self:getFreeDecks() else self:_decks(glow.OccupiedToo, tutorialPlace)
+	for _, deck in decks do
 		if (deck.Position - here).Magnitude <= glow.Studs then
 			table.insert(lit, deck)
 		end

@@ -221,6 +221,11 @@ function RaceEntryController._onPlayPressed(self, instance: Instance?)
 	if instance and instance:GetAttribute("Page") then
 		return
 	end
+	local startCar = Shard.get("StartCarController")
+	if startCar and startCar:oneScreen() then
+		startCar:openPlay()
+		return
+	end
 	Dispatcher:Publish("OpenPage", WorldConfig.PageName)
 end
 

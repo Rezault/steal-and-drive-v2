@@ -1425,7 +1425,10 @@ function PoliceController._stepPit(self, dt: number, now: number)
 	self:_paintBar(rec, self:_flashOn(rec.alternate))
 
 	if not pit.hitAt then
-		if t >= 1 then
+		--- Not into a hopping car, as a bail and a boarding wait (`HopController.isFlying`): the hop holds
+		--- the anchors and its own `suspend`, and its landing `resume` would hand the spin back the wheel.
+		local hop = Shard.get("HopController")
+		if t >= 1 and not (hop and hop:isFlying()) then
 			pit.hitAt = now
 			self:_hit(rec)
 		end

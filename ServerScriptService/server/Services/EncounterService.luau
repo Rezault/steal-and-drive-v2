@@ -44,11 +44,13 @@ local TutorialConfig = require(ReplicatedStorage.shared.Configs.TutorialConfig)
 local UpgradeConfig = require(ReplicatedStorage.shared.Configs.UpgradeConfig)
 local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
+local RoadsterEventConfig = require(ReplicatedStorage.shared.Configs.RoadsterEventConfig)
+local Data = require(script.Parent.Parent.Data)
 
 --[[ `RaceService` for "is this player racing" and the end-of-run signal. `WorldService`, `RoadService`,
 	`ObstacleService` and `RewardService` are reached through `Shard.get` when needed and are optional,
 	the `GetawayService` rule: a missing one degrades a clamp or a log line, never the issuing. ]]
-local EncounterService = Shard.new("EncounterService"):withDependencies({ "RaceService" })
+local EncounterService = Shard.new("EncounterService"):withDependencies({ "RaceService", "GarageService" })
 
 --- The pass that adds luck, read off the Player exactly as `TrafficController._refreshLuck` reads it.
 local LUCKY_ROADS_ATTRIBUTE = PassConfig.ownedAttribute("LuckyRoads")
@@ -82,7 +84,11 @@ type Ledger = {
 	nearMisses: number,
 	total: number, -- cars issued this run
 	capped: boolean?, -- the cap warning has been logged for this run (`_onRequest`)
-	convoyAt: number?, -- os.clock() this run's convoy is due, or nil for none / already sent (`ConvoyConfig`)
+	convoyAt: number?, -- os.clock() this run's convoy is due
+	convoyRolled: boolean?,
+	convoyId: string?,
+	convoyIssuedAt: number?,
+	convoyShown: boolean?,
 }
 
 EncounterService:withRemoteEvents({
@@ -97,6 +103,9 @@ EncounterService:withRemoteEvents({
 			down the road." `rung` is the tutorial's staged steal asking for one particular rung, and is
 			honoured on a tutorial run only. `retired` is the tokens of cars that have left this
 			client's road since its last request (`_retire`). See "what it trusts". ]]
+		[ConvoyConfig.ShownRemote] = function(player: Player, id: unknown)
+			EncounterService:_convoyShown(player, id)
+		end,
 		EncounterRequest = function(player: Player, tileIndex: unknown, count: unknown, rung: unknown, retired: unknown, run: unknown)
 			EncounterService:_onRequest(player, tileIndex, count, rung, retired, run)
 		end,
@@ -104,6 +113,49 @@ EncounterService:withRemoteEvents({
 })
 
 -- === The ledger =============================================================
+
+function EncounterService._profile(self, player: Player)
+	local profile = self._profiles[player]
+	return if profile and profile:IsActive() then profile else nil
+end
+
+function EncounterService._cooldownUntil(self, profile): number
+	local deadline = profile:Get({ ConvoyConfig.ProfileKey })
+	return if type(deadline) == "number" and deadline == deadline and deadline < math.huge then math.max(0, deadline) else 0
+end
+
+--- One chance per eligible run. No loaded profile means defer, never bypass the saved cooldown.
+function EncounterService._scheduleConvoy(self, player: Player, ledger: Ledger)
+	if ledger.convoyRolled then return end
+	local profile = self:_profile(player)
+	if not profile then return end
+	ledger.convoyRolled = true
+	if not ConvoyConfig.Enabled or ledger.tutorial or os.time() < self:_cooldownUntil(profile) then return end
+	if self._rng:NextNumber() < ConvoyConfig.Chance then
+		ledger.convoyAt = ledger.startedAt + self._rng:NextNumber(ConvoyConfig.After[1], ConvoyConfig.After[2])
+	end
+end
+
+--- Reserve on issue so a suppressed acknowledgement cannot bypass the cooldown.
+--- The first valid appearance extends it from the server's clock; replays cannot keep extending it.
+function EncounterService._convoyShown(self, player: Player, id: unknown)
+	local ledger = self._ledgers[player]
+	local profile = self:_profile(player)
+	if not (ledger and profile and type(id) == "string" and id == ledger.convoyId)
+		or ledger.convoyShown or not ledger.convoyIssuedAt
+		or os.clock() - ledger.convoyIssuedAt > ConvoyConfig.SpawnWithin + 10 then return end
+	ledger.convoyShown = true
+	profile:Set({ ConvoyConfig.ProfileKey }, math.max(self:_cooldownUntil(profile), os.time() + ConvoyConfig.Cooldown))
+end
+
+function EncounterService._watch(self, player: Player)
+	task.spawn(function()
+		local ok, profile = pcall(function() return Data:GetProfileAsync(player) end)
+		if ok and profile and player.Parent == Players then
+			self._profiles[player] = profile
+		end
+	end)
+end
 
 --[[ This player's ledger for the run they are in, made on first use. nil for a player who is not
 	racing — a request between runs is refused rather than starting a ledger nothing will end. The
@@ -113,6 +165,7 @@ EncounterService:withRemoteEvents({
 function EncounterService._ledger(self, player: Player): Ledger?
 	local ledger = self._ledgers[player]
 	if ledger then
+		self:_scheduleConvoy(player, ledger)
 		return ledger
 	end
 	local Race = Shard.get("RaceService")
@@ -137,10 +190,7 @@ function EncounterService._ledger(self, player: Player): Ledger?
 		nearMisses = 0,
 		total = 0,
 	}
-	--- Whether this run gets a convoy, and when, decided once as the run starts. Never the tutorial's.
-	if ConvoyConfig.Enabled and not ledger.tutorial and self._rng:NextNumber() < ConvoyConfig.Chance then
-		ledger.convoyAt = now + self._rng:NextNumber(ConvoyConfig.After[1], ConvoyConfig.After[2])
-	end
+	self:_scheduleConvoy(player, ledger)
 	self._ledgers[player] = ledger
 	return ledger
 end
@@ -254,7 +304,7 @@ function EncounterService._roll(self, ledger: Ledger, luck: number, tileIndex: n
 		The rung stays the rolled one, since on the road a rung is only speed and lane habits; the tier is
 		the event car's own, which is what the steal refills from and what the bank checks the body
 		against (`GarageService.awardCar`). Never on the tutorial's staged road. ]]
-	if not ledger.tutorial and not rung then
+	if not ledger.tutorial and not rung and RoadsterEventConfig.isActive() then
 		for name, entry in WorldConfig.EventBodies do
 			if entry.SpawnChance and self._rng:NextNumber() < entry.SpawnChance then
 				body, tierNumber = name, WorldConfig.TierOfBody[name]
@@ -347,6 +397,8 @@ end
 	a steal and a bank need nothing new. Outside the bucket and the cap on purpose — it is once a run
 	at most and four cars, and a convoy refused for a full ledger is the rare event silently lost. ]]
 function EncounterService._issueConvoy(self, player: Player, ledger: Ledger, run: unknown)
+	local profile = self:_profile(player)
+	if not profile or os.time() < self:_cooldownUntil(profile) then return end
 	local event = self:_event(ledger)
 	local batch, names = {}, {}
 	for _, choice in ConvoyConfig.pick(self._rng, ledger.tiers) do
@@ -369,8 +421,12 @@ function EncounterService._issueConvoy(self, player: Player, ledger: Ledger, run
 		return
 	end
 	ledger.total += #batch
+	ledger.convoyId = HttpService:GenerateGUID(false)
+	ledger.convoyIssuedAt = os.clock()
+	ledger.convoyShown = false
+	profile:Set({ ConvoyConfig.ProfileKey }, os.time() + ConvoyConfig.Cooldown)
 	self.log:info(string.format("%s's convoy: %s.", player.Name, table.concat(names, ", ")))
-	self:getRemoteEvent("EncounterConvoy"):Fire(player, batch, ledger.world, run)
+	self:getRemoteEvent("EncounterConvoy"):Fire(player, batch, ledger.world, run, ledger.convoyId)
 end
 
 -- === Redeeming ==============================================================
@@ -470,9 +526,15 @@ EncounterService:withLifecycle({
 	init = function(self)
 		self._rng = Random.new()
 		self._ledgers = {} :: { [Player]: Ledger }
+		self._profiles = {} :: { [Player]: any }
 	end,
 
 	start = function(self)
+		local Garage = Shard.get("GarageService")
+		Garage:getSignal("ProfileReady"):Connect(function(player: Player) self:_watch(player) end)
+		for _, player in Players:GetPlayers() do
+			if Garage:isProfileReady(player) then self:_watch(player) end
+		end
 		local Race = Shard.get("RaceService")
 		if Race then
 			--- The run is over: its ledger goes, spent and unspent alike, so no token outlives its run.
@@ -487,6 +549,7 @@ EncounterService:withLifecycle({
 			end)
 		end
 		Players.PlayerRemoving:Connect(function(player: Player)
+			self._profiles[player] = nil
 			self._ledgers[player] = nil
 		end)
 	end,

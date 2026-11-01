@@ -1,77 +1,6 @@
---[[
-	GarageService  (server)
-	-----------------------
-	The meta game. A car you got away with is parked on a bay of your dealership plot, that bay owes
-	you money for every second it stands there, and walking onto the mat in front of it pays out.
+-- GarageService: authoritative collection, ownership, cash, carried cars and showroom bays.
+-- Placement uses setBayCar; CarParked is emitted only after the profile and display update.
 
-	=== MOST OF THAT FIRST PARAGRAPH IS THE FLAGGED-OFF MODE NOW — 2026-09-28 ================
-
-	The dealership rework changed three things this file owns, each behind a flag that restores the
-	old behaviour exactly:
-
-	  • CARS ARE PLACED, NOT PARKED (`GarageConfig.Banking.AutoPark`, `SellDuplicates`). A bank goes to
-	    the Cars Inventory under its own car ID (`GarageConfig.carId`), duplicates included, and the
-	    player chooses what stands on the lot.
-	  • A BAY EARNS NOTHING (`GarageConfig.Income.Passive`). `_collect` is gated, the mats are hidden
-	    (`_hideMats`), the loops are not started. The dealership's income is `CustomerService`'s tips,
-	    priced by `getBayTip`, and "NOTHING ACCUMULATES" below is still true — there is simply nothing
-	    left to accumulate.
-	  • A CAR HAS STATE OF ITS OWN (`Garage.CarData`, `NotForSale`): the condition it banked in, and
-	    whether buyers may make offers on it.
-	  • ONE BAY IS A WORKSHOP (`CustomizeConfig.Enabled`): that podium draws no tips, takes no buyers
-	    and sells no tip levels, and a car on it can be repaired, repainted (`repaintCar`, which
-	    re-keys it) and fitted with parts. See "The workshop" below.
-
-	The rest of this header describes the passive-income design as it was built, and is exactly what
-	`Income.Passive = true` brings back.
-
-	It is the economy `PlotService` deliberately does not own. That one answers "which lot is this
-	player's?" and nothing more; this one is the only thing in the game that writes `Cash`.
-
-	=== THE ONE IDEA WORTH READING BEFORE ANYTHING ELSE ========================================
-
-	NOTHING ACCUMULATES. There is no income tick adding to a counter anywhere in this file. A parked
-	car stores a single number — the `os.time()` it was last collected — and what it owes is a
-	function of the clock:
-
-	    pending = min(now - collectedAt, MaxBankedSeconds) * rate(tier) * Multiplier
-
-	Everything else falls out of that, and it is worth spelling out what it buys, because a service
-	written the obvious way would need all of it:
-
-	  • OFFLINE INCOME IS NOT A FEATURE HERE. It is what the formula already says. There is no
-	    "catch up on login" pass, because there is nothing to catch up.
-	  • NOTHING HAS TO BE FLUSHED. A player who crashes, disconnects mid-collection or is in the
-	    server when it shuts down loses nothing, because the pending amount was never state.
-	  • THE LOOP IS COSMETIC. `_labelLoop` redraws the numbers on the mats. Delete it and the money
-	    is still exactly right; the mats just stop counting up in front of you.
-
-	The only writes to the profile are the ones a player caused: collecting, banking a car, selling
-	one. That is a handful per minute rather than one per second per bay.
-
-	=== WHAT THE MAP OWNS ======================================================================
-
-	Bays are AUTHORED, not built (`docs/MapLayout.md` §4, propagated by the `PropagateCarSlots`
-	command). This service walks each plot's `CarSlots` folder, reads the `SlotIndex` the podium
-	already carries, and fills in the mat's label. It never places a podium and never assumes six.
-
-	The one thing it does build is the CAR on the podium, and that is a stripped clone rather than a
-	vehicle: `Workspace.CarSystem.<Body>` is a 311-instance CarBones rig, and six of those on six
-	plots is eleven thousand instances of fully-wired car standing still. Only the `Body` dress is
-	cloned, its joints are destroyed and its parts are anchored. See `_buildDisplayCar` — the joint
-	destruction in particular is load-bearing, not tidiness.
-
-	=== WHAT IT TRUSTS =========================================================================
-
-	`awardCar` is reached from `GetawayService`, i.e. from a client message. Traffic is client-sided,
-	so there is no car on the server to check a bank against — the accepted gap `StealService`,
-	`TrafficService` and `ObstacleService` all document, and the same server-rolled spawn token
-	closes all four. What this service does add is a REAL constraint the others could not: the body
-	name and the tier have to agree with `GarageConfig.TierOfBody`, which is the server's own copy of
-	the roster. A client can still lie about which car it stole; it can no longer claim a Tier 5
-	payout for a hatchback, and it cannot bank a car it never stole at all, because a car that was
-	never stolen carries no `Tier` attribute for the client to send.
-]]
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -980,7 +909,7 @@ end
 	Idempotent, and the only writer. It used to be bounded at one entry per (body, colour, mutation)
 	the roster allows. Since IDs each copy is separate; awardCar now bounds new entries through
 	InventoryConfig.MaxCars backpack spaces plus the hotbar and bays (2026-10-12). ]]
-function GarageService._addOwned(self, player: Player, key: string): boolean
+function GarageService._addOwned(self, player: Player, key: string, onGranted: (() -> ())?): boolean
 	local profile = self:_profile(player)
 	if not profile or self:_owns(player, key) then
 		return false
@@ -988,6 +917,7 @@ function GarageService._addOwned(self, player: Player, key: string): boolean
 	local owned = table.clone(self:_ownedList(player))
 	table.insert(owned, key)
 	profile:Set({ GarageConfig.Keys.Garage, GarageConfig.Keys.Owned }, owned)
+	if onGranted then onGranted() end
 	self:_publishOwned(player, owned)
 	return true
 end
@@ -1733,14 +1663,21 @@ function GarageService.getCash(self, player: Player): number
 end
 
 -- Add (or, with a negative amount, take) cash. Returns the new balance.
-function GarageService.addCash(self, player: Player, amount: number): number
+function GarageService.addCash(self, player: Player, amount: number, onGranted: (() -> ())?): number
 	local profile = self:_profile(player)
-	if not profile or amount == 0 then
+	if not profile then
+		return self:getCash(player)
+	end
+	if amount == 0 then
+		-- Nothing to add is still granted: a $0 reward must be claimable, not pending forever.
+		if onGranted then onGranted() end
 		return self:getCash(player)
 	end
 
 	local balance = math.max(0, self:getCash(player) + amount)
 	profile:Set(GarageConfig.Keys.Cash, balance)
+	-- Commit reward receipts before presentation can fail. This callback must not yield.
+	if onGranted then onGranted() end
 	self:_publishCash(player, balance)
 	--[[ The kiosks follow the balance, so a level you have just earned the money for lights up while
 		you are standing in front of it. The forecourt billboard gets this for free by watching
@@ -2158,45 +2095,9 @@ function GarageService._freeBay(self, player: Player, cars: { Car }): number?
 	return nil
 end
 
---[[ Public: the player got away with a car. Park it, hand it over, or sell it, but never nothing.
+-- Award a validated banked car. Returns (outcome, amount, id): parked, carried, or sold.
+-- Own the car before publishing it. FirstCarService handles the first-car milestones.
 
-	Returns `(outcome, amount, id)` where outcome is "parked" | "upgraded" | "collected" | "sold" |
-	"carried" | "rejected", and `id` is the car ID the player now owns (`GarageConfig.carId`) — nil
-	for every outcome that did not add a car. A caller that needs to find the car afterwards (which
-	bay it landed on, what to hand the player) should use this rather than rebuild a key: two copies
-	of one model are two IDs, and only this one is the car just awarded.
-
-	`source` NAMES THE CALLER ("Bank", "Pull", "Buy", "Admin", "Seller") and does exactly one thing: it decides
-	whether the car goes into the player's HANDS instead of onto a bay (`CarryConfig.Sources`). It is
-	a name rather than a boolean so the decision stays in one config instead of being made four times
-	at four call sites, and it is optional so every caller that does not pass one keeps the behaviour
-	it has always had.
-
-	THE "NEVER NOTHING" RULE IS A DESIGN CONSTRAINT, NOT POLITENESS. Driving into the truck ENDS the
-	run — that is GDD §3.5's design guard, and it is what makes banking a real decision — so a bank
-	that paid nothing would be a whole minute of play thrown away, and it would read as a bug the
-	first time it happened.
-
-	WHAT THE COLLECTION CHANGED, because it changes what two of these branches MEAN. Every body you
-	bank is now yours permanently (`Owned`), and the six bays are a display you choose. So:
-
-	  • AN EXACT DUPLICATE IS THE ONLY REAL SALE, and "exact" means body AND colour. It is matched
-	    against the collection rather than against the lot: a car you own but have not parked is one
-	    you own. A Camaro in a colour you do not have is a new car and parks; a second Camaro in a
-	    colour you already have is indistinguishable from the first, so it is cash.
-	  • DISPLACING A CAR NO LONGER SELLS IT. The worst bay still gives way to a better car with no UI
-	    involved — a lot of beaters still becomes a lot of supercars on its own — but the car that
-	    comes off goes back to the collection instead of being cashed out, because you still own it
-	    and can park it again. That is a real economy change: the refund that branch used to pay is
-	    gone. It is the price of the car not being destroyed, and it is the one number to look at
-	    first if banking starts to feel thin.
-	  • A NEW CAR WITH A FULL LOT PAYS NOTHING AND IS STILL NOT NOTHING. It is a car you did not have,
-	    on a screen that shows you the roster you are filling. "collected" is that outcome.
-
-	WHAT "carried" DOES TO ALL OF THAT: nothing, except that no bay is picked here. The catalogue is
-	still ticked, the collection still gets the car, a duplicate still sells for the same money. The
-	only branch it replaces is the one that chose a podium, because that is the decision the player
-	now makes for themselves (`CarryConfig`, and `placeCarried` below is the other end of it). ]]
 --[[ Public: is there anywhere for one more car to go (a free hotbar slot, or space in the backpack)?
 	False is exactly the case `awardCar` auto-sells, so a caller that must NOT be sold (a one-time
 	reward, `GroupRewardService`) asks this first and refuses instead. Pure. ]]
@@ -2213,7 +2114,9 @@ function GarageService.awardCar(
 	paint: unknown,
 	mutation: unknown,
 	source: unknown,
-	initialCondition: number?
+	initialCondition: number?,
+	onGranted: ((string?, number?, string?) -> ())?,
+	pastCapacity: boolean?
 ): (string, number, string?)
 	if not GarageConfig.Enabled then
 		return "rejected", 0
@@ -2272,9 +2175,12 @@ function GarageService.awardCar(
 
 	-- New cars use a free hotbar slot first; only overflow into a full backpack is sold.
 	-- Keeping the same sold outcome lets all reward callers finish normally without a phantom car.
-	if not self:hasRoom(player) then
+	-- `pastCapacity` (a Robux purchase, `BundleService`): what was paid for is the car, never its cash.
+	if not pastCapacity and not self:hasRoom(player) then
 		local amount = MarketValueConfig.valueOf(realTier, realMutation, { Condition = initialCondition })
-		self:addCash(player, amount)
+		self:addCash(player, amount, function()
+			if onGranted then onGranted("sold", amount, "Full") end
+		end)
 		self:getSignal("CarSold"):Fire(player, realBody, realTier, amount, "Full")
 		self:getRemoteEvent("InventoryAutoSold"):Fire(player, realBody, amount, InventoryConfig.MaxCars)
 		return "sold", amount
@@ -2293,7 +2199,9 @@ function GarageService.awardCar(
 		only honest reading when two identical cars on two podiums were a lot the picker could not
 		tell apart. Each copy has its own ID now, so the picker can, and the repeat is just a car. ]]
 	if GarageConfig.Banking.SellDuplicates and self:ownsModel(player, key) then
-		self:addCash(player, value)
+		self:addCash(player, value, function()
+			if onGranted then onGranted("sold", value, "Duplicate") end
+		end)
 		self:getSignal("CarSold"):Fire(player, realBody, realTier, value, "Duplicate")
 		self.log:info(
 			string.format("%s banked a duplicate %s (Tier %d) — sold for %d.", player.Name, realBody, realTier, value)
@@ -2318,7 +2226,9 @@ function GarageService.awardCar(
 		)
 		return "rejected", 0
 	end
-	self:_addOwned(player, id)
+	if not self:_addOwned(player, id, onGranted) then
+		return "rejected", 0
+	end
  if initialCondition ~= nil then
   self:setCarData(player, id, {Condition = math.clamp(initialCondition, 0, 1)})
  end
@@ -2634,34 +2544,31 @@ function GarageService.pickUpBay(self, player: Player, bayIndex: number): (boole
 	return true, "stored"
 end
 
---[[ Public: park the car in this player's hands on `bayIndex`. The podium prompt's end of the
-	carry, and the only one.
+-- Place the held owned car via setBayCar. Ordinary placements may swap occupied bays;
+-- first-placement guidance only accepts empty showroom bays. Invalid ownership/duplicate
+-- placement clears the stale carry; other failures leave it available for a retry.
 
-	IT IS `setBayCar` WITH THE KEY FILLED IN, which is the whole point of it being written this way:
-	a placement is not a new way for a car to reach a bay. The swap rule, the ownership check, the
-	`Collected` stamp, the rebuild and the `CarParked` signal are all that function's, so a car placed
-	out of your hands and a car dragged onto a bay from the Cars Inventory land in exactly the same
-	state. Placing onto an OCCUPIED bay therefore swaps: the car that was standing there goes back to
-	the collection, which is what a player with a full lot is doing when they press this.
-
-	TWO REFUSALS EMPTY THE HANDS ANYWAY, and they are the two that would otherwise persist forever.
-	`notOwned` is a car sold out from under the carry, and `alreadyThere` is that same car ALREADY
-	standing on the bay being pressed, which is what the Cars Inventory parking it mid-carry leaves
-	behind. Neither has anything left to place, and a model welded to somebody that no press can ever
-	take off them is worse than a carry that quietly ends. Every other refusal is a state the next
-	press can succeed from, so the car stays in their hands.
-
-	Returns `(ok, reason)`, the reasons being `setBayCar`'s plus "notCarrying". ]]
 function GarageService.placeCarried(self, player: Player, bayIndex: number): (boolean, string)
+	local placement = Shard.get("FirstPlacementService")
 	local key = self:getCarriedCar(player)
 	if not key then
+		if placement then placement:failed(player, "notCarrying") end
 		--- Not an error and not logged: a client cannot reach this, and the one way to get here is to
 		--- press a podium with empty hands, which is the ordinary case for that prompt.
 		return false, "notCarrying"
 	end
 
-	local ok, reason = self:setBayCar(player, bayIndex, key)
+	if placement then
+		local allowed, why = placement:beforePlace(player, bayIndex)
+		if not allowed then return false, why end
+	end
+	local callOk, ok, reason = pcall(self.setBayCar, self, player, bayIndex, key)
+	if not callOk then
+		self.log:warn("Placement failed before confirmation: " .. tostring(ok))
+		ok, reason = false, "internal"
+	end
 	if not ok then
+		if placement then placement:failed(player, reason) end
 		-- Logged because a refused placement is otherwise invisible: the car stays in the player's
 		-- hands and the press simply does nothing, which is indistinguishable from a broken prompt.
 		self.log:info(
@@ -2914,6 +2821,11 @@ function GarageService.setBayCar(self, player: Player, bayIndex: number, key: st
 		return false, "noSuchBay"
 	end
 
+	-- Briefly protect the FIRST confirmed placement from a repeated pickup/clear press.
+	local placement = Shard.get("FirstPlacementService")
+	if key == nil and placement and not placement:canPickUp(player, bayIndex) then
+		return false, "protected"
+	end
 	local cars = self:_cars(player)
 	local target, targetSlot = self:_carAtBay(cars, bayIndex)
 

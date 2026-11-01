@@ -398,6 +398,22 @@ local RaceConfig = {
 		ReplicatedStorage. That group is 116 instances, so ~2.9 ms is the real worst frame here. ]]
 	TileBuildBudget = 60,
 
+	--[[ BOTH OFF SINCE 2026-10-27. Build 2655 shipped them on, and together they made the opening ring
+		frame-bound: about 290 frames to build on every device (`PerformanceSummary.roadOpeningFrames`),
+		which is under 5 s at 60 fps and nearly 10 s at 30 fps. `RoadController` holds `RaceReady` until
+		the whole ring is up and gives up at `EnterReadyTimeout - 0.5`, so slow devices had the entry
+		aborted ("Couldn't load the world"). Measured on 2655 against 2652: races that never moved went
+		8% to 35% on phones and 2% to 12.5% on PC, and new players finishing BOOST 94% to 60%.
+
+		`FirstTileIncremental = false` builds tile 0 whole on the entry frame, as before 2655: it is the
+		ground the ack waits on. `TileBuildTimeBudgetMs = 0` turns the per-frame time cap off, so only
+		`TileBuildBudget` paces the rest of the ring. Turn either back on only with the ack deadline
+		reworked to match, and measured on a 30 fps phone. ]]
+	FirstTileIncremental = false,
+	-- Stop between clone units after this CPU-time target. An indivisible joint group can exceed it.
+	-- 0 means no time cap.
+	TileBuildTimeBudgetMs = 0,
+
 	-- === Car spawn placement =================================================
 	-- Where along the road (forward-axis coordinate) a fresh car is dropped. Every race in
 	-- every world starts on the origin tile — see `Lanes` for what keeps two of them apart.

@@ -177,6 +177,13 @@ function CarRarityBadge.oddsText(body: unknown, world: unknown, luck: number?): 
 	if type(body) ~= "string" then
 		return RarityBadgeConfig.UnknownOdds
 	end
+	--- A limited event car is on no world's ladder; its odds are its own flat `SpawnChance` per car.
+	local event = WorldConfig.EventBodies[body]
+	if event then
+		return if event.SpawnChance
+			then string.format(RarityBadgeConfig.OddsFormat, grouped(1 / event.SpawnChance))
+			else RarityBadgeConfig.UnknownOdds
+	end
 	local factor = if RarityBadgeConfig.Luck then (tonumber(luck) or 1) else 1
 	local chance = chanceTable(world, factor)[body]
 	if not chance or chance <= 0 then
@@ -411,8 +418,12 @@ function CarRarityBadge.set(car: Instance?, tier: any, body: unknown, world: unk
 	--[[ The band, off the tier when there is one and off the body otherwise. `CarRarity.of` is the
 		fallback rather than the source: it dedupes across worlds and first world wins, so a body on
 		two ladders would read as the wrong band on one of them. A tier cannot be wrong that way. ]]
+	--- A limited event car rides another car's rung (`EncounterService._roll`), so the rung's band is
+	--- not its own: it reads "Limited" off the body, never the Common it replaced.
 	local word, band
-	if type(tier) == "table" and tier.Band then
+	if type(body) == "string" and WorldConfig.EventBodies[body] then
+		word, band = CarRarity.of(body)
+	elseif type(tier) == "table" and tier.Band then
 		word, band = tostring(tier.Rarity or ""), tier.Band
 	else
 		word, band = CarRarity.of(body)

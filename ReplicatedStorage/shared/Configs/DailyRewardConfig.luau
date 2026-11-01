@@ -40,7 +40,7 @@ DailyRewardConfig.Enabled = true
 --- The Frame under `MainUIV2.Pages` (`BuildDailyRewardsV2`), and the name `UIController` files it under.
 DailyRewardConfig.PageName = "DailyRewards"
 
---- Top-level profile key: `{ Day = <1..7 last claimed>, LastDay = <the UTC day it was claimed on> }`.
+--- Top-level profile key: `{ Day, LastDay, Receipts = { ["1"] = <actual payout>, ... } }` for this week.
 DailyRewardConfig.ProfileKey = "DailyReward"
 
 DailyRewardConfig.ResetOnMiss = true
@@ -112,6 +112,8 @@ DailyRewardConfig.Text = {
 	Claim = "CLAIM",
 	--- The grey kit button's caption on a day already taken, and on a day still to come.
 	Claimed = "CLAIMED",
+	ConvertedFull = "INVENTORY FULL · %s → CASH",
+	ConvertedDuplicate = "DUPLICATE · %s → CASH",
 	Locked = "LOCKED",
 	NextIn = "Next reward in %s",
 }

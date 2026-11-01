@@ -174,7 +174,7 @@ AudioConfig.Car = {
 	StateEvent = "CarVolumeState",
 	GroupName = "CarSounds",
 	EffectsFolder = "Effects",
-	Names = { DriftSound = true, TestEngine = true },
+	Names = { DriftSound = true, TestEngine = true, HopLaunch = true, HopLoop = true, HopLand = true },
 	Copy = {
 		Row = "Car sounds",
 	},

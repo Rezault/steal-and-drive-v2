@@ -115,6 +115,7 @@ local DrivingHudController = Shard.new("DrivingHudController"):withDependencies(
 	"DriveController",
 	"RoadController",
 	"StealController",
+	"HopController",
 	"NitroController",
 	"TrafficController",
 })
@@ -823,6 +824,11 @@ function DrivingHudController._runFrame(self, on: boolean)
 			star.arcAt = -1
 			star.frame.Visible = false
 		end
+		local hop = self._hopBadge
+		if hop then
+			hop.arcAt = -1
+			hop.frame.Visible = false
+		end
 		self._jumpReminder = false
 		if self._tutorialHighlight then self._tutorialHighlight:step(nil,false) end
 		self._actionSteal = nil
@@ -869,6 +875,7 @@ function DrivingHudController._runFrame(self, on: boolean)
 		-- is deciding whether to take the car in front.
 		self:_stepNitro(dt)
 		self:_layoutTimers()
+		self:_stepHop()
 		self:_stepStar(dt)
 		self:_stepNitroHint()
 		if self._tutorialHighlight then
@@ -1493,7 +1500,73 @@ function DrivingHudController._attachBadge(self, frame: Instance)
 	--- What `_layoutTimers` stands in slot 1 of the powerup row.
 	self._nitroBadgeFrame = if frame:IsA("GuiObject") then frame else nil
 	self:_buildNitroHint(frame)
+	self:_buildHopBadge(frame)
 	self:_buildStarBadge(frame)
+end
+
+--[[ The Floater's air reserve: the nitro badge cloned into the shared timer row, with its bottle
+	replaced by the flight icon. Its ring is the remaining share of `DriveConfig.Hop.Float.Seconds`. ]]
+function DrivingHudController._buildHopBadge(self, frame: Instance)
+	if self._hopBadge and self._hopBadge.frame then
+		self._hopBadge.frame:Destroy()
+	end
+	self._hopBadge = nil
+	local cfg = DriveConfig.Hop.Hud
+	if not (cfg and cfg.Enabled and frame:IsA("GuiObject")) then
+		return
+	end
+
+	local hop = frame:Clone()
+	hop.Name = "HopBadge"
+	hop.AnchorPoint = Vector2.zero
+	hop.Position = UDim2.fromScale(cfg.Offset.X, cfg.Offset.Y)
+	hop.Size = UDim2.fromScale(1, 1)
+	hop.Visible = false
+	for _, name in { "Glow", "Amount" } do
+		local layer = hop:FindFirstChild(name)
+		if layer then
+			layer:Destroy()
+		end
+	end
+	local icon = hop:FindFirstChild("Icon")
+	if icon then
+		icon:ClearAllChildren()
+		local glyph = Instance.new("ImageLabel")
+		glyph.Name = "Air"
+		glyph.BackgroundTransparency = 1
+		glyph.Size = UDim2.fromScale(1, 1)
+		glyph.ScaleType = Enum.ScaleType.Fit
+		glyph.Image = UIAssets.url(cfg.Icon)
+		glyph.ZIndex = 7
+		glyph.Parent = icon
+	end
+
+	local arc = hop:FindFirstChild("Arc")
+	local right = arc and arc:FindFirstChild("Right")
+	local left = arc and arc:FindFirstChild("Left")
+	local track = hop:FindFirstChild("RingTrack")
+	for _, half in { right, left } do
+		if half and half:IsA("ImageLabel") then
+			half.ImageColor3 = cfg.Color
+		end
+	end
+	if track and track:IsA("ImageLabel") then
+		track.ImageColor3 = dimmed(cfg.Color, NitroConfig.Hud.Badge.RingDim)
+	end
+
+	hop.LayoutOrder = 1
+	hop.Parent = frame
+	self._hopBadge = {
+		frame = hop,
+		right = right,
+		left = left,
+		rightCut = right and right:FindFirstChild("Cut"),
+		leftCut = left and left:FindFirstChild("Cut"),
+		arcAt = -1,
+	}
+	if not (right and left) then
+		self.log:warn("DrivingHud.NitroBadge has no Arc halves to clone; the Floater air timer will not drain.")
+	end
 end
 
 --[[ The tutorial's SHIFT cap over the nitro badge (`TutorialConfig.NitroHint`). A CHILD of the badge,
@@ -1731,31 +1804,39 @@ function DrivingHudController._timerRow(self, gui: Instance): Frame?
 		row.BackgroundTransparency = 1
 		row.AnchorPoint = Vector2.new(0, 1)
 		row.ZIndex = 5
-		local layout = Instance.new("UIListLayout")
+		local layout = Instance.new("UIGridLayout")
 		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.FillDirectionMaxCells = PickupConfig.TimerRow.Columns
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 		layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 		layout.SortOrder = Enum.SortOrder.LayoutOrder
-		layout.Padding = UDim.new(0, PickupConfig.TimerRow.Spacing)
 		layout.Parent = row
 		row.Parent = gui
 		self._timerRowFrame = row
 	end
 	local origin = (gui :: ScreenGui).AbsolutePosition
-	local at, size = speedo.AbsolutePosition, speedo.AbsoluteSize
+	local at = speedo.AbsolutePosition
 	row.Position = UDim2.fromOffset(at.X - origin.X, at.Y - origin.Y - PickupConfig.TimerRow.Gap)
-	--- Twice the speedo's width is room for the nitro badge and a few packs; the frame is invisible
-	--- and not `Active`, so the spare width costs nothing and catches no input.
-	row.Size = UDim2.new(0, size.X * 2, NitroConfig.Hud.Badge.Height * PickupConfig.TimerRow.Scale, 0)
+	local spacing = PickupConfig.TimerRow.Spacing
+	local cell = (gui :: ScreenGui).AbsoluteSize.Y * NitroConfig.Hud.Badge.Height * PickupConfig.TimerRow.Scale
+	local layout = row:FindFirstChildOfClass("UIGridLayout")
+	if layout then
+		layout.CellSize = UDim2.fromOffset(cell, cell)
+		layout.CellPadding = UDim2.fromOffset(spacing, spacing)
+	end
+	--- Reserve two rows: one stays against the speedo; a fourth item begins the row beneath the first.
+	row.Size = UDim2.fromOffset(
+		cell * PickupConfig.TimerRow.Columns + spacing * (PickupConfig.TimerRow.Columns - 1),
+		cell * 2 + spacing
+	)
 	return row
 end
 
---- One readout into the row: a square the row's height (`RelativeYY` reads both axes off it).
+--- One readout into the grid; `UIGridLayout.CellSize` owns its square dimensions.
 local function intoRow(frame: GuiObject, row: Frame)
 	if frame.Parent ~= row then
 		frame.Parent = row
-		frame.SizeConstraint = Enum.SizeConstraint.RelativeYY
-		frame.Size = UDim2.fromScale(1, 1)
+		frame.SizeConstraint = Enum.SizeConstraint.RelativeXY
 	end
 end
 
@@ -1771,6 +1852,7 @@ function DrivingHudController._layoutTimers(self)
 	end
 	local gui = self._gui
 	local row = if PickupConfig.TimerRow.Enabled and gui then self:_timerRow(gui) else nil
+	local hop = self._hopBadge and self._hopBadge.frame
 	local star = self._starBadge and self._starBadge.frame
 	if row then
 		if not self._nitroHome then
@@ -1781,6 +1863,9 @@ function DrivingHudController._layoutTimers(self)
 		end
 		nitro.LayoutOrder = 0
 		intoRow(nitro, row)
+		if hop then
+			intoRow(hop, row)
+		end
 		if star then
 			intoRow(star, row)
 		end
@@ -1792,11 +1877,37 @@ function DrivingHudController._layoutTimers(self)
 		nitro.AnchorPoint, nitro.Position, nitro.Size = home.anchor, home.position, home.size
 		nitro.SizeConstraint = home.constraint
 	end
+	if hop and hop.Parent ~= nitro then
+		hop.Parent = nitro
+		hop.SizeConstraint = Enum.SizeConstraint.RelativeXY
+		hop.Size = UDim2.fromScale(1, 1)
+		hop.Position = UDim2.fromScale(DriveConfig.Hop.Hud.Offset.X, DriveConfig.Hop.Hud.Offset.Y)
+	end
 	if star and star.Parent ~= nitro then
 		star.Parent = nitro
 		star.SizeConstraint = Enum.SizeConstraint.RelativeXY
 		star.Size = UDim2.fromScale(1, 1)
 		star.Position = UDim2.fromScale(PickupConfig.StarTimer.Offset.X, PickupConfig.StarTimer.Offset.Y)
+	end
+end
+
+--- Keep the Floater's air badge up for the run, draining in flight and refilling on the road.
+function DrivingHudController._stepHop(self)
+	local badge = self._hopBadge
+	if not badge then
+		return
+	end
+	local available = self._hop and self._hop:isAvailable()
+	badge.frame.Visible = available == true
+	if not available then
+		return
+	end
+	if badge.right and badge.left then
+		local swept = self._hop:airRemaining()
+		if math.abs(swept - badge.arcAt) > 0.002 then
+			badge.arcAt = swept
+			sweepArc(badge, swept)
+		end
 	end
 end
 
@@ -2080,6 +2191,7 @@ DrivingHudController:withLifecycle({
 		-- last written sweep and the bloom's eased transparency. All nil until one is bound, which
 		-- is what `_stepNitro` tests to know which painter to call.
 		self._nitroBadge = nil
+		self._hopBadge = nil -- the Floater's air timer cloned off the nitro badge
 		self._starBadge = nil -- the star timer cloned off it (`_buildStarBadge`); lives inside it
 		self._timerRowFrame = nil -- the powerup row over the speedo (`_timerRow`), made on first use
 		self._nitroBadgeFrame = nil -- slot 1 of that row
@@ -2124,6 +2236,7 @@ DrivingHudController:withLifecycle({
 		self._drive = Shard.get("DriveController")
 		self._road = Shard.get("RoadController")
 		self._steal = Shard.get("StealController")
+		self._hop = Shard.get("HopController")
 		self._nitro = Shard.get("NitroController")
 		self._traffic = Shard.get("TrafficController")
 		--- Before `_attach`, which is a spawned thread that waits on PlayerGui: the legend has to

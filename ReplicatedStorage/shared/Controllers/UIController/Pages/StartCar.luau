@@ -114,7 +114,8 @@ end
 	colour choice, and "STOCK CAMARO" reads as a trim level. ]]
 local function cardName(body: string, paint: number): string
 	local name = displayName(body)
-	if paint == PaintConfig.StockIndex then
+	--- One-colour bodies too: `GarageConfig.carName`'s rule.
+	if paint == PaintConfig.StockIndex or #PaintConfig.poolFor(body) <= 1 then
 		return name
 	end
 	return string.upper(string.gsub(PaintConfig.nameOf(paint), " ", "\u{00A0}")) .. "\u{00A0}" .. name

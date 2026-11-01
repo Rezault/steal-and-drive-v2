@@ -15,7 +15,7 @@ local AudioConfig = require(ReplicatedStorage.shared.Configs.AudioConfig)
 
 local TestEngineController = Shard.new("TestEngineController")
 local MPH_PER_STUD = 0.6263
-local KEEP = { CarRadio = true, DriftSound = true, TestEngine = true }
+local KEEP = { CarRadio = true, DriftSound = true, TestEngine = true, HopLoop = true }
 local function approach(value, target, rate, dt)
 	return value + (target - value) * (1 - math.exp(-rate * math.max(dt, 0)))
 end

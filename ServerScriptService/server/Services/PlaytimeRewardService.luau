@@ -11,8 +11,9 @@
 	interval of progress, and never a gift already paid.
 
 	TRUST, the daily calendar's rule: the client says "claim" and nothing else. The server picks the
-	oldest gift that is due, WRITES the new count, then pays. A double press is one gift, because the
-	second press finds the count already moved.
+	oldest gift that is due. A per-session lock covers yielding payouts. The payout commits the
+	count and exact receipt immediately after ownership is written, before presentation work.
+	Failed grants remain claimable; presentation errors after a grant cannot grant it again.
 
 	A NEW DAY MID-SESSION starts the ladder again at zero from that moment, and the client is told.
 ]]
@@ -40,6 +41,8 @@ type Session = {
 	--- `os.clock()` the current stretch began.
 	since: number,
 	claimed: number,
+	receipts: { [string]: { [string]: any } },
+	claiming: boolean?,
 }
 
 local REMOTES = PlaytimeRewardConfig.Remotes
@@ -68,22 +71,59 @@ end
 --- Start the ladder over if the UTC day has turned since this session last looked. Answers whether it did.
 function PlaytimeRewardService._rollDay(self, session: Session): boolean
 	local today = QuestConfig.dayIndex()
-	if session.day == today then
-		return false
-	end
+	-- A yielding payout belongs to the day it started on.
+	if session.day == today or session.claiming then return false end
 	session.day, session.base, session.since, session.claimed = today, 0, os.clock(), 0
+	session.receipts = {}
 	return true
+end
+
+-- These profile writes must not yield between ownership and the receipt.
+function PlaytimeRewardService._record(self, session: Session)
+	return {
+		Day = session.day, Seconds = math.floor(self:_seconds(session)),
+		Claimed = session.claimed, Receipts = table.clone(session.receipts),
+	}
+end
+
+-- Old claims keep their count. Their original prizes cannot be reconstructed.
+function PlaytimeRewardService._restore(self, stored, today: number): Session
+	local sameDay = type(stored) == "table" and stored.Day == today
+	local seconds = sameDay and stored.Seconds
+	local claimed = sameDay and stored.Claimed
+	local session: Session = {
+		day = today,
+		base = if type(seconds) == "number" and seconds == seconds and seconds < math.huge then math.max(0, seconds) else 0,
+		since = os.clock(),
+		claimed = if type(claimed) == "number" and claimed == claimed then math.clamp(math.floor(claimed), 0, #PlaytimeRewardConfig.Gifts) else 0,
+		receipts = {},
+	}
+	local receipts = sameDay and stored.Receipts
+	if type(receipts) == "table" then
+		for index = 1, session.claimed do
+			local receipt = receipts[tostring(index)]
+			if type(receipt) == "table" then
+				local kind, amount, body = receipt.Kind, receipt.Amount, receipt.Body
+				if (kind == "Cash" or kind == "Revive" or (kind == "Car" and type(body) == "string"))
+					and type(amount) == "number" and amount == amount and amount >= 0 and amount < math.huge then
+					session.receipts[tostring(index)] = {
+						Kind = kind, Amount = amount, Body = if kind == "Car" then body else nil,
+						ConvertedFrom = if kind == "Cash" and type(receipt.ConvertedFrom) == "string" then receipt.ConvertedFrom else nil,
+						Reason = if receipt.Reason == "Full" or receipt.Reason == "Duplicate" then receipt.Reason else nil,
+						ClaimId = tostring(today) .. ":" .. tostring(index),
+					}
+				end
+			end
+		end
+	end
+	return session
 end
 
 function PlaytimeRewardService._save(self, player: Player)
 	local session = self._sessions[player]
 	local profile = self:_profile(player)
 	if session and profile then
-		profile:Set({ PlaytimeRewardConfig.ProfileKey }, {
-			Day = session.day,
-			Seconds = math.floor(self:_seconds(session)),
-			Claimed = session.claimed,
-		})
+		profile:Set({ PlaytimeRewardConfig.ProfileKey }, self:_record(session))
 	end
 end
 
@@ -96,18 +136,19 @@ end
 	WHAT IS INSIDE A GIFT IS SENT ONLY ONCE IT IS OPENED (2026-10-19). The panel shows wrapped gifts
 	and reveals each on its claim, and a reveal the client could read ahead of time out of this table
 	is not a surprise. So an unclaimed gift is just its `Minutes`; a claimed one carries what it paid
-	(priced now, which for a car is the body it was priced at today). ]]
+	from the saved grant receipt. Legacy claims without receipts say CLAIMED. ]]
 function PlaytimeRewardService._payload(self, player: Player, session: Session, justClaimed: number?)
-	local Daily = Shard.get("DailyRewardService")
 	local gifts = {}
 	for index, spec in PlaytimeRewardConfig.Gifts do
 		local gift: { [string]: any } = { Minutes = spec.Minutes }
 		if index <= session.claimed then
-			local kind, amount, body = spec.Kind, spec.Amount or 0, spec.Body
-			if Daily then
-				kind, amount, body = Daily:priceSpec(player, spec)
+			local receipt = session.receipts[tostring(index)]
+			if receipt then
+				gift.Kind, gift.Amount, gift.Body = receipt.Kind, receipt.Amount, receipt.Body
+				gift.ConvertedFrom, gift.Reason = receipt.ConvertedFrom, receipt.Reason
+			else
+				gift.Kind = "Legacy"
 			end
-			gift.Kind, gift.Amount, gift.Body = kind, amount, body
 		end
 		gifts[index] = gift
 	end
@@ -123,18 +164,15 @@ end
 
 -- === Claiming ===============================================================
 
---- Header TRUST, in order: throttle, check, WRITE, then pay.
+--- Commit on the payout backend's profile write, never on its return alone.
 function PlaytimeRewardService._claim(self, player: Player)
 	local now = os.clock()
-	if not PlaytimeRewardConfig.Enabled or now - (self._lastMessage[player] or -math.huge) < MESSAGE_COOLDOWN then
-		return
-	end
+	if not PlaytimeRewardConfig.Enabled or now - (self._lastMessage[player] or -math.huge) < MESSAGE_COOLDOWN then return end
 	self._lastMessage[player] = now
 	local session = self._sessions[player]
 	local Daily = Shard.get("DailyRewardService")
-	if not (session and Daily and self:_profile(player)) then
-		return
-	end
+	local profile = self:_profile(player)
+	if not (session and Daily and profile) or session.claiming then return end
 	self:_rollDay(session)
 	local index = session.claimed + 1
 	local spec = PlaytimeRewardConfig.Gifts[index]
@@ -143,20 +181,43 @@ function PlaytimeRewardService._claim(self, player: Player)
 		return
 	end
 
-	local kind, amount, body = Daily:priceSpec(player, spec)
-	session.claimed = index
-	self:_save(player)
-	local paid = Daily:pay(player, kind, amount, body, "Playtime")
-	if paid then
-		self.log:info(string.format("%s claimed playtime gift %d: %s %s.", player.Name, index, kind, body or tostring(amount)))
-		local Analytics = Shard.get("AnalyticsService")
-		if Analytics then
-			Analytics:Design(player, "Playtime:Claimed:" .. index, spec.Minutes)
-		end
-	else
-		self.log:warn(string.format("%s claimed playtime gift %d but it could not be paid; it is still marked taken.", player.Name, index))
+	-- The lock also covers a backend that waits for its profile.
+	session.claiming = true
+	local committed = false
+	local receipt
+	local ok, result = pcall(function()
+		local kind, amount, body = Daily:priceSpec(player, spec)
+		receipt = { Kind = kind, Amount = amount, Body = body, ClaimId = tostring(session.day) .. ":" .. tostring(index) }
+		return Daily:pay(player, kind, amount, body, "Playtime", function(delivered)
+			-- Called immediately after the reward's profile mutation, before UI/signals.
+			-- No yielding work may be added between that mutation and this receipt.
+			if committed then return end
+			if delivered then
+				receipt.Kind, receipt.Amount, receipt.Body = delivered.Kind, delivered.Amount, delivered.Body
+				receipt.ConvertedFrom, receipt.Reason = delivered.ConvertedFrom, delivered.Reason
+			end
+			committed = true
+			session.claimed = index
+			session.receipts[tostring(index)] = receipt
+			-- PlayerRemoving may have removed the session while the backend waited.
+			profile:Set({ PlaytimeRewardConfig.ProfileKey }, self:_record(session))
+		end)
+	end)
+	session.claiming = false
+
+	if not committed then
+		self.log:warn(string.format("%s's playtime gift %d was not granted; it remains claimable (%s).", player.Name, index, tostring(result)))
+		self:_send(player)
+		return
+	end
+	-- Presentation errors after the confirmed write must never re-arm a gift.
+	if not ok then
+		self.log:warn(string.format("%s's playtime gift %d was granted, but its notification failed: %s.", player.Name, index, tostring(result)))
 	end
 	self:_send(player, index)
+	self.log:info(string.format("%s claimed playtime gift %d: %s %s.", player.Name, index, receipt.Kind, receipt.Body or tostring(receipt.Amount)))
+	local Analytics = Shard.get("AnalyticsService")
+	if Analytics then Analytics:Design(player, "Playtime:Claimed:" .. index, spec.Minutes) end
 end
 
 -- === Lifecycle ==============================================================
@@ -170,16 +231,10 @@ function PlaytimeRewardService._watch(self, player: Player)
 		if not (ok and profile) or player.Parent ~= Players then
 			return
 		end
+		if self._sessions[player] then return end
 		self._profiles[player] = profile
 		local stored = profile:Get({ PlaytimeRewardConfig.ProfileKey })
-		local today = QuestConfig.dayIndex()
-		local sameDay = type(stored) == "table" and stored.Day == today
-		self._sessions[player] = {
-			day = today,
-			base = if sameDay and type(stored.Seconds) == "number" then math.max(0, stored.Seconds) else 0,
-			since = os.clock(),
-			claimed = if sameDay and type(stored.Claimed) == "number" then math.clamp(math.floor(stored.Claimed), 0, #PlaytimeRewardConfig.Gifts) else 0,
-		}
+		self._sessions[player] = self:_restore(stored, QuestConfig.dayIndex())
 		self:_send(player)
 	end)
 end

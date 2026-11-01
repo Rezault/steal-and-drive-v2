@@ -965,84 +965,157 @@ DriveConfig.NitroRecovery = { Seconds = 6, Deceleration = 55, CruiseHeadroom = 1
 function DriveConfig.nitroRecoveryDelta(speed: number, ceiling: number, dt: number): number
 	return math.min(math.max(speed - ceiling, 0), DriveConfig.NitroRecovery.Deceleration * math.clamp(dt, 0, 0.1))
 end
---[[ THE HOP (2026-10-22, the Roadster Limited Event): a car flagged `Hop` in `WorldConfig.EventBodies`
-	can leave the deck on its own, to clear an obstacle or a car, in a run and in the lobby. Its own key,
-	because Space is the bail in a run and the character's jump in the lobby.
-	`Speed` is the upward velocity it is given (studs/s; ~40 clears a car at normal gravity), only from the
-	deck (`GroundProbe` studs down from the PrimaryPart) and once per `Cooldown`. `Enabled = false`: no hop.
+--[[ THE FLOATER'S HOP (2026-10-22, the Roadster Limited Event). A car flagged `Hop` in
+	`WorldConfig.EventBodies` lifts off on cold-gas thrusters, one under every wheel, the way the real
+	Roadster did at its Oct 15 2026 demo. In a run and in the lobby. Its own key, because Space is the
+	bail in a run and the character's jump in the lobby. `Enabled = false`: no hop.
 
-	THE PUFF is the real car's party trick: the Oct 15 2026 Roadster demo lifted off on SpaceX cold-gas
-	thrusters, so a hop is a blast of cold air out from under every wheel. `Jet` is the hard downward
-	shot, `Cloud` the slow billow it leaves on the ground. Pale blue-white, not smoke grey: it is gas, not
-	burnt rubber. `Sound` is a clip named `Name` in `SoundService[Group]`; silent until one is authored. ]]
---[[ IT FLIES LIKE A JETPACK (2026-10-22, the owner: "make it like a jetpack almost"). A tap is the launch
-	(`Speed`). HOLDING the key keeps the thrusters lit: the climb is held at `Thrust.Speed` for up to
-	`Thrust.Seconds`, jets streaming from the wheels, and stops at `Thrust.MaxHeight` above the launch so
-	the race camera (`CameraConfig.MaxJumpFollowStuds` 25) keeps the car in shot. Let go and it falls.
-	THE LANDING is cushioned: falling, within `Land.Probe` studs of the ground, the fall is capped at
-	`Land.Speed` and one softer puff (`Puff.Land.Scale` of the launch's) goes down, so it settles instead
-	of slamming. ]]
+	TAP: a kick of `Speed` studs/s up, every physics body in the car at once.
+	HOLD: the thrusters stay lit and the car climbs to `Float.Height` above the launch and FLOATS there,
+	bobbing, for up to `Float.Seconds`. Under the race camera's follow cap (`CameraConfig.MaxJumpFollowStuds`
+	25), so the car stays in shot. Let go, or run out, and it comes down.
+	THE LANDING: from `Land.Probe` studs above where the car sits at rest, the thrusters fire again and
+	hold the fall to `Land.Speed`, easing to `Touch` over the last `Final`, so the wheels meet the deck at
+	a walk. The gyro holds on for `Settle` seconds after.
+
+	PHYSICS CONSTRAINTS, NOT VELOCITY WRITES (2026-10-22, third pass). A `LinearVelocity` on every
+	assembly lifts the chassis and the four wheels together, with a force cap (`Accel`, studs/s² on top of
+	gravity) so it eases in instead of snapping; an `AlignOrientation` is the gyro. The second cut wrote
+	velocities by hand each frame: it felt stiff, a lobby car could still tip, and in a run it lifted
+	nothing, because it listed the car's bodies once, during the countdown, when the car is anchored. ]]
 DriveConfig.Hop = {
 	Enabled = true,
-	Keys = { Enum.KeyCode.R, Enum.KeyCode.DPadUp },
-	Speed = 55,
-	Cooldown = 1.2,
-	GroundProbe = 8,
-	Thrust = { Speed = 32, Seconds = 1.4, MaxHeight = 22 },
-	--[[ Heights are studs above where the car sits at REST (measured at launch), not above the PrimaryPart:
-		the first cut ended the flight 8 studs up, so the car free-fell the rest, hit at ~50 studs/s and
-		bounced over. Now the fall is capped at `Speed` from `Probe` up, eased to `Touch` over the last
-		`Final`, and the gyro holds for `Settle` seconds after the wheels are down. ]]
-	Land = { Probe = 14, Speed = 16, Final = 4, Touch = 5, Settle = 0.35 },
+	--- L3, not DPadUp: DPadUp is `GamepadConfig.FocusGlyph` (open the menu), and L3 is bound nowhere else.
+	Keys = { Enum.KeyCode.R, Enum.KeyCode.ButtonL3 },
 	--- The on-screen button on touch devices (ContextActionService's own).
 	Title = "HOP",
 	ButtonPosition = UDim2.new(1, -170, 1, -210),
-	--[[ THE LOOK (2026-10-22, second pass: "make it 100x cooler"). One thruster per wheel, mounted on the
-		chassis at the tyre's contact patch so it rides with the car (never on the wheel, which spins):
+	Cooldown = 0.8,
+	--- A hop starts only with the ground this close under the PrimaryPart.
+	GroundProbe = 8,
+	Speed = 50,
+	Float = {
+		Height = 14,
+		--- Fastest climb toward the float height, studs/s, and how hard it closes the gap (per second).
+		Climb = 34,
+		Gain = 4,
+		Accel = 160,
+		Seconds = 3,
+		--- Air (seconds of `Seconds`) every run launch spends, tap or hold, so tapping is not free.
+		TapCost = 0.6,
+		--- Time on grounded wheels to refill the whole air reserve after it is empty.
+		RechargeSeconds = 8,
+		Bob = { Studs = 0.8, Rate = 2.2 },
+	},
+	--[[ The in-run air reserve: a nitro-badge clone whose ring drains while R is held. `Offset` is
+		its fallback placement when the shared powerup row is disabled; with the row on, layout is automatic. ]]
+	Hud = {
+		Enabled = true,
+		Icon = 91745376365273,
+		Color = Color3.fromRGB(110, 225, 255),
+		Offset = Vector2.new(-1.12, 0),
+	},
+	Land = { Probe = 14, Speed = 16, Final = 4, Touch = 4, Settle = 0.6, Accel = 140 },
+	--[[ IN A RUN THE CAR IS FLOWN, NOT SIMULATED (2026-10-22, fourth pass: three physics cuts lifted nothing
+		in a run while working in the lobby). The run hop is the steal's own proven machinery
+		(`StealController._onBail`): the drive layer is suspended, the car anchored and moved along the road
+		frame each frame, then handed back at its resting height with its speed. So nothing in a run can
+		cancel it, and nothing can flip it. Same `Speed`, `Float` and `Land` numbers as the lobby.
+		`Gravity` is a share of `workspace.Gravity` for the fall (under 1 is floatier); `AirLaneSpeed` is
+		how fast the steer moves the car across the road in the air (studs/s, `DriveConfig.LaneSpeed` is the
+		ground's); `MaxPitchDeg`/`MaxRollDeg` tilt it with the climb and lean it into that steer. The lobby has
+		real walls and no road frame, so it keeps the physics version. ]]
+	Run = { Gravity = 0.8, AirLaneSpeed = 40, MaxPitchDeg = 9, MaxRollDeg = 12 },
+	--[[ THE GYRO: the real car's attitude-control thrusters. Holds the car upright in the air (`Responsiveness`,
+		the constraint's own), leaving yaw to the steering. It is not dead level, for life: the nose lifts up to
+		`MaxPitchDeg` as the car climbs and dips as it falls. In the lobby the steer turns the car in the air
+		(`AirTurnRate`, rad/s at full lock) and it leans into the turn (`MaxRollDeg`); in a run the drive layer
+		already owns the heading. ]]
+	Gyro = { Responsiveness = 25, MaxPitchDeg = 9, AirTurnRate = 2.2, MaxRollDeg = 10 },
+	--[[ THE LOOK. One thruster per wheel, mounted on the chassis at the tyre's contact patch so it rides
+		with the car (never on the wheel, which spins):
 		  `Plume`  frosty cold-gas jet, the body of the thrust.
 		  `Core`   a hot cyan needle inside it, additive, so the jet reads as powered from far down the road.
 		  `Frost`  glitter thrown off the jet, the "it is freezing cold" note.
-		Each streams at `Rate` while thrusting and fires `Burst` at once on launch (`Land` times that on the
-		landing). On the ground under the car: `Cloud`, a billow blown flat (launch, landing, and the wash
-		while flying low), and `Ring`, a shimmering shockwave disc. `Glow` is a cyan underlight, flashed on
-		launch and held while thrusting. Every count is per wheel. ]]
+		  `Trail`  a cyan streak off each thruster while the car is in the air.
+		Each streams at `Rate` while thrusting (scaled down on the landing burn) and fires `Burst` at once on
+		launch (`Land.Scale` of that on touchdown). On the ground under the car: `Cloud`, a billow blown flat
+		(launch, landing, and the wash while flying low), and `Ring`, a shimmering shockwave disc. `Glow` is a
+		cyan underlight, flashed on launch and held while thrusting. Every count is per wheel. ]]
 	Puff = {
 		Plume = {
 			Texture = "rbxasset://textures/particles/smoke_main.dds",
 			Color = { Color3.fromRGB(200, 240, 255), Color3.fromRGB(235, 245, 255) },
-			LightEmission = 0.4, Rate = 70, Burst = 22,
-			Speed = { 45, 70 }, Spread = 10, Lifetime = { 0.3, 0.55 }, Size = { 1, 5 }, Transparency = 0.15,
+			LightEmission = 0.4,
+			Rate = 70,
+			Burst = 22,
+			Speed = { 45, 70 },
+			Spread = 10,
+			Lifetime = { 0.3, 0.55 },
+			Size = { 1, 5 },
+			Transparency = 0.15,
 		},
 		Core = {
 			Texture = "rbxasset://textures/particles/smoke_main.dds",
 			Color = { Color3.fromRGB(120, 230, 255), Color3.fromRGB(60, 140, 255) },
-			LightEmission = 1, Rate = 110, Burst = 12,
-			Speed = { 70, 90 }, Spread = 3, Lifetime = { 0.1, 0.18 }, Size = { 1.1, 0.2 }, Transparency = 0,
+			LightEmission = 1,
+			Rate = 110,
+			Burst = 12,
+			Speed = { 70, 90 },
+			Spread = 3,
+			Lifetime = { 0.1, 0.18 },
+			Size = { 1.1, 0.2 },
+			Transparency = 0,
 		},
 		Frost = {
 			Texture = "rbxasset://textures/particles/sparkles_main.dds",
 			Color = { Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 220, 255) },
-			LightEmission = 1, Rate = 25, Burst = 14,
-			Speed = { 12, 28 }, Spread = 55, Lifetime = { 0.5, 0.9 }, Size = { 0.5, 0 }, Transparency = 0,
+			LightEmission = 1,
+			Rate = 25,
+			Burst = 14,
+			Speed = { 12, 28 },
+			Spread = 55,
+			Lifetime = { 0.5, 0.9 },
+			Size = { 0.5, 0 },
+			Transparency = 0,
 		},
 		Cloud = {
 			Texture = "rbxasset://textures/particles/smoke_main.dds",
 			Color = { Color3.fromRGB(225, 240, 255), Color3.fromRGB(200, 215, 230) },
-			LightEmission = 0.2, Rate = 0, Burst = 26,
-			Speed = { 18, 32 }, Spread = 80, Lifetime = { 0.8, 1.4 }, Size = { 3, 10 }, Transparency = 0.3,
+			LightEmission = 0.2,
+			Rate = 0,
+			Burst = 26,
+			Speed = { 18, 32 },
+			Spread = 80,
+			Lifetime = { 0.8, 1.4 },
+			Size = { 3, 10 },
+			Transparency = 0.3,
+		},
+		Trail = {
+			Color = { Color3.fromRGB(110, 225, 255), Color3.fromRGB(255, 255, 255) },
+			Lifetime = 0.3,
+			Width = 0.7,
+			Transparency = 0.25,
 		},
 		--- Seconds between ground-wash puffs while thrusting, and how far down the ground still gets one.
 		Wash = { Every = 0.09, Count = 4, Reach = 30 },
 		Ring = { Color = Color3.fromRGB(120, 220, 255), From = 4, To = 34, Time = 0.45, Transparency = 0.2 },
 		Glow = { Color = Color3.fromRGB(90, 200, 255), Range = 18, Brightness = 3, Flash = 8 },
-		--- The landing's puff, as a share of the launch's bursts, and its ring's width.
-		Land = { Scale = 0.5, RingTo = 20 },
+		--- The landing burn's streams, as a share of `Rate`; its burst, as a share of `Burst`; its ring.
+		Land = { Rate = 0.45, Scale = 0.5, RingTo = 20 },
 	},
-	--[[ THE GYRO: the real car's attitude-control thrusters. While the car is in the air its roll and pitch
-		are pulled back to level (`Gain`, per second; yaw is left alone so steering still works). Without it a
-		lobby car flips: its wheels are separate physics bodies on springs, and the lobby has no upright
-		servo the way a run does (`DriveConfig.Upright`). ]]
-	Gyro = { Gain = 9 },
-	Sound = { Group = "Steal", Name = "Hop" },
+	--[[ SOUND. `Loop` is the experience group's authored thrust clip; `Launch` and `Land` use Roblox's
+		built-in character clips as lightweight bookends. A clip named `Name` in `SoundService[Group]`
+		replaces the launch once one is authored. ]]
+	Sound = {
+		Group = "Steal",
+		Name = "Hop",
+		Launch = { Id = "rbxasset://sounds/action_jump.mp3", Volume = 0.9, Pitch = 0.55 },
+		Loop = { Id = "rbxassetid://131792141808870", Volume = 2.5, Pitch = 1 },
+		Land = { Id = "rbxasset://sounds/action_jump_land.mp3", Volume = 0.8, Pitch = 0.7 },
+	},
+	--- The camera: the race camera's own punches in a run (`StealJuiceConfig.Punch.HopLaunch`/`HopLand`); in
+	--- the lobby a field-of-view kick of `LobbyFovKick` degrees, eased back over `LobbyFovTime` seconds.
+	Camera = { LobbyFovKick = 10, LobbyFovTime = 0.5 },
 }
 return DriveConfig

@@ -29,9 +29,13 @@ ConvoyConfig.Enabled = true
 -- === When ===================================================================
 
 --- Share of (non-tutorial) runs that get a convoy. "Rare": most runs do not.
-ConvoyConfig.Chance = 1 -- TEMP TEST, was 0.25
+ConvoyConfig.Chance = 0.25
 --- Seconds into the run it arrives, rolled per run. Late enough that the road is up to speed.
-ConvoyConfig.After = { 6, 8 } -- TEMP TEST, was { 40, 110 }
+ConvoyConfig.After = { 40, 110 }
+--- Persisted per player across runs, worlds and rejoins. Starts at issue, confirmed at appearance.
+ConvoyConfig.Cooldown = 10 * 60
+ConvoyConfig.ProfileKey = "ConvoyNextAt"
+ConvoyConfig.ShownRemote = "EncounterConvoyShown"
 
 -- === What ===================================================================
 
@@ -42,27 +46,35 @@ ConvoyConfig.MinBand = 3
 
 -- === How it drives ==========================================================
 
---- Studs behind the player the front car appears, and between consecutive cars along the road.
---- Cars alternate between two lanes, so two in one lane are `2 * Spacing` apart: room to land a steal.
-ConvoyConfig.Behind = 120
-ConvoyConfig.Spacing = 60
---- Speed while catching up, as a share of the player's cruise. Above 1 or it never passes.
-ConvoyConfig.PassSpeed = 1.3
---- Once a car is this far ahead of the player it settles to `SettleSpeed` of their cruise and drives
---- on as ordinary traffic, so the player can catch it and steal it.
-ConvoyConfig.SettleAhead = 90
+--- Studs behind the player the front car appears, and the stagger between consecutive cars.
+--- The four cars use four different non-player lanes, so the whole convoy arrives as one visible beat.
+ConvoyConfig.Behind = 70
+ConvoyConfig.Spacing = 32
+--[[ Speed while catching up, as a share of how fast the player is ACTUALLY going (or their cruise,
+	whichever is higher). Above 1 or it never passes. 2026-10-22: WAS 1.3 off cruise, which either
+	never caught a player running past cruise or, when it did, was gone in a blink. ]]
+ConvoyConfig.PassSpeed = 1.15
+--[[ Once a car is `SettleAhead` studs in front it ESCORTS the player: `Escort.Speed` of their actual
+	speed for `Escort.Seconds`, so the line stays in view, drifting slowly back towards them, which is
+	the steal. After that (or once the player has passed it) it drives on at `SettleSpeed` of their
+	cruise as ordinary traffic. ]]
+ConvoyConfig.SettleAhead = 60
+ConvoyConfig.Escort = { Speed = 0.95, Seconds = 12 }
 ConvoyConfig.SettleSpeed = 0.85
---- A convoy car this many studs behind the player, in their lane, moves over or holds at their speed.
+--[[ A passing car that falls further behind than this (the player hit nitro) is moved back up to it.
+	Behind the chase camera, so it is never seen, and it means a fast player cannot outrun the convoy
+	before it has ever arrived. ]]
+ConvoyConfig.CatchUp = 250
+--[[ On its way in, a convoy car further than this behind the player drives through traffic (out of the
+	chase camera's view, so the line always arrives). Closer, and once it has reached the player, it is
+	solid and overtakes instead: a slower car within `Overtake.Look` in its lane and it changes lane,
+	retrying every `Retry` seconds; still boxed in after `GiveUp` once it has arrived, it becomes
+	ordinary traffic rather than sit there as a convoy car forever. 2026-10-23. ]]
+ConvoyConfig.GhostBehind = 40
+ConvoyConfig.Overtake = { Look = 80, Retry = 0.6, GiveUp = 3 }
+--- Start matching the player inside this range; never close past `PlayerGap` in the same lane.
 ConvoyConfig.YieldGap = 100
---[[ Passing slower traffic. A convoy car with a slower car within `Look` studs ahead in its lane
-	moves over to a neighbouring lane (never the player's) that has no slower car within `Clear`.
-	Without it the line sat behind cars the player had already passed and was never seen.
-
-	NEVER STUCK FOR LONG. Still blocked after `Patience` seconds, it takes any neighbour with room
-	alongside (traffic further up that lane or not), or the car in its way pulls over for it. Still
-	blocked after `GhostAfter` while behind the player, it drives through the blocker: out of the chase
-	camera's view, and far better than the player never seeing the convoy. ]]
-ConvoyConfig.Overtake = { Look = 140, Clear = 90, Patience = 1, GhostAfter = 2.5 }
+ConvoyConfig.PlayerGap = 36
 --- Recycled once this far behind (the road's ordinary 120 would recycle it as it spawned).
 ConvoyConfig.DespawnBehind = 450
 --- Seconds the client may wait for a moment to put the convoy on the road (a hold, a flight)
@@ -75,6 +87,21 @@ ConvoyConfig.SpawnWithin = 20
 ConvoyConfig.Event = "ConvoyApproaching"
 ConvoyConfig.Kicker = "RARE TO LEGENDARY"
 ConvoyConfig.Title = "A CAR CONVOY IS APPROACHING!"
+
+--- Non-player lanes, farthest first, so one four-car convoy spreads across a five-lane road.
+function ConvoyConfig.formationLanes(playerLane: number, laneCount: number): { number }
+	local out = {}
+	for lane = 1, laneCount do
+		if lane ~= playerLane then
+			table.insert(out, lane)
+		end
+	end
+	table.sort(out, function(a, b)
+		local aDistance, bDistance = math.abs(a - playerLane), math.abs(b - playerLane)
+		return if aDistance == bDistance then a < b else aDistance > bDistance
+	end)
+	return out
+end
 
 --[[ The convoy's cars out of one world's ladder (`TrafficConfig.tiersFor`): `{ rung, tier, body }` per
 	entry of `Bands`, in order, or fewer if the world has nothing at or above `MinBand` for a slot.

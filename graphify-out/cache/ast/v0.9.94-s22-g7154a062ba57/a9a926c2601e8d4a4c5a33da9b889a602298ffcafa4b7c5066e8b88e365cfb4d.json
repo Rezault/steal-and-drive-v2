@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_serverscriptservice_server_data_components_settings_luau", "label": "Settings.luau", "file_type": "code", "source_file": "ServerScriptService/server/Data/Components/Settings.luau", "source_location": "L1"}], "edges": [], "raw_calls": [], "parse_errors": {"first_error_line": 776, "multiline_error": true}}

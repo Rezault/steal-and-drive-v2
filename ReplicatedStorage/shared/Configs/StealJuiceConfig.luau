@@ -82,6 +82,9 @@ StealJuiceConfig.Punch = {
 	Enabled = true,
 	Land = { RollPeakDeg = 0, PitchPeakDeg = 2.6, FovPeakDeg = -3 },
 	Takeover = { RollPeakDeg = 0, PitchPeakDeg = -0.8, FovPeakDeg = 5.5 },
+	--- The Floater's hop (`HopController`, 2026-10-22): a kick out on lift-off, a nod down on touchdown.
+	HopLaunch = { RollPeakDeg = 0, PitchPeakDeg = -1.6, FovPeakDeg = 7 },
+	HopLand = { RollPeakDeg = 0, PitchPeakDeg = 2, FovPeakDeg = -2.5 },
 }
 
 -- === The cinematic ==========================================================

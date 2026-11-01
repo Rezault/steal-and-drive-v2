@@ -161,7 +161,7 @@ end
 --[[ RETURNS WHETHER THE LIFE WAS BANKED (2026-09-28). `DevProductsHandler` raises on false so the
 	receipt is NOT acknowledged and Roblox re-delivers it; this used to return nothing, and a receipt
 	that landed with no live profile was consumed for a life that was never written. ]]
-function ReviveService.grantLife(self, player: Player, count: number?): boolean
+function ReviveService.grantLife(self, player: Player, count: number?, onGranted: (() -> ())?): boolean
 	--[[ THE ONE PLACE THAT IS ALLOWED TO YIELD FOR A PROFILE, and the only place that must.
 
 		Everywhere else in this service reads the cache and answers "not yet", because everywhere
@@ -189,7 +189,10 @@ function ReviveService.grantLife(self, player: Player, count: number?): boolean
 		self.log:warn(string.format("%s bought a revive with no live profile; the receipt will be retried.", player.Name))
 		return false
 	end
-	profile:Increment(ReviveConfig.ProfileKey, count or 1)
+	local lives = profile:Increment(ReviveConfig.ProfileKey, count or 1)
+	if lives == nil then return false end
+	-- Confirm ownership before notifications or an automatic revive can fail/yield.
+	if onGranted then onGranted() end
 	self:_publishLives(player)
 	self.log:info(string.format("%s now has %d revive(s) in hand.", player.Name, self:getLives(player)))
 

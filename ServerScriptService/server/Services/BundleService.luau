@@ -54,7 +54,8 @@ function BundleService.grantBundle(self, player: Player, bundle: ShopConfig.Bund
 	end
 
 	for _, body in bundle.Cars do
-		local outcome, _, id = Garage:awardCar(player, GarageConfig.TierOfBody[body], body, nil, nil, bundle.Key)
+		--- Past capacity: a full backpack must not turn a bought car into cash (`awardCar`'s `pastCapacity`).
+		local outcome, _, id = Garage:awardCar(player, GarageConfig.TierOfBody[body], body, nil, nil, bundle.Key, nil, nil, true)
 		if outcome == "rejected" then
 			self.log:warn(string.format("%s's %s could not give a %s (not on the roster?); the rest was paid.", player.Name, bundle.Key, body))
 		elseif id and GarageConfig.Banking.PaidCarsNotForSale then

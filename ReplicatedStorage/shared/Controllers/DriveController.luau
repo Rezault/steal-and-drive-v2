@@ -1352,6 +1352,13 @@ function DriveController.frozenAnchor(self, part: BasePart): boolean?
 	return if anchors then anchors[part] else nil
 end
 
+--- A flight holds the car's anchors: a steal's (`StealController._onBail`) or the Floater's run hop (`HopController`).
+function DriveController._flightOwnsCar(self): boolean
+	local steal = Shard.get("StealController")
+	local hop = Shard.get("HopController")
+	return (steal ~= nil and (select(1, steal:getFlight())) ~= "idle") or (hop ~= nil and hop:isFlying())
+end
+
 function DriveController.setFrozen(self, frozen: boolean)
 	frozen = frozen == true
 	if frozen == (self._frozen == true) then
@@ -1400,9 +1407,7 @@ function DriveController.setFrozen(self, frozen: boolean)
 
 				The release path already declines to restore while a flight is up; this is what makes
 				it safe for the flight to END first, which is precisely what a whiff does. ]]
-			local steal = Shard.get("StealController")
-			local flying = steal and (select(1, steal:getFlight())) ~= "idle"
-			if not flying then
+			if not self:_flightOwnsCar() then
 				for _, part in car:GetDescendants() do
 					if part:IsA("BasePart") then
 						self._freezeAnchors[part] = part.Anchored
@@ -1438,8 +1443,7 @@ function DriveController.setFrozen(self, frozen: boolean)
 
 		So a freeze that ends inside a flight simply lets go of its bookkeeping. The flight owns the
 		anchors, the suspension and the velocity, and restores all three at the handoff. ]]
-	local steal = Shard.get("StealController")
-	if steal and (select(1, steal:getFlight())) ~= "idle" then
+	if self:_flightOwnsCar() then
 		self._freezeAnchors = nil
 		self._freezeVel, self._freezeSpin, self._freezeSuspended = nil, nil, nil
 		return

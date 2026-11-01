@@ -1179,10 +1179,13 @@ end
 	IT LIVES HERE RATHER THAN ON THE SCREEN THAT FIRST NEEDED IT (the Cars Inventory, where it was a
 	local until the sell lot arrived) for the reason `carKey` gives about identity: a car is a body
 	and a colour, and there must be exactly one place that turns that pair into words. Two copies is
-	how a lot ends up offering to buy a "CAMARO" the inventory calls a "RED CAMARO". ]]
+	how a lot ends up offering to buy a "CAMARO" the inventory calls a "RED CAMARO".
+
+	A BODY THAT COMES IN ONE COLOUR takes no prefix either (2026-10-22, "WHITE FLOATER"): the colour
+	tells two of them apart from nothing, since every one is that colour (`PaintConfig.poolFor`). ]]
 function GarageConfig.carName(body: string, paint: number?): string
 	local name = GarageConfig.displayName(body)
-	if paint == nil or paint == PaintConfig.StockIndex then
+	if paint == nil or paint == PaintConfig.StockIndex or #PaintConfig.poolFor(body) <= 1 then
 		return name
 	end
 	return string.upper(string.gsub(PaintConfig.nameOf(paint), " ", "\u{00A0}")) .. "\u{00A0}" .. name

@@ -30,6 +30,21 @@ local function check(ok, name)
 	end
 end
 
+check(ConvoyConfig.PlayerGap > 0 and ConvoyConfig.PlayerGap < ConvoyConfig.YieldGap, "rear safety gap sits inside the braking range")
+check(ConvoyConfig.GhostBehind < ConvoyConfig.Behind, "the convoy spawns far enough back to drive through traffic on its way in")
+check(ConvoyConfig.Overtake.Retry > 0 and ConvoyConfig.Overtake.GiveUp > ConvoyConfig.Overtake.Retry, "a boxed-in car tries to overtake before it gives up")
+
+-- The entrance uses every non-player lane once, starting at the far edge.
+for playerLane = 1, 5 do
+	local lanes = ConvoyConfig.formationLanes(playerLane, 5)
+	local seen = {}
+	for _, lane in lanes do
+		seen[lane] = true
+	end
+	check(#lanes == 4 and not seen[playerLane], "formation excludes the player lane")
+	check(math.abs(lanes[1] - playerLane) >= math.abs(lanes[#lanes] - playerLane), "formation starts farthest away")
+end
+
 -- A full world: one per slot, bands in order, the two Epics never the same car.
 for seed = 1, 200 do
 	local picks = ConvoyConfig.pick(rng(seed), ladder({ { "C1" }, { "U1" }, { "R1", "R2" }, { "E1", "E2", "E3" }, { "L1" } }))

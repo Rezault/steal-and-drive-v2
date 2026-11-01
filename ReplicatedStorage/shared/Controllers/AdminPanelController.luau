@@ -64,6 +64,8 @@ local CameraTuningConfig = require(ReplicatedStorage.shared.Configs.CameraTuning
 local CarMutation = require(ReplicatedStorage.shared.Modules.CarMutation)
 --- For the Showroom tab's new-best preview: the roster grouped by rarity, as the garage colours it.
 local CarRarity = require(ReplicatedStorage.shared.Modules.CarRarity)
+--- The limited cars' on-screen names, for their list in the Cars tab.
+local CarNameConfig = require(ReplicatedStorage.shared.Configs.CarNameConfig)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local NitroConfig = require(ReplicatedStorage.shared.Configs.NitroConfig)
 local ObstacleConfig = require(ReplicatedStorage.shared.Configs.ObstacleConfig)
@@ -1592,6 +1594,21 @@ function AdminPanelController._initCarsTab(self)
 		mutationOfLabel[mutation.Name] = mutation.Key
 	end
 
+	--[[ The limited event cars (`WorldConfig.EventBodies`, 2026-10-22). On no world's ladder, so the
+		World/Car combos above can never reach them; the grant is the same `car` action, which takes any
+		body `GarageConfig.TierOfBody` prices. Sorted so the list does not reshuffle between sessions. ]]
+	local limitedCars = {}
+	for body, event in WorldConfig.EventBodies do
+		local name = CarNameConfig.nameOf(body)
+		table.insert(limitedCars, {
+			body = body,
+			label = string.format("%s%s  (%s)", if name then name .. " - " else "", body, if event.Paid then "Robux" else "free spawn"),
+		})
+	end
+	table.sort(limitedCars, function(a, b)
+		return a.body < b.body
+	end)
+
 	self:addTab("Cars", function()
 		Iris.Text({
 			"Granted through GarageService.awardCar — the same call the truck makes when a run banks. A free bay parks it, a full lot swaps its worst, and one you already own sells itself.",
@@ -1658,6 +1675,42 @@ function AdminPanelController._initCarsTab(self)
 			self:_adminAsk("world", target, world, paint, mutation)
 		end
 		Iris.End()
+
+		--- The limited cars, on the same target, paint and mutation as above (see `limitedCars`).
+		Iris.Separator()
+		Iris.Text({ "Limited cars" })
+		if #limitedCars == 0 then
+			Iris.Text({ "No limited cars in WorldConfig.EventBodies.", true, DIM_COLOR })
+		else
+			local limitedState = Iris.State(limitedCars[1].label)
+			local limited = limitedCars[1]
+			for _, car in limitedCars do
+				if car.label == limitedState:get() then
+					limited = car
+				end
+			end
+			Iris.Combo({ "Limited car" }, { index = limitedState })
+			for _, car in limitedCars do
+				Iris.Selectable({ car.label, car.label }, { index = limitedState })
+			end
+			Iris.End()
+
+			Iris.SameLine()
+			if Iris.Button({ "Give limited car" }).clicked() then
+				self:_adminAsk("car", target, limited.body, paint, mutation)
+			end
+			if Iris.Button({ "Give all limited cars" }).clicked() then
+				-- Spaced past AdminService's 0.25s COOLDOWN, else every car after the first is "Too fast".
+				task.spawn(function()
+					for _, car in limitedCars do
+						self:_adminAsk("car", target, car.body, paint, mutation)
+						task.wait(0.3)
+					end
+				end)
+			end
+			Iris.End()
+		end
+		Iris.Separator()
 
 		--[[ The stock car, folded away. Everything above this line GRANTS; this parks something to
 			look at and writes nothing, which is why it is behind an arrow rather than sitting in the

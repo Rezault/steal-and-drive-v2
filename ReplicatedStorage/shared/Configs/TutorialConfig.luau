@@ -419,6 +419,19 @@ TutorialConfig.Meters = {
 TutorialConfig.TeleportPathV2 = { "Main", "ScrollingFrame", "World1", "Btns", "PlayBtn" }
 TutorialConfig.StartCarPathV2 = { "Main", "ScrollingFrame", "Starter", "Btns", "EquipBtn" }
 
+--[[ PLAY ON ONE SCREEN (`StartCarConfig.OneScreenPlay`): the world and the car are already picked
+	when it opens (the world you are in, your stored car or the starter), so the one press left is
+	DRIVE. Hung off the end of each chain below; `TutorialController._leg` takes whichever page in a
+	chain is open, so where it hangs does not matter. New UI only, so `Path` is the V2 path too. ]]
+TutorialConfig.PlayMenuPathV2 = { "Main", "Footer", "DriveBtn" }
+TutorialConfig.PlayMenuLink = {
+	Kind = "Page",
+	Page = "PlayMenu", -- StartCarConfig.PlayPageName
+	Path = TutorialConfig.PlayMenuPathV2,
+	PathV2 = TutorialConfig.PlayMenuPathV2,
+	Hint = "Hit DRIVE",
+}
+
 -- === The beats ==============================================================
 
 --[[ In order, and the order in this table IS the order they are served. ]]
@@ -488,6 +501,7 @@ TutorialConfig.Steps = {
 					Path = { "Cards", "List", "Starter" },
 					PathV2 = TutorialConfig.StartCarPathV2,
 					Hint = "Take your car out",
+					Then = TutorialConfig.PlayMenuLink,
 				},
 			},
 		},
@@ -806,7 +820,7 @@ TutorialConfig.Steps = {
 		Id = "place",
 		Funnel = 9,
 		Title = "PARK YOUR NEW CAR",
-		Hint = "Park it in a glowing bay. Parked cars earn tips while you drive",
+		Hint = "Use PLACE CAR at the highlighted bay. Parked cars earn tips",
 		Where = "Lobby",
 		Advance = { Kind = "Signal", Service = "GarageService", Signal = "CarParked" },
 		Target = { Kind = "World", What = "FreeBay", Follow = true },
@@ -984,6 +998,7 @@ TutorialConfig.Steps = {
 					Path = { "Cards", "List", "Starter" },
 					PathV2 = TutorialConfig.StartCarPathV2,
 					Hint = "Take your car out",
+					Then = TutorialConfig.PlayMenuLink,
 				},
 			},
 		},
@@ -1014,8 +1029,9 @@ end
 	At 0.1 (build 2647, 2026-10-20) 519 carried and 523 parked, yet the funnel read 11%: the share of
 	players whose tenth of a second happened to cross a second boundary. The bank happens out on the
 	road and the trip home takes about 8 seconds, so nobody sees the wait. ]]
+-- Manual placement v1: stable assigned bay and a server-confirmed PLACE CAR action.
 TutorialConfig.AutoPark = {
-	Enabled = true,
+	Enabled = false,
 	Beat = "place",
 	After = 1.5,
 }
@@ -1054,6 +1070,66 @@ TutorialConfig.RaceAgain = {
 		Path = { "live", "Tutorial", "RaceAgain" },
 	},
 	ServerProperty = "tutorialRaceAgainTest",
+}
+
+--[[ === THE FIRST JOIN: AN A/B/C (2026-10-26) ==============================================
+
+	Dylan: on a player's first join, A sends them straight into a race, B shows the Play screen with
+	the arrow on DRIVE (the PLAY press is done for them), C is the lobby as it is today (press PLAY,
+	then DRIVE). Which one gets more new players through the tutorial and keeps them playing.
+
+	`Arms` names what each answer does, all three through the doors a player would use:
+	    Race    the race is asked for the moment the join screen has lifted, the same request DRIVE
+	            sends (`RaceEntryController:play`), so the PLAY beat finishes on `RaceEntered` as ever
+	    Menu    the Play screen is put up the way the PLAY button puts it up
+	            (`StartCarController:openPlay`), and the beat's chain already points at DRIVE on it
+	    Lobby   nothing: the arrow on PLAY, as built
+
+	EACH PLAYER'S ARM IS GAMEBEAST'S: experiment 100 "Tutorial: first join, race vs Play screen vs
+	lobby", by player, a third each. "live" holds `Tutorial.FirstJoin = "Lobby"` (group 228, C), and
+	groups 226 (A) and 227 (B) set it to "Race" and "Menu". The SERVER reads it once Gamebeast has this player's groups
+	(`AnalyticsService._resolveFirstJoin`; a read before that is the base value, which would put every
+	new player in C) and puts it on the Player as `Attribute`. Anything missing or unknown is `Default`,
+	and so is a Gamebeast that has not answered in `ResolveTimeout` seconds, so the client never waits
+	on an outage. Studio's "studio" environment has no "live": `StudioArm`, when set, is the arm every
+	Studio playtest gets instead, to try A and B by hand. It is read in Studio only.
+
+	ONCE A SESSION, AND ONLY ON THE PLAY BEAT (`Beat`): the first time that beat lands, the client
+	reads the attribute (`TutorialController._firstJoin`), waits for the join screen to lift plus
+	`Delay`, and acts only if PLAY is still the live beat and no run has started, so a player who
+	pressed PLAY themselves in the meantime is left alone. A player who left on the PLAY beat gets
+	their arm again on the next join. A Replay from the admin panel in the same session does not.
+
+	ONLY A SERVER RUNNING THIS CODE ENROLS ANYBODY. It sets the Gamebeast server property
+	`ServerProperty` to true at boot (`AnalyticsService`), and the experiment targets new players on a
+	server that has it, the same as `RaceAgain`, so nobody is enrolled into an arm their build cannot
+	serve.
+
+	READING IT: Gamebeast experiment results, and its funnels broken down by the experiment's group.
+	Use the tutorial's `stage = Completed` markers (play, boost, ... sell), `TutorialCompleted`,
+	`RunStarted`, Logout `sessionLength`, and D1. Arm A finishes PLAY within seconds of `Login`, so a
+	funnel that starts at Login needs a window of minutes, not the second the two land in.
+
+	SHIPPING THE WINNER: terminate the experiment, set `Tutorial.FirstJoin` in "live" to it, and set
+	`Default` above to match. `Remote.Enabled = false`: every player gets `Default`. ]]
+TutorialConfig.FirstJoin = {
+	Default = "Lobby",
+	Arms = { Race = true, Menu = true, Lobby = true },
+	Beat = "play",
+	Attribute = "TutorialFirstJoin",
+	--- Seconds the server waits for Gamebeast's answer before taking `Default`.
+	ResolveTimeout = 8,
+	--- Seconds the client waits for the attribute once PLAY lands, then `Default`.
+	WaitSeconds = 10,
+	--- Seconds after the join screen starts to lift (its fade is 0.5) before Race or Menu acts.
+	Delay = 0.6,
+	--- Studio only: an arm name here is the arm every Studio playtest gets. nil = `Default`.
+	StudioArm = nil :: string?,
+	Remote = {
+		Enabled = true,
+		Path = { "live", "Tutorial", "FirstJoin" },
+	},
+	ServerProperty = "tutorialFirstJoinTest",
 }
 
 --[[ THE CAMERA TURNS TO THE BUYER (2026-10-19), on a face carrying `Look = true` (SELL's, once the
@@ -1182,6 +1258,7 @@ TutorialConfig.Offroad = {
 				Path = { "Cards", "List", "Starter" },
 				PathV2 = TutorialConfig.StartCarPathV2,
 				Hint = "Take your car out",
+				Then = TutorialConfig.PlayMenuLink,
 			},
 		},
 	},

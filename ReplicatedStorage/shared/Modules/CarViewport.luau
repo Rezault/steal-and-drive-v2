@@ -51,6 +51,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local CarPaint = require(ReplicatedStorage.shared.Modules.CarPaint)
 --- A mutation's look on the picture (`Options.mutation`): the module every car in the world wears it by.
@@ -160,11 +161,12 @@ end
 
 --[[ The unit direction the camera looks from, in the car's own frame. Nose is local -Z; see `YAW`.
 
-	`yaw` defaults to the pose above, which is every still picture in the game. The TURNTABLE is the
-	only caller that passes anything else: a spin is this same shot with one number moving. ]]
-local function eyeDirection(yaw: number?): Vector3
-	local turn, pitch = math.rad(yaw or YAW), math.rad(PITCH)
-	return Vector3.new(math.sin(turn) * math.cos(pitch), math.sin(pitch), math.cos(turn) * math.cos(pitch))
+	`yaw` and `pitch` default to the pose above, which is every still picture in the game. The
+	TURNTABLE passes a moving yaw (a spin is this same shot with one number moving), and a picture
+	with a shot of its own (`Options.yaw`, the Play menu's hero) passes both. ]]
+local function eyeDirection(yaw: number?, pitch: number?): Vector3
+	local turn, tilt = math.rad(yaw or YAW), math.rad(pitch or PITCH)
+	return Vector3.new(math.sin(turn) * math.cos(tilt), math.sin(tilt), math.cos(turn) * math.cos(tilt))
 end
 
 --[[ Every part's own eight corners, in the car's frame, from the offsets `set` has already placed
@@ -202,8 +204,8 @@ end
 --[[ The corners as a camera at `yaw` sees them: the pose fixes the camera's ROTATION, so a corner's
 	camera-space position is its car-space position turned by the inverse of it, with the distance
 	left to fall out as a term in Z. Done once per yaw and read many times by the bisection. ]]
-local function seenFrom(corners: { Vector3 }, yaw: number): { Vector3 }
-	local inverse = CFrame.lookAt(eyeDirection(yaw), Vector3.zero).Rotation:Inverse()
+local function seenFrom(corners: { Vector3 }, yaw: number, pitch: number?): { Vector3 }
+	local inverse = CFrame.lookAt(eyeDirection(yaw, pitch), Vector3.zero).Rotation:Inverse()
 	local seen = table.create(#corners)
 	for index, corner in corners do
 		seen[index] = inverse * corner
@@ -280,21 +282,22 @@ end
 	The shift is multiplied on the RIGHT, so it is in the camera's own right and up axes and the pose
 	is untouched: it is a lens shift rather than a new angle. The camera no longer looks at the car's
 	centre, which is the entire point. ]]
-local function cameraAt(seen: { Vector3 }, yaw: number, distance: number, hTan: number, vTan: number): CFrame
+local function cameraAt(seen: { Vector3 }, yaw: number, distance: number, hTan: number, vTan: number, pitch: number?): CFrame
 	local _, shiftX, shiftY = aimFor(seen, distance, hTan, vTan)
-	return CFrame.lookAt(eyeDirection(yaw) * distance, Vector3.zero) * CFrame.new(shiftX, shiftY, 0)
+	return CFrame.lookAt(eyeDirection(yaw, pitch) * distance, Vector3.zero) * CFrame.new(shiftX, shiftY, 0)
 end
 
---- Where the camera goes to hold this car at the pose above, filling a frame of this aspect.
---- `placed` is every part at the offset it has already been moved to.
-local function cameraFor(placed: { [BasePart]: CFrame }, aspect: number): CFrame
+--- Where the camera goes to hold this car at the pose above (or at `yaw`/`pitch`, a shot of its
+--- own), filling a frame of this aspect. `placed` is every part at the offset it has already been
+--- moved to.
+local function cameraFor(placed: { [BasePart]: CFrame }, aspect: number, yaw: number?, pitch: number?): CFrame
 	local corners = cornersOf(placed)
 	if #corners == 0 then
-		return CFrame.lookAt(eyeDirection(), Vector3.zero)
+		return CFrame.lookAt(eyeDirection(yaw, pitch), Vector3.zero)
 	end
 	local hTan, vTan = reachOf(aspect)
-	local seen = seenFrom(corners, YAW)
-	return cameraAt(seen, YAW, fitDistance(seen, hTan, vTan), hTan, vTan)
+	local seen = seenFrom(corners, yaw or YAW, pitch)
+	return cameraAt(seen, yaw or YAW, fitDistance(seen, hTan, vTan), hTan, vTan, pitch)
 end
 
 --[[ Flatten a car into one shape, for the locked look above.
@@ -404,6 +407,17 @@ export type Options = {
 	--- A weather mutation key: the car drawn RUSTED / GHOST / ... (2026-10-14: an inventory full of
 	--- mutated cars drew them all plain). Colours and materials show; its particles do not render here.
 	mutation: string?,
+	--[[ A SHOT OF ITS OWN, for the one picture on a screen that is the screen's subject rather than a
+		card in a grid: the Play menu's hero banner (2026-10-25). Nil is the shared pose, which is what
+		every card wants and why it is the default; see `YAW` for what the numbers mean. ]]
+	yaw: number?,
+	pitch: number?,
+	--[[ ...and a key light of its own. `LIGHT_DIR` arrives from behind the car's far shoulder as the
+		shared pose sees it, so the flank facing the lens is lit by the ambient alone and a red car reads
+		maroon; a banner that big shows it. Nil is the shared light. Written on every `set`, so a viewport
+		handed a hero shot once does not keep its light for the next car. ]]
+	light: Vector3?,
+	ambient: Color3?,
 }
 
 --[[ Put a body in this viewport. Returns false — leaving the frame empty and hidden — when there is
@@ -512,8 +526,10 @@ function CarViewport.set(viewport: ViewportFrame, body: unknown, options: Option
 			plate.Visible = false
 		end
 	else
-		viewport.Ambient = AMBIENT
+		local ambient = settings.ambient or AMBIENT
+		viewport.Ambient = ambient
 		viewport.LightColor = LIGHT
+		viewport.LightDirection = settings.light or LIGHT_DIR
 		-- A stock index paints nothing, and that is correct: the car is already wearing its own.
 		CarPaint.apply(clone, settings.paint, body)
 		--- After the paint, as on the road and the podium: the mutation dresses over whatever colour it is.
@@ -527,7 +543,7 @@ function CarViewport.set(viewport: ViewportFrame, body: unknown, options: Option
 			local mutation = WeatherConfig.mutationOf(settings.mutation)
 			if mutation and mutation.ViewportTint and typeof(mutation.Color) == "Color3" then
 				viewport.LightColor = mutation.Color
-				viewport.Ambient = AMBIENT:Lerp(mutation.Color, 0.4)
+				viewport.Ambient = ambient:Lerp(mutation.Color, 0.4)
 			end
 		end
 		--[[ And its number, hashed out of the same body-and-colour pair (`PlateConfig.forKey`), so
@@ -540,7 +556,7 @@ function CarViewport.set(viewport: ViewportFrame, body: unknown, options: Option
 
 	local camera = viewport.CurrentCamera
 	if camera then
-		camera.CFrame = cameraFor(offsets, settings.aspect or 1)
+		camera.CFrame = cameraFor(offsets, settings.aspect or 1, settings.yaw, settings.pitch)
 	end
 
 	viewport.Visible = true
@@ -719,4 +735,104 @@ function CarViewport.spin(viewport: ViewportFrame, options: SpinOptions?): Spin?
 	connection = RunService.RenderStepped:Connect(step)
 	return spin
 end
+
+-- === The entrance ===========================================================
+--[[ A car that SWINGS INTO its still instead of appearing in it: the Play menu's hero, each time the
+	screen opens or a car is picked (2026-10-25). The camera starts `swing` degrees further round and
+	`pull` times further out, and eases onto exactly the shot `set` left, so its last frame IS the
+	still and nothing jumps when it stops.
+
+	TWO FITS, NOT ONE A FRAME. The start and the end are each fitted once (`fitDistance` and its aim,
+	the pair a still pays for) and the frames between interpolate the yaw, the distance and the lens
+	shift. A fit per frame is the turntable's "breathing" (its section above); over half a second,
+	easing in, a moving distance reads as the dolly it is meant to be instead.
+
+	A ONE-SHOT, NOT A LOOP. It stops itself when it lands, and the handle's `stop` is the same
+	idempotent stop a spin hands back, for a page put away mid-swing. ]]
+local ARRIVE_SWING = 40
+local ARRIVE_PULL = 1.12
+local ARRIVE_SECONDS = 0.55
+
+export type ArriveOptions = {
+	aspect: number?,
+	--- The still it lands on: the same two numbers `set` was given, or nil for the shared pose.
+	yaw: number?,
+	pitch: number?,
+	--- Degrees round from the still that it starts at; positive starts it nearer side-on.
+	swing: number?,
+	--- How much further out it starts, as a multiple of the distance that fits the car there.
+	pull: number?,
+	seconds: number?,
+}
+
+--[[ Swing the car already in this viewport into its still. Nil when there is nothing in it, the same
+	empty case `set` returns false for. Call it straight after `set`, with the same aspect and pose. ]]
+function CarViewport.arrive(viewport: ViewportFrame, options: ArriveOptions?): Spin?
+	local settings = options or {}
+	local camera = viewport.CurrentCamera
+	local model = viewport:FindFirstChild(MODEL_NAME)
+	if not (camera and model and model:IsA("Model")) then
+		return nil
+	end
+
+	--- Where `set` left every part, exactly as the turntable reads them.
+	local placed: { [BasePart]: CFrame } = {}
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			placed[descendant] = descendant.CFrame
+		end
+	end
+	local corners = cornersOf(placed)
+	if #corners == 0 then
+		return nil
+	end
+
+	local hTan, vTan = reachOf(settings.aspect or 1)
+	local pitch = settings.pitch
+	local landYaw = settings.yaw or YAW
+	local startYaw = landYaw + (settings.swing or ARRIVE_SWING)
+	--- One end of the swing: how far out, and the lens shift that centres the car from there.
+	local function shot(yaw: number, pull: number): (number, number, number)
+		local seen = seenFrom(corners, yaw, pitch)
+		local distance = fitDistance(seen, hTan, vTan) * pull
+		local _, shiftX, shiftY = aimFor(seen, distance, hTan, vTan)
+		return distance, shiftX, shiftY
+	end
+	local fromDistance, fromX, fromY = shot(startYaw, settings.pull or ARRIVE_PULL)
+	local toDistance, toX, toY = shot(landYaw, 1)
+	local seconds = math.max(settings.seconds or ARRIVE_SECONDS, 1e-3)
+
+	local elapsed = 0
+	local connection: RBXScriptConnection? = nil
+	local arrival = {}
+	function arrival.stop()
+		if connection then
+			connection:Disconnect()
+			connection = nil
+		end
+	end
+
+	local function step(delta: number)
+		if model.Parent ~= viewport or not viewport:IsDescendantOf(game) then
+			arrival.stop()
+			return
+		end
+		elapsed = math.min(elapsed + delta, seconds)
+		local t = TweenService:GetValue(elapsed / seconds, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		local yaw = startYaw + (landYaw - startYaw) * t
+		local distance = fromDistance + (toDistance - fromDistance) * t
+		local shift = CFrame.new(fromX + (toX - fromX) * t, fromY + (toY - fromY) * t, 0)
+		camera.CFrame = CFrame.lookAt(eyeDirection(yaw, pitch) * distance, Vector3.zero) * shift
+		if elapsed >= seconds then
+			arrival.stop()
+		end
+	end
+
+	--- The first frame is drawn here, so the car never shows at its still for a frame and then jumps
+	--- back to where the swing starts.
+	step(0)
+	connection = RunService.RenderStepped:Connect(step)
+	return arrival
+end
+
 return CarViewport

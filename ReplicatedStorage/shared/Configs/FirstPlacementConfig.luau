@@ -1,0 +1,33 @@
+-- First-car placement only. Existing milestones retain their historical meanings.
+local Config = {
+	Enabled = true,
+	Version = 1,
+	ActiveAttribute = "FirstPlacementActive",
+	BayAttribute = "FirstPlacementBay",
+	FlowAttribute = "FirstPlacementFlow",
+	MaxDistance = 22,
+	RequestCooldown = 0.75,
+	PickupProtection = 2,
+	RequestTimeout = 6,
+	StandFromFront = 3,
+	FunnelName = "FirstPlacementV1",
+	Messages = {
+		tooFar = "Move closer to the highlighted bay",
+		occupied = "That bay filled up. Follow the new highlight",
+		noBay = "Waiting for an empty showroom bay",
+		noCharacter = "Waiting for your character",
+		racing = "Return to your dealership to park",
+		noProfile = "Your garage is still loading. Try again",
+		notCarrying = "Select your new car in the hotbar first",
+		badBay = "Follow the highlighted bay",
+		noSuchBay = "Your bay is still loading. Try again",
+		notOwned = "That car is no longer in your collection",
+		alreadyThere = "Your car is already parked",
+		protected = "Car parked! Give it a moment before picking it up",
+		timeout = "No confirmation yet. Please try again",
+		disabled = "Placement is unavailable. Try again shortly",
+		notOnRoster = "This car could not be placed. Try another car",
+		internal = "Could not place your car. Please try again",
+	},
+}
+return Config

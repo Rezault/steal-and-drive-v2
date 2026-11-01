@@ -35,8 +35,10 @@ local profile = {
 local sent, paid = {}, {}
 local Daily = {
 	priceSpec = function(_, _, spec) return spec.Kind, spec.Amount or spec.Floor, spec.Body end,
-	pay = function(_, _, kind, amount, body, source)
+	pay = function(_, _, kind, amount, body, source, onGranted)
 		table.insert(paid, { kind = kind, amount = amount, body = body, source = source })
+		-- The real `pay` commits through this callback; the service records the claim there.
+		if onGranted then onGranted() end
 		return true
 	end,
 }

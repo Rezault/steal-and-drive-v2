@@ -34,6 +34,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local StealConfig = require(ReplicatedStorage.shared.Configs.StealConfig)
+local CarConfig = require(ReplicatedStorage.shared.Configs.CarConfig)
 --- Whether a steal redeems a server-issued token (`_onLanded`'s dated block).
 local EncounterConfig = require(ReplicatedStorage.shared.Configs.EncounterConfig)
 
@@ -101,6 +102,7 @@ function StealService._onLanded(self, player: Player, tier: unknown)
 		return
 	end
 	local index
+	local body: string?
 	if EncounterConfig.Enabled then
 		local Encounters = Shard.get("EncounterService")
 		local car = Encounters and Encounters:redeemSteal(player, tier)
@@ -109,6 +111,7 @@ function StealService._onLanded(self, player: Player, tier: unknown)
 			return
 		end
 		index = self:_readTier(car.tier)
+		body = car.body -- Only the server-issued token decides which body refills health.
 	else
 		index = self:_readTier(tier)
 	end
@@ -130,7 +133,9 @@ function StealService._onLanded(self, player: Player, tier: unknown)
 	-- Only stamp the cooldown when the refill actually lands, so a report from someone who isn't
 	-- racing can't shadow a real steal a moment later. Same pattern as TrafficService's clip.
 	local stats = StealConfig.TierStats[index]
-	if ObstacleService:refillHealth(player, stats.MaxHealth) then
+	-- Economy aliases may have different health (the Floater is priced as M5, but still has 130 HP).
+	local maxHealth = if body then CarConfig.maxHealthOf(body) else stats.MaxHealth
+	if ObstacleService:refillHealth(player, maxHealth) then
 		self._lastSteal[player] = now
 		self:getSignal("CarStolen"):Fire(player, index)
 		self.log:info(string.format("%s stole a Tier %d.", player.Name, index))

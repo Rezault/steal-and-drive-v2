@@ -203,6 +203,8 @@ end
 	     `Renamed`. ]]
 function TutorialService._resume(self, player: Player)
 	local record = self:_record(player)
+	local audit = Shard.get("FirstPlacementService")
+	if audit then audit:tutorialEvent(player, if record.Done then "ExistingDone" else "Entered", record.Step, 0) end
 	if record.Done then
 		self._live[player] = nil
 		self:_publish(player)
@@ -301,6 +303,8 @@ function TutorialService._funnel(self, player: Player, step)
 		return
 	end
 	seen[stage] = true
+	local audit = Shard.get("FirstPlacementService")
+	if audit then audit:tutorialEvent(player, "Reached", step.Id, stage) end
 
 	pcall(function()
 		AnalyticsService:LogOnboardingFunnelStepEvent(player, stage, step.Id)
@@ -332,6 +336,8 @@ function TutorialService._advance(self, player: Player)
 		between the two is the whole point of tracking it per beat — a step everybody reaches and
 		nobody finishes is a step that is broken, and one event cannot tell you that. ]]
 	local Analytics = Shard.get("AnalyticsService")
+	local audit = Shard.get("FirstPlacementService")
+	if audit and done then audit:tutorialEvent(player, "StepCompleted", done.Id, tonumber(done.Funnel) or index) end
 	if Analytics and done then
 		Analytics:TutorialFinished(player, tonumber(done.Funnel) or index, done.Id)
 	end
@@ -363,6 +369,7 @@ function TutorialService._advance(self, player: Player)
 	if Analytics then
 		Analytics:TutorialComplete(player)
 	end
+	if audit then audit:tutorialEvent(player, "Completed", doneId or "", finish and finish.Stage or 0) end
 	self.log:info(string.format("%s finished the tutorial.", player.Name))
 end
 
@@ -711,6 +718,8 @@ function TutorialService._onSkip(self, player: Player)
 	end
 
 	local step = TutorialConfig.stepAt(index)
+	local audit = Shard.get("FirstPlacementService")
+	if audit then audit:tutorialEvent(player, "Skipped", step and step.Id or "", step and step.Funnel or index) end
 	self._live[player] = nil
 	self:_store(player, step and step.Id or "", true)
 	self:_publish(player)

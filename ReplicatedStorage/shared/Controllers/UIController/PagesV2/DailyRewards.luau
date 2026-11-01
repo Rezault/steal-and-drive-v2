@@ -134,7 +134,9 @@ end
 
 --- The prize picture for a day: the cash ladder rung by how far into the week, the heart, the car.
 local function prizeImage(day, index: number): number
-	if day.Kind == "Revive" then
+	if day.Kind == "Legacy" then
+		return UIAssets.GiftGlyph
+	elseif day.Kind == "Revive" then
 		return UIAssets.Pickups.Health
 	end
 	local ladder = UIAssets.CashTiers
@@ -142,7 +144,9 @@ local function prizeImage(day, index: number): number
 end
 
 local function prizeText(day): string
-	if day.Kind == "Cash" then
+	if day.Kind == "Legacy" then
+		return TEXT.Claimed
+	elseif day.Kind == "Cash" then
 		return "+" .. GarageConfig.formatCash(day.Amount)
 	elseif day.Kind == "Revive" then
 		return string.format(TEXT.Revive, day.Amount)
@@ -182,15 +186,19 @@ function Page:_buildCard(parent: Instance, index: number, x: number, y: number, 
 	amount.Name = "Amount"
 	amount.ZIndex = 6
 
-	local prize, viewport = nil, nil
+	-- The jackpot can become cash; always build both visual types and select from the receipt.
+	local prize = picture(face, "Prize", if big then 0.25 else 0.1, PRIZE[1], if big then 0.5 else 0.8, PRIZE[2], UIAssets.GiftGlyph, 5)
+	local viewport
 	if big then
 		viewport = CarViewport.new(face, "PrizeCar")
 		viewport.Position = UDim2.fromScale(0.03, CAR[1])
 		viewport.Size = UDim2.fromScale(0.94, CAR[2])
 		viewport.ZIndex = 5
-	else
-		prize = picture(face, "Prize", 0.1, PRIZE[1], 0.8, PRIZE[2], 0, 5)
 	end
+	local conversion = ArcadeKit.text(face, 0.04, 0.685, 0.92, 0.075, WHITE, true)
+	conversion.Name = "Conversion"
+	conversion.ZIndex = 9
+	conversion.Visible = false
 
 	--[[ The old check was made from two thick rotated bars. At card size it read as a bent pipe over
 		the reward, so this uses one font glyph with the same outline as the rest of the UI. ]]
@@ -240,6 +248,7 @@ function Page:_buildCard(parent: Instance, index: number, x: number, y: number, 
 		viewAspect = 2,
 		burst = if big and bg then bg:FindFirstChild("Sunray") else nil,
 		amount = amount,
+		conversion = conversion,
 		tick = tick,
 		tickScale = tickScale,
 		lock = lock,
@@ -296,17 +305,32 @@ function Page:_paintCard(card, day, state: string)
 	local faceKey = if card.big and state ~= "Taken" then "Jackpot" else state
 	ArcadeKit.paint(card.face, ArcadeKit.Faces[FACE[faceKey]])
 	card.heading.Text = string.format(if card.big then TEXT.BigDayFormat else TEXT.DayFormat, card.index)
+	local showCar = card.viewport ~= nil and day.Kind == "Car" and type(day.Body) == "string"
 	if card.prize then
+		card.prize.Visible = not showCar
 		card.prize.Image = UIAssets.url(prizeImage(day, card.index))
-	elseif card.viewport and type(day.Body) == "string" and card.viewportBody ~= day.Body then
-		--- The car's frame is measured once it has a size: a car framed for the wrong shape crops.
-		local size = card.viewport.AbsoluteSize
-		if size.X > 0 and size.Y > 0 then
-			card.viewAspect = size.X / size.Y
+	end
+	if card.viewport then
+		card.viewport.Visible = showCar
+		if showCar and card.viewportBody ~= day.Body then
+			local size = card.viewport.AbsoluteSize
+			if size.X > 0 and size.Y > 0 then card.viewAspect = size.X / size.Y end
+			if CarViewport.set(card.viewport, day.Body, { aspect = card.viewAspect }) then
+				card.viewportBody = day.Body
+			end
+		elseif not showCar and card.viewportBody then
+			CarViewport.clear(card.viewport)
+			card.viewportBody = nil
 		end
-		if CarViewport.set(card.viewport, day.Body, { aspect = card.viewAspect }) then
-			card.viewportBody = day.Body
-		end
+	end
+	local converted = day.Kind == "Cash" and type(day.ConvertedFrom) == "string"
+	card.conversion.Visible = converted
+	card.conversion.Text = if converted then string.format(
+		if day.Reason == "Full" then TEXT.ConvertedFull else TEXT.ConvertedDuplicate,
+		GarageConfig.displayName(day.ConvertedFrom)
+	) else ""
+	if card.prize then
+		card.prize.Size = UDim2.fromScale(if card.big then 0.5 else 0.8, if converted then 0.33 else PRIZE[2])
 	end
 	card.amount.Text = prizeText(day)
 	local fade = if state == "Taken" then 0.55 elseif state == "Waiting" then 0.25 else 0
@@ -318,7 +342,7 @@ function Page:_paintCard(card, day, state: string)
 			over its body. The lock already communicates "later"; the jackpot car stays solid. ]]
 		card.viewport.ImageTransparency = 0
 	end
-	card.tick.Visible = state == "Taken"
+	card.tick.Visible = state == "Taken" and not converted
 	card.lock.Visible = state == "Waiting"
 	card.claim.Visible = state == "Today"
 	card.idle.Visible = state ~= "Today"

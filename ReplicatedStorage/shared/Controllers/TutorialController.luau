@@ -124,6 +124,8 @@
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+--- The join screen's `JoinScreenRunning` flag, for the first join arms (`_firstJoin`).
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -3973,6 +3975,9 @@ function TutorialController._onState(self, state)
 		self:_sync()
 		self:_repoint()
 		self:_applyGate()
+		if step.Id == TutorialConfig.FirstJoin.Beat then
+			self:_firstJoin(token)
+		end
 	end
 
 	if state.completed and self:_canStamp() then
@@ -3985,6 +3990,62 @@ function TutorialController._onState(self, state)
 		reads. The card is not shown by this — `_sync` decides that — so the delay costs nothing when
 		the screen is already quiet. ]]
 	task.delay(TutorialConfig.Timing.Settle, land)
+end
+
+--[[ THE FIRST JOIN A/B/C (`TutorialConfig.FirstJoin`), the first time the PLAY beat lands this
+	session. The arm is the server's, on the Player (`AnalyticsService._resolveFirstJoin`), waited for
+	up to `WaitSeconds`. Race and Menu then wait for the join screen to lift and `Delay` more: a race
+	asked for under that screen has no road yet, and a screen opened under it is one nobody saw open.
+
+	Each acts only if PLAY is still the beat this call was made for and no run has started, so a
+	player who pressed PLAY in the meantime is left alone, and it goes through the same door a press
+	would: Race is DRIVE's request (`RaceEntryController:play`, nothing named, so the world they are
+	in and their stored car or the starter, which is what the Play screen opens on), and Menu is
+	PLAY's own screen (`StartCarController:openPlay`), not opened again if it is already up, since
+	`OpenPage` toggles. The beat's chain already points at DRIVE on it. ]]
+function TutorialController._firstJoin(self, token: number)
+	if self._firstJoinDone then
+		return
+	end
+	self._firstJoinDone = true
+	local firstJoin = TutorialConfig.FirstJoin
+
+	task.spawn(function()
+		local player = Players.LocalPlayer
+		local giveUp = os.clock() + firstJoin.WaitSeconds
+		local arm = player:GetAttribute(firstJoin.Attribute)
+		while arm == nil and os.clock() < giveUp do
+			task.wait(0.25)
+			arm = player:GetAttribute(firstJoin.Attribute)
+		end
+		if arm ~= "Race" and arm ~= "Menu" then
+			return
+		end
+
+		giveUp = os.clock() + firstJoin.WaitSeconds
+		while ReplicatedFirst:GetAttribute("JoinScreenRunning") == true and os.clock() < giveUp do
+			task.wait(0.25)
+		end
+		task.wait(firstJoin.Delay)
+
+		--- A run that has started has already finished PLAY, so the token is the check that matters.
+		local still = self._token == token and self._step ~= nil and self._step.Id == firstJoin.Beat and not self:_inRace()
+		if not still then
+			return
+		end
+
+		if arm == "Race" then
+			local entry = Shard.get("RaceEntryController")
+			if entry then
+				entry:play()
+			end
+			return
+		end
+		local startCar = Shard.get("StartCarController")
+		if startCar and startCar:oneScreen() and not self:_pageOpen(TutorialConfig.PlayMenuLink.Page) then
+			startCar:openPlay()
+		end
+	end)
 end
 
 --[[ Is there a card on screen for DONE to be stamped over?
@@ -4175,6 +4236,8 @@ TutorialController:withLifecycle({
 		--- The buyer's root the guide line is on, or nil. See `_stepGuide`.
 		self._guided = nil :: BasePart?
 		self._celebrate = nil :: number?
+		--- The first join arm has had its one go this session. See `_firstJoin`.
+		self._firstJoinDone = false
 	end,
 
 	start = function(self)

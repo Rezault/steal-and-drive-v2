@@ -311,6 +311,7 @@ end
 
 --- A fresh tile for `tileIndex`, laid at `pivot`, stamped with everything that keys off it.
 function RoadController._makeTile(self, tileIndex: number, pivot: CFrame): Model
+	if self._roadPerf then self._roadPerf.inlineTiles += 1 end
 	local segment = self:_segmentFor(tileIndex)
 	--- On demand rather than for every variant up front — see the note in `_buildRoad`. Idempotent
 	--- and near-free once done, so asking on every tile costs nothing after the first of a segment.
@@ -499,9 +500,14 @@ function RoadController._planFor(self, segment: number)
 	measureTree(variant, sizes)
 
 	local units = { { kind = "root", src = root, size = 1 } }
-	for _, child in variant:GetChildren() do
-		if child ~= root then
-			emitUnit(child, sizes, blocked, budget, units)
+	-- Stable partition: the authored drivable surface is emitted before decorative siblings.
+	-- Preserve complete joint groups and the order WITHIN each subtree.
+	local children = variant:GetChildren()
+	for _, surfaceFirst in { true, false } do
+		for _, child in children do
+			if child ~= root and (child.Name == "RoadSurface") == surfaceFirst then
+				emitUnit(child, sizes, blocked, budget, units)
+			end
 		end
 	end
 
@@ -611,8 +617,11 @@ end
 function RoadController._runTileJob(self, job, budget: number)
 	local units = job.plan.units
 	local spent = 0
+	local began = os.clock()
+	local timeBudget = math.max(0, RaceConfig.TileBuildTimeBudgetMs or 0) / 1000
 
-	while job.cursor <= #units and spent < budget do
+	while job.cursor <= #units and spent < budget
+		and (spent == 0 or timeBudget == 0 or os.clock() - began < timeBudget) do
 		local unit = units[job.cursor]
 		local at = job.cursor
 		job.cursor += 1
@@ -678,10 +687,8 @@ end
 	whatever the variant welds cost. It is the recycle spike again, at the one moment nothing was
 	spreading it.
 
-	ONLY TILE 0 IS BUILT WHOLE, and it has to be: the server is holding the car anchored until this
-	client acks `RaceReady`, and the ack is gated on there being collidable ground under the car
-	(`_hasGroundUnder`). Tile 0 is that ground. One 64 ms frame is the floor on what entry can cost
-	and it lands under a fade; the other eight tiles are road the player cannot reach yet.
+	TILE 0 IS QUEUED FIRST, including its surface, so entry does not clone its full scenery
+	on the RaceStart frame. The car remains anchored until the ground probe and full-ring gate pass.
 
 	THE ACK MACHINERY ALREADY TOLERATES THIS. `_onRaceStart` polls for ground every 0.05s up to
 	`EnterReadyTimeout - 0.5`, so a road that finishes arriving over the next couple of seconds is a
@@ -695,7 +702,13 @@ function RoadController._startBuild(self)
 		return
 	end
 	self._buildConn = RunService.Heartbeat:Connect(function()
+		local began = os.clock()
 		self:_stepBuild()
+		local perf = self._roadPerf
+		if perf then
+			perf.openingFrames += 1
+			perf.openingMaxWorkMs = math.max(perf.openingMaxWorkMs, (os.clock() - began) * 1000)
+		end
 	end)
 end
 
@@ -1064,10 +1077,14 @@ function RoadController._buildRoad(self, world: number?, laneOffset: Vector3?, t
 		return origin * CFrame.new(self._forwardWorld * (self._segmentLength * i))
 	end
 
-	--[[ Tile 0 whole and now: it is the ground the car spawns on and the ack is gated on it being
-		there. Everything else is queued — see the `_startBuild` header for why that is safe and why
-		the order is ahead-first. ]]
-	table.insert(self._segments, self:_makeTile(0, pivotFor(0)))
+	-- Tile zero now uses the same bounded builder as the rest of the ring. Its RoadSurface
+	-- is emitted first. RaceReady still waits for actual collidable ground AND the complete ring.
+	self._roadPerf = { openingFrames = 0, openingMaxWorkMs = 0, inlineTiles = 0 }
+	if RaceConfig.FirstTileIncremental ~= false then
+		table.insert(self._buildQueue, { index = 0, pivot = pivotFor(0) })
+	else
+		table.insert(self._segments, self:_makeTile(0, pivotFor(0)))
+	end
 	for i = 1, ahead do
 		table.insert(self._buildQueue, { index = i, pivot = pivotFor(i) })
 	end
@@ -1088,20 +1105,8 @@ end
 
 -- === Road frame accessors (for anything that decorates the local road) =======
 
---[[ Is the local road finished, rather than merely started?
-
-	THE ACK IS NOT THIS QUESTION, and the difference is the whole reason this exists. `RaceReady`
-	means "there is ground under the car and the server may let go" — one tile's worth, which is
-	deliberately all it needs to be (see `_startBuild`). The ring behind and ahead of that tile is
-	still being laid for a couple of seconds afterwards.
-
-	That was invisible while `_buildRoad` cloned all nine tiles in one frame: the road existed before
-	the ack could possibly happen. Now that it is spread, anything that treats the ack as "the world
-	is up" drops its cover early and shows the player the road assembling — which is exactly what
-	`RaceUIController`'s loading screen is for, so it asks this instead.
-
-	False before a race and after one, because a road that is not being built is not a built road:
-	callers want "ready to be looked at", and an empty world is not that. ]]
+-- The server release and the loading cover both wait for the complete local ring.
+-- A collidable surface arriving early is not permission to release the car into unfinished art.
 function RoadController.isWorldReady(self): boolean
 	return self._active and self._folder ~= nil and self._buildJob == nil and #self._buildQueue == 0
 end
@@ -1872,3 +1877,5 @@ RoadController:withLifecycle({
 })
 
 return RoadController
+
+

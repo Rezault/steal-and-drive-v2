@@ -1,0 +1,2336 @@
+{
+  "ReplicatedFirst/JoinScreen.local.luau": {
+    "mtime": 1792581917.6299107,
+    "seen": 1792687334.11829,
+    "ast_hash": "8ffa97042ce0bfdcea36bdcf39b22e99",
+    "semantic_hash": "8ffa97042ce0bfdcea36bdcf39b22e99"
+  },
+  "ReplicatedStorage/shared/Configs/Admins.luau": {
+    "mtime": 1792265610.4420922,
+    "seen": 1792687334.11829,
+    "ast_hash": "3bc6ea5c465ce5caf336c7ac793b8b82",
+    "semantic_hash": "3bc6ea5c465ce5caf336c7ac793b8b82"
+  },
+  "ReplicatedStorage/shared/Configs/AudioConfig.luau": {
+    "mtime": 1792760012.7022285,
+    "seen": 1792948538.2661812,
+    "ast_hash": "56c338ae036c26f8380f3dd9d4985eef",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/BalanceConfig.luau": {
+    "mtime": 1792527665.3618915,
+    "seen": 1792687334.11829,
+    "ast_hash": "13703c4fdec91356b675ff072a571149",
+    "semantic_hash": "13703c4fdec91356b675ff072a571149"
+  },
+  "ReplicatedStorage/shared/Configs/BrakeLightConfig.luau": {
+    "mtime": 1792265610.5163317,
+    "seen": 1792687334.11829,
+    "ast_hash": "6a7a4827a5cdbabec08570e12efd95fd",
+    "semantic_hash": "6a7a4827a5cdbabec08570e12efd95fd"
+  },
+  "ReplicatedStorage/shared/Configs/BuyerConfig.luau": {
+    "mtime": 1792701974.2110567,
+    "seen": 1792702034.7943616,
+    "ast_hash": "0b4b3e9805e10e05ce6d894c477a3ca2",
+    "semantic_hash": "0b4b3e9805e10e05ce6d894c477a3ca2"
+  },
+  "ReplicatedStorage/shared/Configs/CabinSkinConfig.luau": {
+    "mtime": 1792265610.535344,
+    "seen": 1792687334.11829,
+    "ast_hash": "13517973b2cc73f6551b2390e31130e3",
+    "semantic_hash": "13517973b2cc73f6551b2390e31130e3"
+  },
+  "ReplicatedStorage/shared/Configs/CameraConfig.luau": {
+    "mtime": 1792527665.3638928,
+    "seen": 1792687334.11829,
+    "ast_hash": "51b1692701c01da4769a818be4398150",
+    "semantic_hash": "51b1692701c01da4769a818be4398150"
+  },
+  "ReplicatedStorage/shared/Configs/CameraTuningConfig.luau": {
+    "mtime": 1792265610.5143225,
+    "seen": 1792687334.11829,
+    "ast_hash": "96f6b3c4299c557d352a8f76b4184c45",
+    "semantic_hash": "96f6b3c4299c557d352a8f76b4184c45"
+  },
+  "ReplicatedStorage/shared/Configs/CarConfig.luau": {
+    "mtime": 1792707015.4559016,
+    "seen": 1792707462.2353103,
+    "ast_hash": "12f986152c909c37bd24ca153e0b2f8d",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/CarDealConfig.luau": {
+    "mtime": 1792265610.4846897,
+    "seen": 1792687334.11829,
+    "ast_hash": "4846243f8817b2b7dbbd556f62bdf6ec",
+    "semantic_hash": "4846243f8817b2b7dbbd556f62bdf6ec"
+  },
+  "ReplicatedStorage/shared/Configs/CarDetailConfig.luau": {
+    "mtime": 1792265610.5093071,
+    "seen": 1792687334.11829,
+    "ast_hash": "4a72f7abe4ce01fe2c69471e00095f8a",
+    "semantic_hash": "4a72f7abe4ce01fe2c69471e00095f8a"
+  },
+  "ReplicatedStorage/shared/Configs/CarNameConfig.luau": {
+    "mtime": 1792707015.456924,
+    "seen": 1792707462.2353103,
+    "ast_hash": "0f5ceb42babe94bf316cc3f3da60c074",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/CarryConfig.luau": {
+    "mtime": 1792707015.4579554,
+    "seen": 1792707462.2353103,
+    "ast_hash": "4a6d194fdaae54efb9918caf23807c79",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/CashConfig.luau": {
+    "mtime": 1792265610.49271,
+    "seen": 1792687334.11829,
+    "ast_hash": "41d4acc26fab2ac50a13b55dfe37c54e",
+    "semantic_hash": "41d4acc26fab2ac50a13b55dfe37c54e"
+  },
+  "ReplicatedStorage/shared/Configs/CockpitConfig.luau": {
+    "mtime": 1792265610.534333,
+    "seen": 1792687334.11829,
+    "ast_hash": "9873de00a73f04707d45ed931d212683",
+    "semantic_hash": "9873de00a73f04707d45ed931d212683"
+  },
+  "ReplicatedStorage/shared/Configs/CodesConfig.luau": {
+    "mtime": 1792265610.5373495,
+    "seen": 1792687334.11829,
+    "ast_hash": "fd8ef17fa841fac9b737a88cf893c189",
+    "semantic_hash": "fd8ef17fa841fac9b737a88cf893c189"
+  },
+  "ReplicatedStorage/shared/Configs/CollectEffectConfig.luau": {
+    "mtime": 1792265610.4761765,
+    "seen": 1792687334.11829,
+    "ast_hash": "c83b66762098f7528de508e550fb42f7",
+    "semantic_hash": "c83b66762098f7528de508e550fb42f7"
+  },
+  "ReplicatedStorage/shared/Configs/CollectionCueConfig.luau": {
+    "mtime": 1792265610.5328248,
+    "seen": 1792687334.11829,
+    "ast_hash": "f6020b6ff7be6b0a9e4640d076ea4149",
+    "semantic_hash": "f6020b6ff7be6b0a9e4640d076ea4149"
+  },
+  "ReplicatedStorage/shared/Configs/CrashSoundConfig.luau": {
+    "mtime": 1792265610.5318258,
+    "seen": 1792687334.11829,
+    "ast_hash": "0ce9c44c53243c62548a44b4577df32c",
+    "semantic_hash": "0ce9c44c53243c62548a44b4577df32c"
+  },
+  "ReplicatedStorage/shared/Configs/CrashVfxConfig.luau": {
+    "mtime": 1792265610.5258243,
+    "seen": 1792687334.11829,
+    "ast_hash": "3d02936447d5286a61ed762a1f130666",
+    "semantic_hash": "3d02936447d5286a61ed762a1f130666"
+  },
+  "ReplicatedStorage/shared/Configs/CustomerConfig.luau": {
+    "mtime": 1792676545.3987422,
+    "seen": 1792687334.11829,
+    "ast_hash": "241cda0e624fa6ba7cd716e8223f1ad5",
+    "semantic_hash": "241cda0e624fa6ba7cd716e8223f1ad5"
+  },
+  "ReplicatedStorage/shared/Configs/CustomizeConfig.luau": {
+    "mtime": 1792265610.5223396,
+    "seen": 1792687334.11829,
+    "ast_hash": "e28c6b26a8c7b3c84682a89b76bd7101",
+    "semantic_hash": "e28c6b26a8c7b3c84682a89b76bd7101"
+  },
+  "ReplicatedStorage/shared/Configs/DailyRewardConfig.luau": {
+    "mtime": 1792527665.365892,
+    "seen": 1792687334.11829,
+    "ast_hash": "57ec79d1eb8758651ea3134d3f0f0234",
+    "semantic_hash": "57ec79d1eb8758651ea3134d3f0f0234"
+  },
+  "ReplicatedStorage/shared/Configs/DayNightConfig.luau": {
+    "mtime": 1792265610.49271,
+    "seen": 1792687334.11829,
+    "ast_hash": "707c05f85736b4dd7cdf9db210820d2c",
+    "semantic_hash": "707c05f85736b4dd7cdf9db210820d2c"
+  },
+  "ReplicatedStorage/shared/Configs/DriveConfig.luau": {
+    "mtime": 1792947592.9534056,
+    "seen": 1792948538.2661812,
+    "ast_hash": "bd3cf1e86ebbd23b0406d26f9f47bed9",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/EncounterConfig.luau": {
+    "mtime": 1792265610.5233386,
+    "seen": 1792687334.11829,
+    "ast_hash": "e20a3cc1d194ab152a0f1f10a56cceb6",
+    "semantic_hash": "e20a3cc1d194ab152a0f1f10a56cceb6"
+  },
+  "ReplicatedStorage/shared/Configs/EngineSoundConfig.luau": {
+    "mtime": 1792707015.459984,
+    "seen": 1792707462.2353103,
+    "ast_hash": "2cbff6ef25fd6f2db92432b9a71d55a2",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/FeedbackAudioConfig.luau": {
+    "mtime": 1792265610.5328248,
+    "seen": 1792687334.11829,
+    "ast_hash": "68c4b3f486391db809969aa8eb467d33",
+    "semantic_hash": "68c4b3f486391db809969aa8eb467d33"
+  },
+  "ReplicatedStorage/shared/Configs/Framework.luau": {
+    "mtime": 1792265610.441095,
+    "seen": 1792687334.11829,
+    "ast_hash": "63b5f685477e7e2b03add14559452cc8",
+    "semantic_hash": "63b5f685477e7e2b03add14559452cc8"
+  },
+  "ReplicatedStorage/shared/Configs/GamepadConfig.luau": {
+    "mtime": 1792265610.4631329,
+    "seen": 1792687334.11829,
+    "ast_hash": "1bcc0f1e3d70de8ca2f600f056036483",
+    "semantic_hash": "1bcc0f1e3d70de8ca2f600f056036483"
+  },
+  "ReplicatedStorage/shared/Configs/GarageConfig.luau": {
+    "mtime": 1792707823.5941367,
+    "seen": 1792707850.427813,
+    "ast_hash": "9af81d043d1c940dc5a3a1b062f0bec3",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/GetawayConfig.luau": {
+    "mtime": 1792265610.4506128,
+    "seen": 1792687334.11829,
+    "ast_hash": "66b8484831d384ea108bbc38e4581aef",
+    "semantic_hash": "66b8484831d384ea108bbc38e4581aef"
+  },
+  "ReplicatedStorage/shared/Configs/GiftConfig.luau": {
+    "mtime": 1792265610.4992409,
+    "seen": 1792687334.11829,
+    "ast_hash": "778b7debb7f1f0ee16befea23a8f1618",
+    "semantic_hash": "778b7debb7f1f0ee16befea23a8f1618"
+  },
+  "ReplicatedStorage/shared/Configs/GlassPromptConfig.luau": {
+    "mtime": 1792420027.2721624,
+    "seen": 1792687334.11829,
+    "ast_hash": "15b29aefd8c30b1218ccb1ac06c93be3",
+    "semantic_hash": "15b29aefd8c30b1218ccb1ac06c93be3"
+  },
+  "ReplicatedStorage/shared/Configs/GroupRewardConfig.luau": {
+    "mtime": 1792265610.5393496,
+    "seen": 1792687334.11829,
+    "ast_hash": "def63c6fc77591684d13efbe347c5cd8",
+    "semantic_hash": "def63c6fc77591684d13efbe347c5cd8"
+  },
+  "ReplicatedStorage/shared/Configs/GuideTrailConfig.luau": {
+    "mtime": 1792527665.3704069,
+    "seen": 1792687334.11829,
+    "ast_hash": "5208fd1b14969a73ebacc4b2bea46af7",
+    "semantic_hash": "5208fd1b14969a73ebacc4b2bea46af7"
+  },
+  "ReplicatedStorage/shared/Configs/IndexRewardConfig.luau": {
+    "mtime": 1792265610.5403473,
+    "seen": 1792687334.11829,
+    "ast_hash": "5ab1a95b9cc0de49a74ac14a6f04fd83",
+    "semantic_hash": "5ab1a95b9cc0de49a74ac14a6f04fd83"
+  },
+  "ReplicatedStorage/shared/Configs/InterfaceConfig.luau": {
+    "mtime": 1792527665.3714073,
+    "seen": 1792687334.11829,
+    "ast_hash": "d467b038f16a54da46402be82b32c479",
+    "semantic_hash": "d467b038f16a54da46402be82b32c479"
+  },
+  "ReplicatedStorage/shared/Configs/InventoryConfig.luau": {
+    "mtime": 1792265610.47517,
+    "seen": 1792687334.11829,
+    "ast_hash": "21f9dcd14855f6a67c1f398a163b91b1",
+    "semantic_hash": "21f9dcd14855f6a67c1f398a163b91b1"
+  },
+  "ReplicatedStorage/shared/Configs/LeaderboardConfig.luau": {
+    "mtime": 1792676524.063684,
+    "seen": 1792687334.11829,
+    "ast_hash": "e58d425ade6029650f169197fad93483",
+    "semantic_hash": "e58d425ade6029650f169197fad93483"
+  },
+  "ReplicatedStorage/shared/Configs/LegendConfig.luau": {
+    "mtime": 1792265610.4917116,
+    "seen": 1792687334.11829,
+    "ast_hash": "ad9e121386f2c5e7e45eb31eff76f947",
+    "semantic_hash": "ad9e121386f2c5e7e45eb31eff76f947"
+  },
+  "ReplicatedStorage/shared/Configs/LobbyCarConfig.luau": {
+    "mtime": 1792265610.4561253,
+    "seen": 1792687334.11829,
+    "ast_hash": "a1fff28511d2063dfbac6285ddc14487",
+    "semantic_hash": "a1fff28511d2063dfbac6285ddc14487"
+  },
+  "ReplicatedStorage/shared/Configs/MarketValueConfig.luau": {
+    "mtime": 1792265610.5193381,
+    "seen": 1792687334.11829,
+    "ast_hash": "aa4328a500420ed4d1922ab9509507e7",
+    "semantic_hash": "aa4328a500420ed4d1922ab9509507e7"
+  },
+  "ReplicatedStorage/shared/Configs/MusicConfig.luau": {
+    "mtime": 1792265610.479183,
+    "seen": 1792687334.11829,
+    "ast_hash": "3d70c6a87d545341a430d0fb1e52e045",
+    "semantic_hash": "3d70c6a87d545341a430d0fb1e52e045"
+  },
+  "ReplicatedStorage/shared/Configs/NearMissConfig.luau": {
+    "mtime": 1792265610.46966,
+    "seen": 1792687334.11829,
+    "ast_hash": "643ae941fce8da107299adea2c63089f",
+    "semantic_hash": "643ae941fce8da107299adea2c63089f"
+  },
+  "ReplicatedStorage/shared/Configs/NewUIConfig.luau": {
+    "mtime": 1792581923.039503,
+    "seen": 1792687334.11829,
+    "ast_hash": "1a026329db3d93bbd8236433c31464d5",
+    "semantic_hash": "1a026329db3d93bbd8236433c31464d5"
+  },
+  "ReplicatedStorage/shared/Configs/NitroConfig.luau": {
+    "mtime": 1792265610.483182,
+    "seen": 1792687334.11829,
+    "ast_hash": "2ae01c367c931f8bd0be1e0742fdbf6c",
+    "semantic_hash": "2ae01c367c931f8bd0be1e0742fdbf6c"
+  },
+  "ReplicatedStorage/shared/Configs/NoticeLaneConfig.luau": {
+    "mtime": 1792527665.3714073,
+    "seen": 1792687334.11829,
+    "ast_hash": "c693b7ce27fb58f77b3f77cff5ea02b2",
+    "semantic_hash": "c693b7ce27fb58f77b3f77cff5ea02b2"
+  },
+  "ReplicatedStorage/shared/Configs/ObstacleConfig.luau": {
+    "mtime": 1792265610.4446013,
+    "seen": 1792687334.11829,
+    "ast_hash": "dd02f4d38eab5061958650d48105ad2a",
+    "semantic_hash": "dd02f4d38eab5061958650d48105ad2a"
+  },
+  "ReplicatedStorage/shared/Configs/OfflineConfig.luau": {
+    "mtime": 1792265610.467659,
+    "seen": 1792687334.11829,
+    "ast_hash": "8f6459d5d23314026677aa54230e0e10",
+    "semantic_hash": "8f6459d5d23314026677aa54230e0e10"
+  },
+  "ReplicatedStorage/shared/Configs/PaintConfig.luau": {
+    "mtime": 1792707015.4609938,
+    "seen": 1792707462.2367423,
+    "ast_hash": "a9347cd0e6c932a1c0844655a2b8e17d",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/PassConfig.luau": {
+    "mtime": 1792265610.4982293,
+    "seen": 1792687334.11829,
+    "ast_hash": "24afd8b2dd398f0f02bc4ce6ecccd7f0",
+    "semantic_hash": "24afd8b2dd398f0f02bc4ce6ecccd7f0"
+  },
+  "ReplicatedStorage/shared/Configs/PickupConfig.luau": {
+    "mtime": 1792760083.4577112,
+    "seen": 1792948538.2661812,
+    "ast_hash": "fd84f17d373b7e9384858ece2eb5b71d",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/PlateConfig.luau": {
+    "mtime": 1792265610.480182,
+    "seen": 1792687334.11829,
+    "ast_hash": "086bd1cf2a20ec98edf1aa40714c05d2",
+    "semantic_hash": "086bd1cf2a20ec98edf1aa40714c05d2"
+  },
+  "ReplicatedStorage/shared/Configs/PlotConfig.luau": {
+    "mtime": 1792265610.4516122,
+    "seen": 1792687334.11829,
+    "ast_hash": "b703398967a7c6085fbc4b5ee5e3e6fc",
+    "semantic_hash": "b703398967a7c6085fbc4b5ee5e3e6fc"
+  },
+  "ReplicatedStorage/shared/Configs/PoliceConfig.luau": {
+    "mtime": 1792701133.572374,
+    "seen": 1792701457.7626352,
+    "ast_hash": "dac90f3d46a83cb73daa09d02ea3a804",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/QuestConfig.luau": {
+    "mtime": 1792265610.46866,
+    "seen": 1792687334.11829,
+    "ast_hash": "e5aeec803709e08b211d605282fcc4a9",
+    "semantic_hash": "e5aeec803709e08b211d605282fcc4a9"
+  },
+  "ReplicatedStorage/shared/Configs/RaceConfig.luau": {
+    "mtime": 1792707015.4637156,
+    "seen": 1792707462.2367423,
+    "ast_hash": "f1a0ed650b120bef5f6cb2d661e952f5",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/RadioConfig.luau": {
+    "mtime": 1792265610.4887097,
+    "seen": 1792687334.11829,
+    "ast_hash": "f236dce7c6118bc8bee93691246e42ab",
+    "semantic_hash": "f236dce7c6118bc8bee93691246e42ab"
+  },
+  "ReplicatedStorage/shared/Configs/RandomCarConfig.luau": {
+    "mtime": 1792265610.4877098,
+    "seen": 1792687334.11829,
+    "ast_hash": "2f2605b6ea06db13595f6c34bca56ff3",
+    "semantic_hash": "2f2605b6ea06db13595f6c34bca56ff3"
+  },
+  "ReplicatedStorage/shared/Configs/RarityBadgeConfig.luau": {
+    "mtime": 1792265610.5143225,
+    "seen": 1792687334.11829,
+    "ast_hash": "3a4fe1a55e781f64f4f0962809817f37",
+    "semantic_hash": "3a4fe1a55e781f64f4f0962809817f37"
+  },
+  "ReplicatedStorage/shared/Configs/ReviveConfig.luau": {
+    "mtime": 1792265610.4631329,
+    "seen": 1792687334.11829,
+    "ast_hash": "c283d4d57bf022b2a14871907c673e46",
+    "semantic_hash": "c283d4d57bf022b2a14871907c673e46"
+  },
+  "ReplicatedStorage/shared/Configs/RewardConfig.luau": {
+    "mtime": 1792265610.4546123,
+    "seen": 1792687334.11829,
+    "ast_hash": "eb459e09732b4918bbbdeef53890e6f5",
+    "semantic_hash": "eb459e09732b4918bbbdeef53890e6f5"
+  },
+  "ReplicatedStorage/shared/Configs/RoadStudsConfig.luau": {
+    "mtime": 1792265610.5083065,
+    "seen": 1792687334.11829,
+    "ast_hash": "9b5b0ea7a4297b6df54f8c06b237a1d9",
+    "semantic_hash": "9b5b0ea7a4297b6df54f8c06b237a1d9"
+  },
+  "ReplicatedStorage/shared/Configs/SellConfig.luau": {
+    "mtime": 1792265610.4897096,
+    "seen": 1792687334.11829,
+    "ast_hash": "b6c225c0117c553ca05e9ec410fdbb30",
+    "semantic_hash": "b6c225c0117c553ca05e9ec410fdbb30"
+  },
+  "ReplicatedStorage/shared/Configs/SellerConfig.luau": {
+    "mtime": 1792538849.6934493,
+    "seen": 1792687334.11829,
+    "ast_hash": "23ff52d7b839730a359fb655c774b96b",
+    "semantic_hash": "23ff52d7b839730a359fb655c774b96b"
+  },
+  "ReplicatedStorage/shared/Configs/SettingsConfig.luau": {
+    "mtime": 1792265610.4952154,
+    "seen": 1792687334.11829,
+    "ast_hash": "bb1f1e5976083461f103d3b276398426",
+    "semantic_hash": "bb1f1e5976083461f103d3b276398426"
+  },
+  "ReplicatedStorage/shared/Configs/ShopConfig.luau": {
+    "mtime": 1792707015.4651423,
+    "seen": 1792707462.2367423,
+    "ast_hash": "38ba63897769ea927e5a1216ecfeb0df",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/ShowcaseConfig.luau": {
+    "mtime": 1792317388.9482062,
+    "seen": 1792687334.11829,
+    "ast_hash": "f2436159aca460367fefe918164ffb9a",
+    "semantic_hash": "f2436159aca460367fefe918164ffb9a"
+  },
+  "ReplicatedStorage/shared/Configs/SpeedTrapConfig.luau": {
+    "mtime": 1792527665.3744068,
+    "seen": 1792687334.11829,
+    "ast_hash": "ed87844001aaaffac62feaf288df3ed8",
+    "semantic_hash": "ed87844001aaaffac62feaf288df3ed8"
+  },
+  "ReplicatedStorage/shared/Configs/SpeedoConfig.luau": {
+    "mtime": 1792265610.5108116,
+    "seen": 1792687334.11829,
+    "ast_hash": "32833853cdb26ff22b0920018cac505b",
+    "semantic_hash": "32833853cdb26ff22b0920018cac505b"
+  },
+  "ReplicatedStorage/shared/Configs/StartCarConfig.luau": {
+    "mtime": 1792947588.6318114,
+    "seen": 1792948538.2661812,
+    "ast_hash": "362c2a83817ca61c61e6d8f336c3e00d",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/StealConfig.luau": {
+    "mtime": 1792527665.3754075,
+    "seen": 1792687334.11829,
+    "ast_hash": "4aae2639eb350d3e42b905b8060453fd",
+    "semantic_hash": "4aae2639eb350d3e42b905b8060453fd"
+  },
+  "ReplicatedStorage/shared/Configs/StealJuiceConfig.luau": {
+    "mtime": 1792708322.9845967,
+    "seen": 1792708574.4387066,
+    "ast_hash": "eeffdc9fd6e905d7d123a8038c23350c",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/StealNudgeConfig.luau": {
+    "mtime": 1792265610.5268273,
+    "seen": 1792687334.11829,
+    "ast_hash": "52d2c30db2b820215b0160f5442336fc",
+    "semantic_hash": "52d2c30db2b820215b0160f5442336fc"
+  },
+  "ReplicatedStorage/shared/Configs/StealTagConfig.luau": {
+    "mtime": 1792265610.5328248,
+    "seen": 1792687334.11829,
+    "ast_hash": "d5d19df934bf61d91c531cf37a1afa8e",
+    "semantic_hash": "d5d19df934bf61d91c531cf37a1afa8e"
+  },
+  "ReplicatedStorage/shared/Configs/TipsConfig.luau": {
+    "mtime": 1792265610.4746633,
+    "seen": 1792687334.11829,
+    "ast_hash": "bf43ef78ee4fbe60dadb0622df9fd5c0",
+    "semantic_hash": "bf43ef78ee4fbe60dadb0622df9fd5c0"
+  },
+  "ReplicatedStorage/shared/Configs/TrafficConfig.luau": {
+    "mtime": 1792527665.3784075,
+    "seen": 1792687334.11829,
+    "ast_hash": "5be6a161d316f8769199adaf3f40e3d8",
+    "semantic_hash": "5be6a161d316f8769199adaf3f40e3d8"
+  },
+  "ReplicatedStorage/shared/Configs/TuningConfig.luau": {
+    "mtime": 1792265610.5128174,
+    "seen": 1792687334.11829,
+    "ast_hash": "6ea15595104e0019963377f3d56da153",
+    "semantic_hash": "6ea15595104e0019963377f3d56da153"
+  },
+  "ReplicatedStorage/shared/Configs/TurnSignalConfig.luau": {
+    "mtime": 1792265610.517339,
+    "seen": 1792687334.11829,
+    "ast_hash": "77c46205e9d115edb499e3f16d78629c",
+    "semantic_hash": "77c46205e9d115edb499e3f16d78629c"
+  },
+  "ReplicatedStorage/shared/Configs/TutorialConfig.luau": {
+    "mtime": 1792947634.0378969,
+    "seen": 1792948538.2661812,
+    "ast_hash": "33e1cf761156f547b18917d44dee27c0",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/UIAssets.luau": {
+    "mtime": 1792265610.4536111,
+    "seen": 1792687334.11829,
+    "ast_hash": "c7f5f373de6af667415b4026f55e476b",
+    "semantic_hash": "c7f5f373de6af667415b4026f55e476b"
+  },
+  "ReplicatedStorage/shared/Configs/UpgradeConfig.luau": {
+    "mtime": 1792527665.3805091,
+    "seen": 1792687334.11829,
+    "ast_hash": "40860bdc684984bf710c73ca87e2e7b5",
+    "semantic_hash": "40860bdc684984bf710c73ca87e2e7b5"
+  },
+  "ReplicatedStorage/shared/Configs/WeatherConfig.luau": {
+    "mtime": 1792317388.9492068,
+    "seen": 1792687334.11829,
+    "ast_hash": "2a3b9de00074f26f85beb1a392376a02",
+    "semantic_hash": "2a3b9de00074f26f85beb1a392376a02"
+  },
+  "ReplicatedStorage/shared/Configs/WindConfig.luau": {
+    "mtime": 1792265610.47366,
+    "seen": 1792687334.11829,
+    "ast_hash": "ee2f0cc7d43a5f42370b75e8db7818f3",
+    "semantic_hash": "ee2f0cc7d43a5f42370b75e8db7818f3"
+  },
+  "ReplicatedStorage/shared/Configs/WorldConfig.luau": {
+    "mtime": 1792707015.4692757,
+    "seen": 1792707462.2367423,
+    "ast_hash": "f08a2c642159d509ded37b4eccecc0ba",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/AdminPanelController.luau": {
+    "mtime": 1792947260.843711,
+    "seen": 1792948538.2661812,
+    "ast_hash": "72e6d62f661cff18139d780b54b680b3",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/AnalyticsController.luau": {
+    "mtime": 1792265610.4350803,
+    "seen": 1792687334.11829,
+    "ast_hash": "947bcc7d6317910ed385a58714dd4332",
+    "semantic_hash": "947bcc7d6317910ed385a58714dd4332"
+  },
+  "ReplicatedStorage/shared/Controllers/BundleStandController.luau": {
+    "mtime": 1792265610.4360871,
+    "seen": 1792687334.11829,
+    "ast_hash": "ac3044207c3977bc257bd255fa64c59d",
+    "semantic_hash": "ac3044207c3977bc257bd255fa64c59d"
+  },
+  "ReplicatedStorage/shared/Controllers/BuyerController.luau": {
+    "mtime": 1792265610.3969593,
+    "seen": 1792687334.11829,
+    "ast_hash": "22391bdc5dad43e0da86af135aee9ea0",
+    "semantic_hash": "22391bdc5dad43e0da86af135aee9ea0"
+  },
+  "ReplicatedStorage/shared/Controllers/CameraTuningController.luau": {
+    "mtime": 1792265610.3934429,
+    "seen": 1792687334.11829,
+    "ast_hash": "dc8a0d95959f107c82a81fbb53563813",
+    "semantic_hash": "dc8a0d95959f107c82a81fbb53563813"
+  },
+  "ReplicatedStorage/shared/Controllers/CarDealController.luau": {
+    "mtime": 1792265610.370385,
+    "seen": 1792687334.11829,
+    "ast_hash": "f86e16faccf650526513f59c49b162b8",
+    "semantic_hash": "f86e16faccf650526513f59c49b162b8"
+  },
+  "ReplicatedStorage/shared/Controllers/CarHudController.luau": {
+    "mtime": 1792265610.2781198,
+    "seen": 1792687334.11829,
+    "ast_hash": "abf7008a180ea571072b70d3785cdea2",
+    "semantic_hash": "abf7008a180ea571072b70d3785cdea2"
+  },
+  "ReplicatedStorage/shared/Controllers/CarLightsController.luau": {
+    "mtime": 1792265610.3959575,
+    "seen": 1792687334.11829,
+    "ast_hash": "da62d521641ea87db7ec43d4ef10f9e3",
+    "semantic_hash": "da62d521641ea87db7ec43d4ef10f9e3"
+  },
+  "ReplicatedStorage/shared/Controllers/CarryController.luau": {
+    "mtime": 1792265610.3914416,
+    "seen": 1792687334.11829,
+    "ast_hash": "443f7217f515c9417483549923c9ec36",
+    "semantic_hash": "443f7217f515c9417483549923c9ec36"
+  },
+  "ReplicatedStorage/shared/Controllers/CarryHotbarController.luau": {
+    "mtime": 1792265610.3979669,
+    "seen": 1792687334.11829,
+    "ast_hash": "f5e910a5c79e898789383b80c851fcb5",
+    "semantic_hash": "f5e910a5c79e898789383b80c851fcb5"
+  },
+  "ReplicatedStorage/shared/Controllers/CashBurstController.luau": {
+    "mtime": 1792265610.360859,
+    "seen": 1792687334.11829,
+    "ast_hash": "934d7ce84378ada44ca13f0aaad0ab14",
+    "semantic_hash": "934d7ce84378ada44ca13f0aaad0ab14"
+  },
+  "ReplicatedStorage/shared/Controllers/CodesController.luau": {
+    "mtime": 1792265610.4295726,
+    "seen": 1792687334.11829,
+    "ast_hash": "cb61c985e07c165ef95348f18e936d9a",
+    "semantic_hash": "cb61c985e07c165ef95348f18e936d9a"
+  },
+  "ReplicatedStorage/shared/Controllers/CrashVfxController.luau": {
+    "mtime": 1792265610.4050083,
+    "seen": 1792687334.11829,
+    "ast_hash": "7ad7bac5673989f33264c7b7687838c1",
+    "semantic_hash": "7ad7bac5673989f33264c7b7687838c1"
+  },
+  "ReplicatedStorage/shared/Controllers/DailyRewardController.luau": {
+    "mtime": 1792707015.4692757,
+    "seen": 1792707462.2367423,
+    "ast_hash": "c17de14ccefad96074e895ac0dfdb68f",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/DayNightController.luau": {
+    "mtime": 1792265610.3819113,
+    "seen": 1792687334.11829,
+    "ast_hash": "9071edea4376c0eb671d37365337fb85",
+    "semantic_hash": "9071edea4376c0eb671d37365337fb85"
+  },
+  "ReplicatedStorage/shared/Controllers/DealershipController.luau": {
+    "mtime": 1792527665.3845086,
+    "seen": 1792687334.11829,
+    "ast_hash": "74ac53be6408e36bb397bca587287b71",
+    "semantic_hash": "74ac53be6408e36bb397bca587287b71"
+  },
+  "ReplicatedStorage/shared/Controllers/DealershipMarkerController.luau": {
+    "mtime": 1792265610.3884401,
+    "seen": 1792687334.11829,
+    "ast_hash": "25752ee5f632bd0d46e2efccb750b4d3",
+    "semantic_hash": "25752ee5f632bd0d46e2efccb750b4d3"
+  },
+  "ReplicatedStorage/shared/Controllers/DealershipSignController.luau": {
+    "mtime": 1792265610.3503404,
+    "seen": 1792687334.11829,
+    "ast_hash": "9ae16a289c70de9eb24a23652ae9b4d7",
+    "semantic_hash": "9ae16a289c70de9eb24a23652ae9b4d7"
+  },
+  "ReplicatedStorage/shared/Controllers/DiscoveryController.luau": {
+    "mtime": 1792265610.419047,
+    "seen": 1792687334.11829,
+    "ast_hash": "52c302dad0b25e85f67af50d51d1eed4",
+    "semantic_hash": "52c302dad0b25e85f67af50d51d1eed4"
+  },
+  "ReplicatedStorage/shared/Controllers/DriveController.luau": {
+    "mtime": 1792755944.6578991,
+    "seen": 1792756130.243801,
+    "ast_hash": "5c142e6a96eade38abe3e56fab0a49da",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/DrivingHudController.luau": {
+    "mtime": 1792760083.460229,
+    "seen": 1792948538.2661812,
+    "ast_hash": "554b52cbadf787cb8fb73d3c0df596a5",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/GameplayFeedbackController.luau": {
+    "mtime": 1792265610.426564,
+    "seen": 1792687334.11829,
+    "ast_hash": "13e183c58a604cffcd4445ba7318bbfb",
+    "semantic_hash": "13e183c58a604cffcd4445ba7318bbfb"
+  },
+  "ReplicatedStorage/shared/Controllers/GarageHudController.luau": {
+    "mtime": 1792265610.2876372,
+    "seen": 1792687334.11829,
+    "ast_hash": "25f2eeda6862f4f5c5dc9c35c60578f0",
+    "semantic_hash": "25f2eeda6862f4f5c5dc9c35c60578f0"
+  },
+  "ReplicatedStorage/shared/Controllers/GetawayController.luau": {
+    "mtime": 1792265610.2866333,
+    "seen": 1792687334.11829,
+    "ast_hash": "7801a9a56a8a743b3210ef9d5ed076fe",
+    "semantic_hash": "7801a9a56a8a743b3210ef9d5ed076fe"
+  },
+  "ReplicatedStorage/shared/Controllers/GetawayHudController.luau": {
+    "mtime": 1792527665.3875089,
+    "seen": 1792687334.11829,
+    "ast_hash": "c4ba13214ccfef1936ab6b236e5d08ca",
+    "semantic_hash": "c4ba13214ccfef1936ab6b236e5d08ca"
+  },
+  "ReplicatedStorage/shared/Controllers/GiftController.luau": {
+    "mtime": 1792265610.3894417,
+    "seen": 1792687334.11829,
+    "ast_hash": "a9ec1249d667c8c8ac4ce81020b0f3ef",
+    "semantic_hash": "a9ec1249d667c8c8ac4ce81020b0f3ef"
+  },
+  "ReplicatedStorage/shared/Controllers/GlassPromptController.luau": {
+    "mtime": 1792265610.419047,
+    "seen": 1792687334.11829,
+    "ast_hash": "d488a6f11d06803871a429696ae088a2",
+    "semantic_hash": "d488a6f11d06803871a429696ae088a2"
+  },
+  "ReplicatedStorage/shared/Controllers/GroupRewardController.luau": {
+    "mtime": 1792265610.431573,
+    "seen": 1792687334.11829,
+    "ast_hash": "d86d37c73f8a9723890be95d52d8943f",
+    "semantic_hash": "d86d37c73f8a9723890be95d52d8943f"
+  },
+  "ReplicatedStorage/shared/Controllers/GuideTrailController.luau": {
+    "mtime": 1792527665.3895423,
+    "seen": 1792687334.11829,
+    "ast_hash": "9a3c116d921800b4e744758df34f9294",
+    "semantic_hash": "9a3c116d921800b4e744758df34f9294"
+  },
+  "ReplicatedStorage/shared/Controllers/IndexRewardController.luau": {
+    "mtime": 1792265610.432571,
+    "seen": 1792687334.11829,
+    "ast_hash": "2584083bacd3475e686be7c0d58d1745",
+    "semantic_hash": "2584083bacd3475e686be7c0d58d1745"
+  },
+  "ReplicatedStorage/shared/Controllers/InterfaceController.luau": {
+    "mtime": 1792265610.3844247,
+    "seen": 1792687334.11829,
+    "ast_hash": "c17355c7b0a164dfc8d6ce59e01d33a4",
+    "semantic_hash": "c17355c7b0a164dfc8d6ce59e01d33a4"
+  },
+  "ReplicatedStorage/shared/Controllers/InventoryLimitController.luau": {
+    "mtime": 1792265610.423046,
+    "seen": 1792687334.11829,
+    "ast_hash": "63ebc929c519dcfb7d35c2ed2155edc5",
+    "semantic_hash": "63ebc929c519dcfb7d35c2ed2155edc5"
+  },
+  "ReplicatedStorage/shared/Controllers/LeaderboardController.luau": {
+    "mtime": 1792265610.3588583,
+    "seen": 1792687334.11829,
+    "ast_hash": "1aa1e88e374674c17fd6d0e452d717c1",
+    "semantic_hash": "1aa1e88e374674c17fd6d0e452d717c1"
+  },
+  "ReplicatedStorage/shared/Controllers/LobbyCarController.luau": {
+    "mtime": 1792265610.3378181,
+    "seen": 1792687334.11829,
+    "ast_hash": "765d5f2b64db3ff1e3c3a2d926bd84a4",
+    "semantic_hash": "765d5f2b64db3ff1e3c3a2d926bd84a4"
+  },
+  "ReplicatedStorage/shared/Controllers/LobbyDriveController.luau": {
+    "mtime": 1792708402.1275713,
+    "seen": 1792708574.4387066,
+    "ast_hash": "86abd50f0030ef1961c4891888ba56bf",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/LuckProgressController.luau": {
+    "mtime": 1792527665.3905425,
+    "seen": 1792687334.11829,
+    "ast_hash": "958020f46439d6feafa81179c387020d",
+    "semantic_hash": "958020f46439d6feafa81179c387020d"
+  },
+  "ReplicatedStorage/shared/Controllers/MusicController.luau": {
+    "mtime": 1792265610.3618572,
+    "seen": 1792687334.11829,
+    "ast_hash": "c812007458f6d4cac4d3a2e7ff8ba353",
+    "semantic_hash": "c812007458f6d4cac4d3a2e7ff8ba353"
+  },
+  "ReplicatedStorage/shared/Controllers/NearMissController.luau": {
+    "mtime": 1792265610.348339,
+    "seen": 1792687334.11829,
+    "ast_hash": "6102649a00d1484e4cb19e0cad2754db",
+    "semantic_hash": "6102649a00d1484e4cb19e0cad2754db"
+  },
+  "ReplicatedStorage/shared/Controllers/NitroController.luau": {
+    "mtime": 1792265610.3673868,
+    "seen": 1792687334.11829,
+    "ast_hash": "585593ff55972db403e2d4e2d5f33d72",
+    "semantic_hash": "585593ff55972db403e2d4e2d5f33d72"
+  },
+  "ReplicatedStorage/shared/Controllers/ObstacleController.luau": {
+    "mtime": 1792265610.2771204,
+    "seen": 1792687334.11829,
+    "ast_hash": "1ea59600f46ab3bb57f0987067654991",
+    "semantic_hash": "1ea59600f46ab3bb57f0987067654991"
+  },
+  "ReplicatedStorage/shared/Controllers/OfflineController.luau": {
+    "mtime": 1792265610.3418164,
+    "seen": 1792687334.11829,
+    "ast_hash": "757e7ab44d3813a56e82930f359438f4",
+    "semantic_hash": "757e7ab44d3813a56e82930f359438f4"
+  },
+  "ReplicatedStorage/shared/Controllers/OfflineLabelController.luau": {
+    "mtime": 1792265610.402966,
+    "seen": 1792687334.11829,
+    "ast_hash": "2eed5819a5d12a3d809102092bf3309e",
+    "semantic_hash": "2eed5819a5d12a3d809102092bf3309e"
+  },
+  "ReplicatedStorage/shared/Controllers/PickupController.luau": {
+    "mtime": 1792265610.3874428,
+    "seen": 1792687334.11829,
+    "ast_hash": "fe1143634ed5bcdae69527e97c49e810",
+    "semantic_hash": "fe1143634ed5bcdae69527e97c49e810"
+  },
+  "ReplicatedStorage/shared/Controllers/PoliceController.luau": {
+    "mtime": 1792947594.1291425,
+    "seen": 1792948538.2661812,
+    "ast_hash": "79d588ece00c16b4b9b66cb3508934dd",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/PoliceHudController.luau": {
+    "mtime": 1792527665.3935418,
+    "seen": 1792687334.11829,
+    "ast_hash": "23a34eb628b0e0a686cb98d3201c21ae",
+    "semantic_hash": "23a34eb628b0e0a686cb98d3201c21ae"
+  },
+  "ReplicatedStorage/shared/Controllers/QuestController.luau": {
+    "mtime": 1792265610.346333,
+    "seen": 1792687334.11829,
+    "ast_hash": "d4323c0a38289ec45f0a2519cdd5fcf9",
+    "semantic_hash": "d4323c0a38289ec45f0a2519cdd5fcf9"
+  },
+  "ReplicatedStorage/shared/Controllers/RaceCameraController.luau": {
+    "mtime": 1792265610.28212,
+    "seen": 1792687334.11829,
+    "ast_hash": "6b455f4670867da9788d4d3ab0b8e72a",
+    "semantic_hash": "6b455f4670867da9788d4d3ab0b8e72a"
+  },
+  "ReplicatedStorage/shared/Controllers/RaceEntryController.luau": {
+    "mtime": 1792947610.0869355,
+    "seen": 1792948538.2661812,
+    "ast_hash": "d9bf5bda06ed3e3eebba352b84f738e4",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/RaceFreezeController.luau": {
+    "mtime": 1792265610.3653755,
+    "seen": 1792687334.11829,
+    "ast_hash": "34bf2f45ad03bb9ec59148021ac7d9e6",
+    "semantic_hash": "34bf2f45ad03bb9ec59148021ac7d9e6"
+  },
+  "ReplicatedStorage/shared/Controllers/RaceUIController.luau": {
+    "mtime": 1792527665.397542,
+    "seen": 1792687334.11829,
+    "ast_hash": "1c6522f6fe94ecbf03ff9cc4c3b0e858",
+    "semantic_hash": "1c6522f6fe94ecbf03ff9cc4c3b0e858"
+  },
+  "ReplicatedStorage/shared/Controllers/RadioController.luau": {
+    "mtime": 1792265610.3723855,
+    "seen": 1792687334.11829,
+    "ast_hash": "87f1cc59438c6501468669fd1c989647",
+    "semantic_hash": "87f1cc59438c6501468669fd1c989647"
+  },
+  "ReplicatedStorage/shared/Controllers/RadioPanelController.luau": {
+    "mtime": 1792265610.3723855,
+    "seen": 1792687334.11829,
+    "ast_hash": "27d2ae66d954803f7d3d72c91e29074a",
+    "semantic_hash": "27d2ae66d954803f7d3d72c91e29074a"
+  },
+  "ReplicatedStorage/shared/Controllers/RandomCarController.luau": {
+    "mtime": 1792527665.3985436,
+    "seen": 1792687334.11829,
+    "ast_hash": "cf04aa9d72247379ef436ccd16476c2b",
+    "semantic_hash": "cf04aa9d72247379ef436ccd16476c2b"
+  },
+  "ReplicatedStorage/shared/Controllers/RareCarBannerController.luau": {
+    "mtime": 1792707015.474247,
+    "seen": 1792707462.2367423,
+    "ast_hash": "3643837b0ee79ffcf353710b46565705",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/RenameController.luau": {
+    "mtime": 1792265610.348339,
+    "seen": 1792687334.11829,
+    "ast_hash": "20be0839ee4602d24da7a72594bce941",
+    "semantic_hash": "20be0839ee4602d24da7a72594bce941"
+  },
+  "ReplicatedStorage/shared/Controllers/ReviveController.luau": {
+    "mtime": 1792538277.170178,
+    "seen": 1792687334.11829,
+    "ast_hash": "562a4634fa8922f52abb72fa2e7b5eee",
+    "semantic_hash": "562a4634fa8922f52abb72fa2e7b5eee"
+  },
+  "ReplicatedStorage/shared/Controllers/RoadController.luau": {
+    "mtime": 1792581923.041503,
+    "seen": 1792687334.11829,
+    "ast_hash": "58c36ee3ba53905e1251e4c307d9f311",
+    "semantic_hash": "58c36ee3ba53905e1251e4c307d9f311"
+  },
+  "ReplicatedStorage/shared/Controllers/SaleTagController.luau": {
+    "mtime": 1792265610.422048,
+    "seen": 1792687334.11829,
+    "ast_hash": "2849e29421b8041dc5888472da4c8971",
+    "semantic_hash": "2849e29421b8041dc5888472da4c8971"
+  },
+  "ReplicatedStorage/shared/Controllers/SellController.luau": {
+    "mtime": 1792265610.3723855,
+    "seen": 1792687334.11829,
+    "ast_hash": "1bd2823a9d67de718810f1b53845e8c0",
+    "semantic_hash": "1bd2823a9d67de718810f1b53845e8c0"
+  },
+  "ReplicatedStorage/shared/Controllers/SellPopupController.luau": {
+    "mtime": 1792265610.3829136,
+    "seen": 1792687334.11829,
+    "ast_hash": "f737441354345c8cd4fe6f2487e7b245",
+    "semantic_hash": "f737441354345c8cd4fe6f2487e7b245"
+  },
+  "ReplicatedStorage/shared/Controllers/SellerController.luau": {
+    "mtime": 1792265610.4295726,
+    "seen": 1792687334.11829,
+    "ast_hash": "ccdfd6b4aa46c9a3530e7cee995cf65f",
+    "semantic_hash": "ccdfd6b4aa46c9a3530e7cee995cf65f"
+  },
+  "ReplicatedStorage/shared/Controllers/ShowcaseController.luau": {
+    "mtime": 1792265610.4019678,
+    "seen": 1792687334.11829,
+    "ast_hash": "25d27b127807400ccc6510cc144d1398",
+    "semantic_hash": "25d27b127807400ccc6510cc144d1398"
+  },
+  "ReplicatedStorage/shared/Controllers/ShowroomSummaryController.luau": {
+    "mtime": 1792265610.3959575,
+    "seen": 1792687334.11829,
+    "ast_hash": "143cea40fffe5364843994790b26e6bc",
+    "semantic_hash": "143cea40fffe5364843994790b26e6bc"
+  },
+  "ReplicatedStorage/shared/Controllers/SoundController.luau": {
+    "mtime": 1792265610.334804,
+    "seen": 1792687334.11829,
+    "ast_hash": "f7df2c1d776068b162d3ba0ea9f35e17",
+    "semantic_hash": "f7df2c1d776068b162d3ba0ea9f35e17"
+  },
+  "ReplicatedStorage/shared/Controllers/SpeedTrapController.luau": {
+    "mtime": 1792265610.3904421,
+    "seen": 1792687334.11829,
+    "ast_hash": "25471528d203597028559905b186584a",
+    "semantic_hash": "25471528d203597028559905b186584a"
+  },
+  "ReplicatedStorage/shared/Controllers/StarController.luau": {
+    "mtime": 1792265610.426564,
+    "seen": 1792687334.11829,
+    "ast_hash": "f8a9ff08b69253cd1f8b4ceefd84a7ec",
+    "semantic_hash": "f8a9ff08b69253cd1f8b4ceefd84a7ec"
+  },
+  "ReplicatedStorage/shared/Controllers/StartCarController.luau": {
+    "mtime": 1792947609.2245183,
+    "seen": 1792948538.2661812,
+    "ast_hash": "ca493e5b68504f063eec9fb1934e423b",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/StealCinematicController.luau": {
+    "mtime": 1792265610.4080164,
+    "seen": 1792687334.11829,
+    "ast_hash": "e48e152d8e99b3453a58e389baf9689a",
+    "semantic_hash": "e48e152d8e99b3453a58e389baf9689a"
+  },
+  "ReplicatedStorage/shared/Controllers/StealController.luau": {
+    "mtime": 1792709532.1690154,
+    "seen": 1792756130.243801,
+    "ast_hash": "d3612da3cd463f6320f09bb03af8ccd3",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/StealNudgeController.luau": {
+    "mtime": 1792527665.4048274,
+    "seen": 1792687334.11829,
+    "ast_hash": "f4eb4218d6c30dad67f8023d04a630cf",
+    "semantic_hash": "f4eb4218d6c30dad67f8023d04a630cf"
+  },
+  "ReplicatedStorage/shared/Controllers/StealTagController.luau": {
+    "mtime": 1792527665.4058306,
+    "seen": 1792687334.11829,
+    "ast_hash": "519d12861e2b3df34bf03c8e718cf0ed",
+    "semantic_hash": "519d12861e2b3df34bf03c8e718cf0ed"
+  },
+  "ReplicatedStorage/shared/Controllers/StealToastController.luau": {
+    "mtime": 1792527665.406827,
+    "seen": 1792687334.11829,
+    "ast_hash": "803d57f7646f3bbfe5898275ba5a8b64",
+    "semantic_hash": "803d57f7646f3bbfe5898275ba5a8b64"
+  },
+  "ReplicatedStorage/shared/Controllers/TestEngineController.luau": {
+    "mtime": 1792760619.2830248,
+    "seen": 1792948538.2661812,
+    "ast_hash": "b268b3be02bbba06f631f5d65766e162",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/TipsController.luau": {
+    "mtime": 1792265610.3568592,
+    "seen": 1792687334.11829,
+    "ast_hash": "e4e5d73b7dff6f9b9945c4f1182c0851",
+    "semantic_hash": "e4e5d73b7dff6f9b9945c4f1182c0851"
+  },
+  "ReplicatedStorage/shared/Controllers/TopbarController.luau": {
+    "mtime": 1792707015.4752645,
+    "seen": 1792707462.2367423,
+    "ast_hash": "f93fbef8d7987b44d6639721a2d6c3ee",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/TrafficController.luau": {
+    "mtime": 1792947400.8042846,
+    "seen": 1792948538.2661812,
+    "ast_hash": "a65dc834ba42f0a7f5da733668230a0a",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/TuningController.luau": {
+    "mtime": 1792265610.3924415,
+    "seen": 1792687334.11829,
+    "ast_hash": "9f834e7e9b604b403ad3329908643d89",
+    "semantic_hash": "9f834e7e9b604b403ad3329908643d89"
+  },
+  "ReplicatedStorage/shared/Controllers/TurntableController.luau": {
+    "mtime": 1792265610.4115274,
+    "seen": 1792687334.11829,
+    "ast_hash": "435870dfd8d6079291515380b08b4ac0",
+    "semantic_hash": "435870dfd8d6079291515380b08b4ac0"
+  },
+  "ReplicatedStorage/shared/Controllers/TutorialController.luau": {
+    "mtime": 1792707015.4801533,
+    "seen": 1792707462.2367423,
+    "ast_hash": "47c0abd8da4d2795fb7561ee43709ffc",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/TutorialDirector.luau": {
+    "mtime": 1792265610.3673868,
+    "seen": 1792687334.11829,
+    "ast_hash": "52f7212ffab9e1f38090b7f41786437d",
+    "semantic_hash": "52f7212ffab9e1f38090b7f41786437d"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/BasicPage.luau": {
+    "mtime": 1792265610.2936337,
+    "seen": 1792687334.11829,
+    "ast_hash": "34c9286d25b1931430d8c012b1503a28",
+    "semantic_hash": "34c9286d25b1931430d8c012b1503a28"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/ButtonPress.luau": {
+    "mtime": 1792265610.2967026,
+    "seen": 1792687334.11829,
+    "ast_hash": "261d03eb6c3fb01b3b0da39bbf81c9e3",
+    "semantic_hash": "261d03eb6c3fb01b3b0da39bbf81c9e3"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/Button.luau": {
+    "mtime": 1792265610.2987082,
+    "seen": 1792687334.11829,
+    "ast_hash": "8a59916a1c8019a6a237379799e3d153",
+    "semantic_hash": "8a59916a1c8019a6a237379799e3d153"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/CarDetailV2.luau": {
+    "mtime": 1792265610.30473,
+    "seen": 1792687334.11829,
+    "ast_hash": "dbfb8ad40cedd341e4a48bc99b4ce1a8",
+    "semantic_hash": "dbfb8ad40cedd341e4a48bc99b4ce1a8"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/GamepadNav.luau": {
+    "mtime": 1792265610.2987082,
+    "seen": 1792687334.11829,
+    "ast_hash": "e136e7c27552d6d9b07035a407231cf3",
+    "semantic_hash": "e136e7c27552d6d9b07035a407231cf3"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/GiftPicker.luau": {
+    "mtime": 1792265610.3012214,
+    "seen": 1792687334.11829,
+    "ast_hash": "cb0d392e118c7e8ac8a8ad4a05139ad0",
+    "semantic_hash": "cb0d392e118c7e8ac8a8ad4a05139ad0"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/GiftPickerV2.luau": {
+    "mtime": 1792265610.303223,
+    "seen": 1792687334.11829,
+    "ast_hash": "acd06bbc0779218cdb224feac90ed6e3",
+    "semantic_hash": "acd06bbc0779218cdb224feac90ed6e3"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/HudClaimBadges.luau": {
+    "mtime": 1792265610.3057384,
+    "seen": 1792687334.11829,
+    "ast_hash": "91a2d4bedeefcf32c0e9d3e00ea41b71",
+    "semantic_hash": "91a2d4bedeefcf32c0e9d3e00ea41b71"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/HudRules.luau": {
+    "mtime": 1792265610.3022206,
+    "seen": 1792687334.11829,
+    "ast_hash": "b028fbd8846289a9e311306d509ab771",
+    "semantic_hash": "b028fbd8846289a9e311306d509ab771"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/MobileMenuRail.luau": {
+    "mtime": 1792265610.3057384,
+    "seen": 1792687334.11829,
+    "ast_hash": "c9fbc01727390a1d5ce7663dea52c5b0",
+    "semantic_hash": "c9fbc01727390a1d5ce7663dea52c5b0"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/RailHover.luau": {
+    "mtime": 1792265610.30473,
+    "seen": 1792687334.11829,
+    "ast_hash": "65b815802b81e10044aa736c6f28e001",
+    "semantic_hash": "65b815802b81e10044aa736c6f28e001"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Components/SunBurst.luau": {
+    "mtime": 1792265610.3002136,
+    "seen": 1792687334.11829,
+    "ast_hash": "0b67266e9736e9173c8c4b89bb19def3",
+    "semantic_hash": "0b67266e9736e9173c8c4b89bb19def3"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/KitPage.luau": {
+    "mtime": 1792265610.2967026,
+    "seen": 1792687334.11829,
+    "ast_hash": "06c25f583fa673482dfec3bb4d531d88",
+    "semantic_hash": "06c25f583fa673482dfec3bb4d531d88"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/CarOdds.luau": {
+    "mtime": 1792265610.3332977,
+    "seen": 1792687334.11829,
+    "ast_hash": "d6c8a25a4b5752378e87515dd943d262",
+    "semantic_hash": "d6c8a25a4b5752378e87515dd943d262"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/DailyRewards.luau": {
+    "mtime": 1792265610.331295,
+    "seen": 1792687334.11829,
+    "ast_hash": "40459dd59b80af5c168f041abe44a4b1",
+    "semantic_hash": "40459dd59b80af5c168f041abe44a4b1"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Dealership.luau": {
+    "mtime": 1792265610.3217728,
+    "seen": 1792687334.11829,
+    "ast_hash": "34add491aa1151e270218df3994ca7a6",
+    "semantic_hash": "34add491aa1151e270218df3994ca7a6"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Index.luau": {
+    "mtime": 1792265610.3242803,
+    "seen": 1792687334.11829,
+    "ast_hash": "ec485b0249e8095763214f94eef244c1",
+    "semantic_hash": "ec485b0249e8095763214f94eef244c1"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Market.luau": {
+    "mtime": 1792265610.3197756,
+    "seen": 1792687334.11829,
+    "ast_hash": "fec15a0b60a199c5a6002fb299e0d604",
+    "semantic_hash": "fec15a0b60a199c5a6002fb299e0d604"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Quest.luau": {
+    "mtime": 1792265610.3187733,
+    "seen": 1792687334.11829,
+    "ast_hash": "dc34e53df38c9463a2ed254ee45a94c6",
+    "semantic_hash": "dc34e53df38c9463a2ed254ee45a94c6"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Settings.luau": {
+    "mtime": 1792265610.3187733,
+    "seen": 1792687334.11829,
+    "ast_hash": "2dc1358e3365a8eab757feb01cb36236",
+    "semantic_hash": "2dc1358e3365a8eab757feb01cb36236"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Shop.luau": {
+    "mtime": 1792317388.9522047,
+    "seen": 1792687334.11829,
+    "ast_hash": "6d03b8d5ab4406b9fa228191e02aa310",
+    "semantic_hash": "6d03b8d5ab4406b9fa228191e02aa310"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/StartCar.luau": {
+    "mtime": 1792265610.3227737,
+    "seen": 1792687334.11829,
+    "ast_hash": "6d74f2f8c7f92bdabdb575ae3b135f4a",
+    "semantic_hash": "6d74f2f8c7f92bdabdb575ae3b135f4a"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Teleport.luau": {
+    "mtime": 1792527665.4113417,
+    "seen": 1792687334.11829,
+    "ast_hash": "5c8edd7e4e1af64852c28372df2277ec",
+    "semantic_hash": "5c8edd7e4e1af64852c28372df2277ec"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/Upgrades.luau": {
+    "mtime": 1792265610.3322945,
+    "seen": 1792687334.11829,
+    "ast_hash": "a5a9bc997d90c222dfcb95df072a22d0",
+    "semantic_hash": "a5a9bc997d90c222dfcb95df072a22d0"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Dealership.luau": {
+    "mtime": 1792265610.311256,
+    "seen": 1792687334.11829,
+    "ast_hash": "c22a432dcf6f56ffc41c4268ea6ba213",
+    "semantic_hash": "c22a432dcf6f56ffc41c4268ea6ba213"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Index.luau": {
+    "mtime": 1792265610.3082457,
+    "seen": 1792687334.11829,
+    "ast_hash": "e24616ef7313bce29ecd7c1f118192ec",
+    "semantic_hash": "e24616ef7313bce29ecd7c1f118192ec"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Market.luau": {
+    "mtime": 1792265610.3102562,
+    "seen": 1792687334.11829,
+    "ast_hash": "1afb140ee49d578df7e951e75458ba7b",
+    "semantic_hash": "1afb140ee49d578df7e951e75458ba7b"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Quest.luau": {
+    "mtime": 1792265610.309256,
+    "seen": 1792687334.11829,
+    "ast_hash": "f7100686255799c4d4d117edd7b83ab4",
+    "semantic_hash": "f7100686255799c4d4d117edd7b83ab4"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Settings.luau": {
+    "mtime": 1792265610.3157666,
+    "seen": 1792687334.11829,
+    "ast_hash": "f1495010ce28b3a4262f14a9341c3333",
+    "semantic_hash": "f1495010ce28b3a4262f14a9341c3333"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Shop.luau": {
+    "mtime": 1792265610.3147612,
+    "seen": 1792687334.11829,
+    "ast_hash": "d2e6953a84c08c1e0be3f62f3b1e5857",
+    "semantic_hash": "d2e6953a84c08c1e0be3f62f3b1e5857"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/StartCar.luau": {
+    "mtime": 1792707825.144379,
+    "seen": 1792707850.427813,
+    "ast_hash": "cf9ac0eb6558fc17ac64226170469b51",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/Pages/Teleport.luau": {
+    "mtime": 1792265610.3132536,
+    "seen": 1792687334.11829,
+    "ast_hash": "551dc4e9e792d1c5c8bd84766d9a8010",
+    "semantic_hash": "551dc4e9e792d1c5c8bd84766d9a8010"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/UIControllerTypes.luau": {
+    "mtime": 1792265610.2916324,
+    "seen": 1792687334.11829,
+    "ast_hash": "def01b7e1a24932fe33090470c20a3ca",
+    "semantic_hash": "def01b7e1a24932fe33090470c20a3ca"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/UIGeom.luau": {
+    "mtime": 1792265610.2946336,
+    "seen": 1792687334.11829,
+    "ast_hash": "34229be5a0a29d190fff007a4fd849ba",
+    "semantic_hash": "34229be5a0a29d190fff007a4fd849ba"
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/init.luau": {
+    "mtime": 1792265610.2886345,
+    "seen": 1792687334.11829,
+    "ast_hash": "c92e2ba3185bb2986e5754a82b127d29",
+    "semantic_hash": "c92e2ba3185bb2986e5754a82b127d29"
+  },
+  "ReplicatedStorage/shared/Controllers/UpgradeCelebrationController.luau": {
+    "mtime": 1792265610.4160433,
+    "seen": 1792687334.11829,
+    "ast_hash": "457313f0eb3b2a1c27b627d4fce1c699",
+    "semantic_hash": "457313f0eb3b2a1c27b627d4fce1c699"
+  },
+  "ReplicatedStorage/shared/Controllers/UpgradeController.luau": {
+    "mtime": 1792265610.3398166,
+    "seen": 1792687334.11829,
+    "ast_hash": "09b10fd790c094c38870083e5b8db746",
+    "semantic_hash": "09b10fd790c094c38870083e5b8db746"
+  },
+  "ReplicatedStorage/shared/Controllers/UpgradeNudgeController.luau": {
+    "mtime": 1792527665.4123404,
+    "seen": 1792687334.11829,
+    "ast_hash": "7d236c60fd9eb70e5cd06495516ec1f9",
+    "semantic_hash": "7d236c60fd9eb70e5cd06495516ec1f9"
+  },
+  "ReplicatedStorage/shared/Controllers/VIPController.luau": {
+    "mtime": 1792265610.4345727,
+    "seen": 1792687334.11829,
+    "ast_hash": "79909321d86f29ef0993362c81534c27",
+    "semantic_hash": "79909321d86f29ef0993362c81534c27"
+  },
+  "ReplicatedStorage/shared/Controllers/WeatherController.luau": {
+    "mtime": 1792527665.4133396,
+    "seen": 1792687334.11829,
+    "ast_hash": "a176e1ce1ffb0b84d31d245cdec33ed9",
+    "semantic_hash": "a176e1ce1ffb0b84d31d245cdec33ed9"
+  },
+  "ReplicatedStorage/shared/Controllers/WindController.luau": {
+    "mtime": 1792265610.355852,
+    "seen": 1792687334.11829,
+    "ast_hash": "bc9e935b34982c6db7d55dc37ca8b134",
+    "semantic_hash": "bc9e935b34982c6db7d55dc37ca8b134"
+  },
+  "ReplicatedStorage/shared/Controllers/WorkshopController.luau": {
+    "mtime": 1792265610.3969593,
+    "seen": 1792687334.11829,
+    "ast_hash": "6695c88df5dd5cf06b3b504713807424",
+    "semantic_hash": "6695c88df5dd5cf06b3b504713807424"
+  },
+  "ReplicatedStorage/shared/Controllers/WorldController.luau": {
+    "mtime": 1792265610.3388202,
+    "seen": 1792687334.11829,
+    "ast_hash": "c88f1d65185c141bf9c9f6dabb439cfd",
+    "semantic_hash": "c88f1d65185c141bf9c9f6dabb439cfd"
+  },
+  "ReplicatedStorage/shared/Controllers/WorldProgressController.luau": {
+    "mtime": 1792527665.4143393,
+    "seen": 1792687334.11829,
+    "ast_hash": "ab7fde1c35f730da85357690f175cd69",
+    "semantic_hash": "ab7fde1c35f730da85357690f175cd69"
+  },
+  "ReplicatedStorage/shared/Controllers/init.local.luau": {
+    "mtime": 1792581923.040502,
+    "seen": 1792687334.11829,
+    "ast_hash": "c8d981c5004661db314a9acbcbe63322",
+    "semantic_hash": "c8d981c5004661db314a9acbcbe63322"
+  },
+  "ReplicatedStorage/shared/GameIds.luau": {
+    "mtime": 1792317388.9532056,
+    "seen": 1792687334.11829,
+    "ast_hash": "95ce9202391bbd7e5fc60c35fc18aeef",
+    "semantic_hash": "95ce9202391bbd7e5fc60c35fc18aeef"
+  },
+  "ReplicatedStorage/shared/Libraries/ProfileStore.luau": {
+    "mtime": 1792265610.5433488,
+    "seen": 1792687334.11829,
+    "ast_hash": "dce815418067979e27330f8df027ab4d",
+    "semantic_hash": "dce815418067979e27330f8df027ab4d"
+  },
+  "ReplicatedStorage/shared/Libraries/Replica/ReplicaClient.luau": {
+    "mtime": 1792265610.574425,
+    "seen": 1792687334.11829,
+    "ast_hash": "0d357e652e813c2f4cc0eb2cebb3cc52",
+    "semantic_hash": "0d357e652e813c2f4cc0eb2cebb3cc52"
+  },
+  "ReplicatedStorage/shared/Libraries/Replica/ReplicaServer.luau": {
+    "mtime": 1792265610.574425,
+    "seen": 1792687334.11829,
+    "ast_hash": "fec597cccdce7ba74af88d81ef4a9ed9",
+    "semantic_hash": "fec597cccdce7ba74af88d81ef4a9ed9"
+  },
+  "ReplicatedStorage/shared/Libraries/Replica/ReplicaShared/Maid.luau": {
+    "mtime": 1792265610.5764337,
+    "seen": 1792687334.11829,
+    "ast_hash": "24f4cee594af62a8c49c38e82c1eea18",
+    "semantic_hash": "24f4cee594af62a8c49c38e82c1eea18"
+  },
+  "ReplicatedStorage/shared/Libraries/Replica/ReplicaShared/RateLimit.luau": {
+    "mtime": 1792265610.5794425,
+    "seen": 1792687334.11829,
+    "ast_hash": "19dcbf1e947f226dbc22b08653c713d0",
+    "semantic_hash": "19dcbf1e947f226dbc22b08653c713d0"
+  },
+  "ReplicatedStorage/shared/Libraries/Replica/ReplicaShared/Remote.luau": {
+    "mtime": 1792265610.580441,
+    "seen": 1792687334.11829,
+    "ast_hash": "db3b56ef271d4b554a3acba9fafcfcc1",
+    "semantic_hash": "db3b56ef271d4b554a3acba9fafcfcc1"
+  },
+  "ReplicatedStorage/shared/Libraries/Replica/ReplicaShared/Signal.luau": {
+    "mtime": 1792265610.5814419,
+    "seen": 1792687334.11829,
+    "ast_hash": "8d30d884214e182997c96fdcdf3bf0f2",
+    "semantic_hash": "8d30d884214e182997c96fdcdf3bf0f2"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/API.luau": {
+    "mtime": 1792265610.5448556,
+    "seen": 1792687334.11829,
+    "ast_hash": "ceb6a81d16e946260afcee17ba8fb57f",
+    "semantic_hash": "ceb6a81d16e946260afcee17ba8fb57f"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/Internal.luau": {
+    "mtime": 1792265610.546864,
+    "seen": 1792687334.11829,
+    "ast_hash": "3ef1d5aaed0d821731abc2be199ef91d",
+    "semantic_hash": "3ef1d5aaed0d821731abc2be199ef91d"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/PubTypes.luau": {
+    "mtime": 1792265610.5488694,
+    "seen": 1792687334.11829,
+    "ast_hash": "97f266a6277cd9098fcfc0b47efb7f4a",
+    "semantic_hash": "97f266a6277cd9098fcfc0b47efb7f4a"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/Types.luau": {
+    "mtime": 1792265610.5498698,
+    "seen": 1792687334.11829,
+    "ast_hash": "b78c465d332890e31bd228ee302e4ebc",
+    "semantic_hash": "b78c465d332890e31bd228ee302e4ebc"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/WidgetTypes.luau": {
+    "mtime": 1792265610.5719142,
+    "seen": 1792687334.11829,
+    "ast_hash": "9443696aea32bdb6a0a4649456352058",
+    "semantic_hash": "9443696aea32bdb6a0a4649456352058"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/config.luau": {
+    "mtime": 1792265610.550869,
+    "seen": 1792687334.11829,
+    "ast_hash": "fc5f89c67df5603fe16490ab893837eb",
+    "semantic_hash": "fc5f89c67df5603fe16490ab893837eb"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/demoWindow.luau": {
+    "mtime": 1792265610.5528712,
+    "seen": 1792687334.11829,
+    "ast_hash": "e198e73bdafd1cd3c8e8df5e811f1a30",
+    "semantic_hash": "e198e73bdafd1cd3c8e8df5e811f1a30"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/init.luau": {
+    "mtime": 1792265610.5443487,
+    "seen": 1792687334.11829,
+    "ast_hash": "71b26b80ae2a3b81ad772346896a38cc",
+    "semantic_hash": "71b26b80ae2a3b81ad772346896a38cc"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Button.luau": {
+    "mtime": 1792265610.5543766,
+    "seen": 1792687334.11829,
+    "ast_hash": "21bb9743885436d974d9448c346d5912",
+    "semantic_hash": "21bb9743885436d974d9448c346d5912"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Checkbox.luau": {
+    "mtime": 1792265610.5573952,
+    "seen": 1792687334.11829,
+    "ast_hash": "a10deeb394c4c6cbc59dca4a930202bd",
+    "semantic_hash": "a10deeb394c4c6cbc59dca4a930202bd"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Combo.luau": {
+    "mtime": 1792265610.558391,
+    "seen": 1792687334.11829,
+    "ast_hash": "d032f145bd11a51b661879b39b6c6e06",
+    "semantic_hash": "d032f145bd11a51b661879b39b6c6e06"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Format.luau": {
+    "mtime": 1792265610.5593908,
+    "seen": 1792687334.11829,
+    "ast_hash": "4b17aa987465910b800ee3306d8c1538",
+    "semantic_hash": "4b17aa987465910b800ee3306d8c1538"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Image.luau": {
+    "mtime": 1792265610.5603914,
+    "seen": 1792687334.11829,
+    "ast_hash": "291781a9373ad558c9a9a30a0c01e877",
+    "semantic_hash": "291781a9373ad558c9a9a30a0c01e877"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Input.luau": {
+    "mtime": 1792265610.5623927,
+    "seen": 1792687334.11829,
+    "ast_hash": "45221c336cb354f1b314a4d2e82e996e",
+    "semantic_hash": "45221c336cb354f1b314a4d2e82e996e"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Menu.luau": {
+    "mtime": 1792265610.563391,
+    "seen": 1792687334.11829,
+    "ast_hash": "073b89ca83322a62843aa73a40847bfa",
+    "semantic_hash": "073b89ca83322a62843aa73a40847bfa"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Plot.luau": {
+    "mtime": 1792265610.563391,
+    "seen": 1792687334.11829,
+    "ast_hash": "2ed26296967e6549cfd319ec000e7116",
+    "semantic_hash": "2ed26296967e6549cfd319ec000e7116"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/RadioButton.luau": {
+    "mtime": 1792265610.5648997,
+    "seen": 1792687334.11829,
+    "ast_hash": "5cb82adbedddeed8250f999cc1dc3331",
+    "semantic_hash": "5cb82adbedddeed8250f999cc1dc3331"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Root.luau": {
+    "mtime": 1792265610.565908,
+    "seen": 1792687334.11829,
+    "ast_hash": "d45567ab666ec6e4865445d710764084",
+    "semantic_hash": "d45567ab666ec6e4865445d710764084"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Tab.luau": {
+    "mtime": 1792265610.566908,
+    "seen": 1792687334.11829,
+    "ast_hash": "fd2f0a4d06ad3f2891d19c9b3f12d2d8",
+    "semantic_hash": "fd2f0a4d06ad3f2891d19c9b3f12d2d8"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Table.luau": {
+    "mtime": 1792265610.5679176,
+    "seen": 1792687334.11829,
+    "ast_hash": "d43cbd04e3282d66665a54a027e22f92",
+    "semantic_hash": "d43cbd04e3282d66665a54a027e22f92"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Text.luau": {
+    "mtime": 1792265610.5679176,
+    "seen": 1792687334.11829,
+    "ast_hash": "929c9828fc08e1a383ff10075ca4e9ea",
+    "semantic_hash": "929c9828fc08e1a383ff10075ca4e9ea"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Tree.luau": {
+    "mtime": 1792265610.569916,
+    "seen": 1792687334.11829,
+    "ast_hash": "deacd972e9782e7ccc8af2eec8d595af",
+    "semantic_hash": "deacd972e9782e7ccc8af2eec8d595af"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/Window.luau": {
+    "mtime": 1792265610.5709157,
+    "seen": 1792687334.11829,
+    "ast_hash": "133ecce3bc0f463c9191e6e882e63628",
+    "semantic_hash": "133ecce3bc0f463c9191e6e882e63628"
+  },
+  "ReplicatedStorage/shared/Libraries/iris/widgets/init.luau": {
+    "mtime": 1792265610.5543766,
+    "seen": 1792687334.11829,
+    "ast_hash": "c78219aea27f8517143c53f5c2113a06",
+    "semantic_hash": "c78219aea27f8517143c53f5c2113a06"
+  },
+  "ReplicatedStorage/shared/Modules/ArcadeKit.luau": {
+    "mtime": 1792265610.6186428,
+    "seen": 1792687334.11829,
+    "ast_hash": "511eeaeff3f3c99471959a68fde004e0",
+    "semantic_hash": "511eeaeff3f3c99471959a68fde004e0"
+  },
+  "ReplicatedStorage/shared/Modules/ArcadeTrafficImpact.luau": {
+    "mtime": 1792265610.6291635,
+    "seen": 1792687334.11829,
+    "ast_hash": "0269dbf3c3fee843e1812f6cf91fda38",
+    "semantic_hash": "0269dbf3c3fee843e1812f6cf91fda38"
+  },
+  "ReplicatedStorage/shared/Modules/AutomaticGearbox.luau": {
+    "mtime": 1792265610.6020885,
+    "seen": 1792687334.11829,
+    "ast_hash": "05f740f66127a0a12b8c72aa94c50b6a",
+    "semantic_hash": "05f740f66127a0a12b8c72aa94c50b6a"
+  },
+  "ReplicatedStorage/shared/Modules/BootGuard.luau": {
+    "mtime": 1792581923.0420084,
+    "seen": 1792687334.11829,
+    "ast_hash": "9cbe400d2a9598f6601062b7f7a740a9",
+    "semantic_hash": "9cbe400d2a9598f6601062b7f7a740a9"
+  },
+  "ReplicatedStorage/shared/Modules/ButtonBeckon.luau": {
+    "mtime": 1792265610.6406834,
+    "seen": 1792687334.11829,
+    "ast_hash": "ca9860267c72510ce79594ce8b55ac71",
+    "semantic_hash": "ca9860267c72510ce79594ce8b55ac71"
+  },
+  "ReplicatedStorage/shared/Modules/BuyerOfferSign.luau": {
+    "mtime": 1792265610.6131208,
+    "seen": 1792687334.11829,
+    "ast_hash": "3a8666f534f4c51d98f17c19943b3041",
+    "semantic_hash": "3a8666f534f4c51d98f17c19943b3041"
+  },
+  "ReplicatedStorage/shared/Modules/CameraFacing.luau": {
+    "mtime": 1792527665.417341,
+    "seen": 1792687334.11829,
+    "ast_hash": "332fe35a695e3d53e9b48a7d0833aa68",
+    "semantic_hash": "332fe35a695e3d53e9b48a7d0833aa68"
+  },
+  "ReplicatedStorage/shared/Modules/CarAura.luau": {
+    "mtime": 1792265610.6261556,
+    "seen": 1792687334.11829,
+    "ast_hash": "c004d0ef1549af927ff01fb2951e1b0c",
+    "semantic_hash": "c004d0ef1549af927ff01fb2951e1b0c"
+  },
+  "ReplicatedStorage/shared/Modules/CarBlinkers.luau": {
+    "mtime": 1792265610.6081243,
+    "seen": 1792687334.11829,
+    "ast_hash": "b7af8cbc7a7a72c378a3c7ad3662395b",
+    "semantic_hash": "b7af8cbc7a7a72c378a3c7ad3662395b"
+  },
+  "ReplicatedStorage/shared/Modules/CarBody.luau": {
+    "mtime": 1792265610.587557,
+    "seen": 1792687334.11829,
+    "ast_hash": "2b3194f3e04790257ed23f708fd152e5",
+    "semantic_hash": "2b3194f3e04790257ed23f708fd152e5"
+  },
+  "ReplicatedStorage/shared/Modules/CarBrakeLights.luau": {
+    "mtime": 1792265610.6111197,
+    "seen": 1792687334.11829,
+    "ast_hash": "05b731282d2b59ac6e99fbfacc39efef",
+    "semantic_hash": "05b731282d2b59ac6e99fbfacc39efef"
+  },
+  "ReplicatedStorage/shared/Modules/CarCardDress.luau": {
+    "mtime": 1792265610.6356826,
+    "seen": 1792687334.11829,
+    "ast_hash": "3dffe1144919fed8c2ad48e2c8be7407",
+    "semantic_hash": "3dffe1144919fed8c2ad48e2c8be7407"
+  },
+  "ReplicatedStorage/shared/Modules/CarCatalogue.luau": {
+    "mtime": 1792265610.6071212,
+    "seen": 1792687334.11829,
+    "ast_hash": "3b63517e5b1aa6c238165acfcb963794",
+    "semantic_hash": "3b63517e5b1aa6c238165acfcb963794"
+  },
+  "ReplicatedStorage/shared/Modules/CarCollision.luau": {
+    "mtime": 1792265610.58555,
+    "seen": 1792687334.11829,
+    "ast_hash": "7611999d6bfee4a191da467a35f55817",
+    "semantic_hash": "7611999d6bfee4a191da467a35f55817"
+  },
+  "ReplicatedStorage/shared/Modules/CarDisplay.luau": {
+    "mtime": 1792265610.5980902,
+    "seen": 1792687334.11829,
+    "ast_hash": "ad8bcaabbe1bb92c251b7df418258708",
+    "semantic_hash": "ad8bcaabbe1bb92c251b7df418258708"
+  },
+  "ReplicatedStorage/shared/Modules/CarDoorRig.luau": {
+    "mtime": 1792265610.5895581,
+    "seen": 1792687334.11829,
+    "ast_hash": "277cd29553abb4cc775e8a0f3267a584",
+    "semantic_hash": "277cd29553abb4cc775e8a0f3267a584"
+  },
+  "ReplicatedStorage/shared/Modules/CarDoors.luau": {
+    "mtime": 1792265610.5885572,
+    "seen": 1792687334.11829,
+    "ast_hash": "373be4e168d30ffeca1afb456c6bb787",
+    "semantic_hash": "373be4e168d30ffeca1afb456c6bb787"
+  },
+  "ReplicatedStorage/shared/Modules/CarHeadlights.luau": {
+    "mtime": 1792265610.6386847,
+    "seen": 1792687334.11829,
+    "ast_hash": "df5c6a4edd44322feb2c21089294d2c4",
+    "semantic_hash": "df5c6a4edd44322feb2c21089294d2c4"
+  },
+  "ReplicatedStorage/shared/Modules/CarInfoTag.luau": {
+    "mtime": 1792265610.6331644,
+    "seen": 1792687334.11829,
+    "ast_hash": "d42d4f538ee85ec20f4074f97a0a9180",
+    "semantic_hash": "d42d4f538ee85ec20f4074f97a0a9180"
+  },
+  "ReplicatedStorage/shared/Modules/CarLamps.luau": {
+    "mtime": 1792265610.6101222,
+    "seen": 1792687334.11829,
+    "ast_hash": "9e44bcd44af91137988b5b3cd105e7ff",
+    "semantic_hash": "9e44bcd44af91137988b5b3cd105e7ff"
+  },
+  "ReplicatedStorage/shared/Modules/CarMutation.luau": {
+    "mtime": 1792265610.5980902,
+    "seen": 1792687334.11829,
+    "ast_hash": "69b7ab7bf43cd672e235a413b53252ff",
+    "semantic_hash": "69b7ab7bf43cd672e235a413b53252ff"
+  },
+  "ReplicatedStorage/shared/Modules/CarPaint.luau": {
+    "mtime": 1792265610.5935583,
+    "seen": 1792687334.11829,
+    "ast_hash": "19ae183e3d2a34079af31af552969b84",
+    "semantic_hash": "19ae183e3d2a34079af31af552969b84"
+  },
+  "ReplicatedStorage/shared/Modules/CarPlate.luau": {
+    "mtime": 1792265610.5980902,
+    "seen": 1792687334.11829,
+    "ast_hash": "d5e98f2d892d468231cbf92ecd6a08f9",
+    "semantic_hash": "d5e98f2d892d468231cbf92ecd6a08f9"
+  },
+  "ReplicatedStorage/shared/Modules/CarRarity.luau": {
+    "mtime": 1792707015.4815395,
+    "seen": 1792707462.2367423,
+    "ast_hash": "4c61819966c43e647c29b4525b309dab",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Modules/CarRarityBadge.luau": {
+    "mtime": 1792707754.7220914,
+    "seen": 1792707778.4778244,
+    "ast_hash": "9b2f4ceefde4dbc8f6e7bee097974fed",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Modules/CarRoster.luau": {
+    "mtime": 1792265610.6081243,
+    "seen": 1792687334.11829,
+    "ast_hash": "0effafba3a13a3f52beb5cf226b2aa08",
+    "semantic_hash": "0effafba3a13a3f52beb5cf226b2aa08"
+  },
+  "ReplicatedStorage/shared/Modules/CarStats.luau": {
+    "mtime": 1792265610.5935583,
+    "seen": 1792687334.11829,
+    "ast_hash": "b58389d23251dcc90b8f3c7edb28156e",
+    "semantic_hash": "b58389d23251dcc90b8f3c7edb28156e"
+  },
+  "ReplicatedStorage/shared/Modules/CarViewport.luau": {
+    "mtime": 1792265610.5950658,
+    "seen": 1792687334.11829,
+    "ast_hash": "d6108e3fe5ced8bf2632da0099af3b8f",
+    "semantic_hash": "d6108e3fe5ced8bf2632da0099af3b8f"
+  },
+  "ReplicatedStorage/shared/Modules/CarViewportGrid.luau": {
+    "mtime": 1792265610.5950658,
+    "seen": 1792687334.11829,
+    "ast_hash": "67e027d90c0c2f6e7aa88cd18aaaa419",
+    "semantic_hash": "67e027d90c0c2f6e7aa88cd18aaaa419"
+  },
+  "ReplicatedStorage/shared/Modules/CarryNoticeLayout.luau": {
+    "mtime": 1792265610.6131208,
+    "seen": 1792687334.11829,
+    "ast_hash": "e45e4d3d8278e12a25dd1cfeabca00f3",
+    "semantic_hash": "e45e4d3d8278e12a25dd1cfeabca00f3"
+  },
+  "ReplicatedStorage/shared/Modules/ControlButtonScale.luau": {
+    "mtime": 1792265610.6321673,
+    "seen": 1792687334.11829,
+    "ast_hash": "53037dcaa38af680c4b0856a922e3380",
+    "semantic_hash": "53037dcaa38af680c4b0856a922e3380"
+  },
+  "ReplicatedStorage/shared/Modules/ControlLegend.luau": {
+    "mtime": 1792265610.6000893,
+    "seen": 1792687334.11829,
+    "ast_hash": "2b212299ee458e49d6a51722561d08e0",
+    "semantic_hash": "2b212299ee458e49d6a51722561d08e0"
+  },
+  "ReplicatedStorage/shared/Modules/CrowdCollision.luau": {
+    "mtime": 1792265610.597089,
+    "seen": 1792687334.11829,
+    "ast_hash": "1fbdefae7248df0c5bf4ad030360a2b9",
+    "semantic_hash": "1fbdefae7248df0c5bf4ad030360a2b9"
+  },
+  "ReplicatedStorage/shared/Modules/EngineAudio.luau": {
+    "mtime": 1792265610.6366775,
+    "seen": 1792687334.11829,
+    "ast_hash": "b7af54e7e5887c7dc14a26f5b116e4fc",
+    "semantic_hash": "b7af54e7e5887c7dc14a26f5b116e4fc"
+  },
+  "ReplicatedStorage/shared/Modules/FirstPersonCabin.luau": {
+    "mtime": 1792265610.631164,
+    "seen": 1792687334.11829,
+    "ast_hash": "7a29727617dcc537e6cd8f3f56329205",
+    "semantic_hash": "7a29727617dcc537e6cd8f3f56329205"
+  },
+  "ReplicatedStorage/shared/Modules/FirstPersonCabinDetail.luau": {
+    "mtime": 1792265610.6331644,
+    "seen": 1792687334.11829,
+    "ast_hash": "ab62023cc92d70c9ae869103df2afaf1",
+    "semantic_hash": "ab62023cc92d70c9ae869103df2afaf1"
+  },
+  "ReplicatedStorage/shared/Modules/FirstPersonCockpit.luau": {
+    "mtime": 1792265610.6271644,
+    "seen": 1792687334.11829,
+    "ast_hash": "17e85d629e920b8953b59fbeb7c6cfa9",
+    "semantic_hash": "17e85d629e920b8953b59fbeb7c6cfa9"
+  },
+  "ReplicatedStorage/shared/Modules/FirstPersonWheel.luau": {
+    "mtime": 1792265610.6281645,
+    "seen": 1792687334.11829,
+    "ast_hash": "bcba40cf9bcafd89bf05bf343f87e04e",
+    "semantic_hash": "bcba40cf9bcafd89bf05bf343f87e04e"
+  },
+  "ReplicatedStorage/shared/Modules/GamepadInput.luau": {
+    "mtime": 1792265610.5950658,
+    "seen": 1792687334.11829,
+    "ast_hash": "8d903419245cd9b78f219d6cef5c17fe",
+    "semantic_hash": "8d903419245cd9b78f219d6cef5c17fe"
+  },
+  "ReplicatedStorage/shared/Modules/GameplayFeedback.luau": {
+    "mtime": 1792265610.62264,
+    "seen": 1792687334.11829,
+    "ast_hash": "f222b822a5178725a4df1ebc747b912d",
+    "semantic_hash": "f222b822a5178725a4df1ebc747b912d"
+  },
+  "ReplicatedStorage/shared/Modules/GetawayBoarding.luau": {
+    "mtime": 1792265610.6131208,
+    "seen": 1792687334.11829,
+    "ast_hash": "992cfb4a44ec8d538c3a277bf25bdb0b",
+    "semantic_hash": "992cfb4a44ec8d538c3a277bf25bdb0b"
+  },
+  "ReplicatedStorage/shared/Modules/GuideTrailClassic.luau": {
+    "mtime": 1792527665.4197197,
+    "seen": 1792687334.11829,
+    "ast_hash": "14e70f928f86d01eb603cc8f15885f89",
+    "semantic_hash": "14e70f928f86d01eb603cc8f15885f89"
+  },
+  "ReplicatedStorage/shared/Modules/GuideTrailModern.luau": {
+    "mtime": 1792265610.6426826,
+    "seen": 1792687334.11829,
+    "ast_hash": "c6b195d1a388e1917b773dcc15155334",
+    "semantic_hash": "c6b195d1a388e1917b773dcc15155334"
+  },
+  "ReplicatedStorage/shared/Modules/HitchProbe.luau": {
+    "mtime": 1792265610.615638,
+    "seen": 1792687334.11829,
+    "ast_hash": "0157f9d2c1584172e12356c3df388bf2",
+    "semantic_hash": "0157f9d2c1584172e12356c3df388bf2"
+  },
+  "ReplicatedStorage/shared/Modules/KitGrowth.luau": {
+    "mtime": 1792265610.6071212,
+    "seen": 1792687334.11829,
+    "ast_hash": "f92412323159926f0518267f6a29adac",
+    "semantic_hash": "f92412323159926f0518267f6a29adac"
+  },
+  "ReplicatedStorage/shared/Modules/LivePrice.luau": {
+    "mtime": 1792265610.6396866,
+    "seen": 1792687334.11829,
+    "ast_hash": "5b70b2d076ebfdd761fa2e78370ebf2c",
+    "semantic_hash": "5b70b2d076ebfdd761fa2e78370ebf2c"
+  },
+  "ReplicatedStorage/shared/Modules/MarketStock.luau": {
+    "mtime": 1792265610.6056032,
+    "seen": 1792687334.11829,
+    "ast_hash": "a002a13a4fc18ffde80c963025a98c37",
+    "semantic_hash": "a002a13a4fc18ffde80c963025a98c37"
+  },
+  "ReplicatedStorage/shared/Modules/MobileMenuSizing.luau": {
+    "mtime": 1792265610.6301644,
+    "seen": 1792687334.11829,
+    "ast_hash": "dcd67c0b5721230e919bacbee048b86e",
+    "semantic_hash": "dcd67c0b5721230e919bacbee048b86e"
+  },
+  "ReplicatedStorage/shared/Modules/NoticeLane.luau": {
+    "mtime": 1792265610.6176424,
+    "seen": 1792687334.11829,
+    "ast_hash": "5770cf673aa90e12128f9cfcc0800f78",
+    "semantic_hash": "5770cf673aa90e12128f9cfcc0800f78"
+  },
+  "ReplicatedStorage/shared/Modules/NpcFriends.luau": {
+    "mtime": 1792265610.6386847,
+    "seen": 1792687334.11829,
+    "ast_hash": "d3f9578ab5865f2b5db6d4fe3675751b",
+    "semantic_hash": "d3f9578ab5865f2b5db6d4fe3675751b"
+  },
+  "ReplicatedStorage/shared/Modules/ObstacleLayout.luau": {
+    "mtime": 1792265610.5824404,
+    "seen": 1792687334.11829,
+    "ast_hash": "344aea2933ad169daf036781d556ebcc",
+    "semantic_hash": "344aea2933ad169daf036781d556ebcc"
+  },
+  "ReplicatedStorage/shared/Modules/Ragdoll.luau": {
+    "mtime": 1792265610.5925572,
+    "seen": 1792687334.11829,
+    "ast_hash": "17fbf0a76bda90d36a7fd5693dd5743b",
+    "semantic_hash": "17fbf0a76bda90d36a7fd5693dd5743b"
+  },
+  "ReplicatedStorage/shared/Modules/RigAnimator.luau": {
+    "mtime": 1792265610.590557,
+    "seen": 1792687334.11829,
+    "ast_hash": "3e680550b6984492075e033f8b13c44c",
+    "semantic_hash": "3e680550b6984492075e033f8b13c44c"
+  },
+  "ReplicatedStorage/shared/Modules/RoadEdgeGuard.luau": {
+    "mtime": 1792265610.6261556,
+    "seen": 1792687334.119297,
+    "ast_hash": "fca9318167b61b9e42f801ebce3b8844",
+    "semantic_hash": "fca9318167b61b9e42f801ebce3b8844"
+  },
+  "ReplicatedStorage/shared/Modules/ScreenConfetti.luau": {
+    "mtime": 1792265610.6166344,
+    "seen": 1792687334.119297,
+    "ast_hash": "e5b9f87271a228a9c939b0b57f466131",
+    "semantic_hash": "e5b9f87271a228a9c939b0b57f466131"
+  },
+  "ReplicatedStorage/shared/Modules/SellLot.luau": {
+    "mtime": 1792265610.6000893,
+    "seen": 1792687334.119297,
+    "ast_hash": "fa35a08c4aaad46a797e263314df938f",
+    "semantic_hash": "fa35a08c4aaad46a797e263314df938f"
+  },
+  "ReplicatedStorage/shared/Modules/SettingsRows.luau": {
+    "mtime": 1792265610.6045938,
+    "seen": 1792687334.119297,
+    "ast_hash": "4f32edf5b4f6c2036c6fde6edf8756fb",
+    "semantic_hash": "4f32edf5b4f6c2036c6fde6edf8756fb"
+  },
+  "ReplicatedStorage/shared/Modules/ShellDoors.luau": {
+    "mtime": 1792265610.5925572,
+    "seen": 1792687334.119297,
+    "ast_hash": "ebd90b569600931f7addbedc1514e33b",
+    "semantic_hash": "ebd90b569600931f7addbedc1514e33b"
+  },
+  "ReplicatedStorage/shared/Modules/ShowcaseGarage.luau": {
+    "mtime": 1792265610.6131208,
+    "seen": 1792687334.119297,
+    "ast_hash": "42673afb88859a9a9282e8c9817a6cd4",
+    "semantic_hash": "42673afb88859a9a9282e8c9817a6cd4"
+  },
+  "ReplicatedStorage/shared/Modules/ShowroomEconomy.luau": {
+    "mtime": 1792676545.3987422,
+    "seen": 1792687334.119297,
+    "ast_hash": "68a671b484bbb621e8a6641f7dd0a2fc",
+    "semantic_hash": "68a671b484bbb621e8a6641f7dd0a2fc"
+  },
+  "ReplicatedStorage/shared/Modules/StarterGuiOnce.luau": {
+    "mtime": 1792581923.0420084,
+    "seen": 1792687334.119297,
+    "ast_hash": "b5292e1b628275c761a68006cbde5db3",
+    "semantic_hash": "b5292e1b628275c761a68006cbde5db3"
+  },
+  "ReplicatedStorage/shared/Modules/StealReminderSchedule.luau": {
+    "mtime": 1792265610.6216426,
+    "seen": 1792687334.119297,
+    "ast_hash": "a4662d2d31487ee39f70d9aaadca46f2",
+    "semantic_hash": "a4662d2d31487ee39f70d9aaadca46f2"
+  },
+  "ReplicatedStorage/shared/Modules/ThrottleCameraResponse.luau": {
+    "mtime": 1792265610.6366775,
+    "seen": 1792687334.119297,
+    "ast_hash": "1e0a71fd8b60178cbf15b265c9637430",
+    "semantic_hash": "1e0a71fd8b60178cbf15b265c9637430"
+  },
+  "ReplicatedStorage/shared/Modules/TimeScale.luau": {
+    "mtime": 1792265610.58555,
+    "seen": 1792687334.119297,
+    "ast_hash": "ca969e0ffaf6240b8cc3e7c164fce67a",
+    "semantic_hash": "ca969e0ffaf6240b8cc3e7c164fce67a"
+  },
+  "ReplicatedStorage/shared/Modules/TrafficCollectionCue.luau": {
+    "mtime": 1792265610.6206412,
+    "seen": 1792687334.119297,
+    "ast_hash": "0cf1e0691dc5626e867818e47d2eab97",
+    "semantic_hash": "0cf1e0691dc5626e867818e47d2eab97"
+  },
+  "ReplicatedStorage/shared/Modules/TutorialControlHighlight.luau": {
+    "mtime": 1792265610.6261556,
+    "seen": 1792687334.119297,
+    "ast_hash": "8abf3c3c2ee6f15e04a6e0eb1f087366",
+    "semantic_hash": "8abf3c3c2ee6f15e04a6e0eb1f087366"
+  },
+  "ReplicatedStorage/shared/Modules/UIRoot.luau": {
+    "mtime": 1792581923.0420084,
+    "seen": 1792687334.119297,
+    "ast_hash": "de76ddabed4c2e19307d85bb067f4543",
+    "semantic_hash": "de76ddabed4c2e19307d85bb067f4543"
+  },
+  "ReplicatedStorage/shared/Modules/UIVisibility.luau": {
+    "mtime": 1792265610.6030872,
+    "seen": 1792687334.119297,
+    "ast_hash": "de8afe73e9e962c055b6b284d67bee7d",
+    "semantic_hash": "de8afe73e9e962c055b6b284d67bee7d"
+  },
+  "ReplicatedStorage/shared/Modules/UpgradeBoardFace.luau": {
+    "mtime": 1792265610.6331644,
+    "seen": 1792687334.119297,
+    "ast_hash": "0335df75e4ddefb3c465ff90e1670288",
+    "semantic_hash": "0335df75e4ddefb3c465ff90e1670288"
+  },
+  "ReplicatedStorage/shared/Modules/Vehicle.luau": {
+    "mtime": 1792265610.5834427,
+    "seen": 1792687334.119297,
+    "ast_hash": "a1f755374123cef227f5ee0a5190f0f8",
+    "semantic_hash": "a1f755374123cef227f5ee0a5190f0f8"
+  },
+  "ReplicatedStorage/shared/Modules/VehiclePromptGui.luau": {
+    "mtime": 1792265610.6010878,
+    "seen": 1792687334.119297,
+    "ast_hash": "2c042f71ba1bce5a6e96ee81737d6d5e",
+    "semantic_hash": "2c042f71ba1bce5a6e96ee81737d6d5e"
+  },
+  "ReplicatedStorage/shared/Modules/WorkshopCards.luau": {
+    "mtime": 1792265610.6121254,
+    "seen": 1792687334.119297,
+    "ast_hash": "d9b1b70118c23d66772ecd0b4b33c3ba",
+    "semantic_hash": "d9b1b70118c23d66772ecd0b4b33c3ba"
+  },
+  "ReplicatedStorage/shared/Types.luau": {
+    "mtime": 1792265610.438093,
+    "seen": 1792687334.119297,
+    "ast_hash": "6a788a62f1244f75d766d650f5021933",
+    "semantic_hash": "6a788a62f1244f75d766d650f5021933"
+  },
+  "ServerScriptService/ServerPackages/ProfileStore.luau": {
+    "mtime": 1792265613.7513738,
+    "seen": 1792687334.119297,
+    "ast_hash": "79afa9ceda7e0ec1d5a38ea365428d4e",
+    "semantic_hash": "79afa9ceda7e0ec1d5a38ea365428d4e"
+  },
+  "ServerScriptService/ServerPackages/_Index/lm-loleris_profilestore@1.0.3/profilestore.luau": {
+    "mtime": 1792265613.7533782,
+    "seen": 1792687334.119297,
+    "ast_hash": "dce815418067979e27330f8df027ab4d",
+    "semantic_hash": "dce815418067979e27330f8df027ab4d"
+  },
+  "ServerScriptService/server/Data/Components/DevProductsHandler.luau": {
+    "mtime": 1792317388.9542048,
+    "seen": 1792687334.119297,
+    "ast_hash": "3d30171e19042a87ba1e4171a9086316",
+    "semantic_hash": "3d30171e19042a87ba1e4171a9086316"
+  },
+  "ServerScriptService/server/Data/Components/PlayerProfile.luau": {
+    "mtime": 1792265613.677694,
+    "seen": 1792687334.119297,
+    "ast_hash": "b47de68eca5d794dc32bc8abaeae82aa",
+    "semantic_hash": "b47de68eca5d794dc32bc8abaeae82aa"
+  },
+  "ServerScriptService/server/Data/Components/ProfileReset.luau": {
+    "mtime": 1792420027.2746668,
+    "seen": 1792687334.119297,
+    "ast_hash": "aef2dba518c18099ea11f20e1de6f7a0",
+    "semantic_hash": "aef2dba518c18099ea11f20e1de6f7a0"
+  },
+  "ServerScriptService/server/Data/Components/Settings.luau": {
+    "mtime": 1792707015.4835563,
+    "seen": 1792707462.2367423,
+    "ast_hash": "dbb3552382dd6aad81c040ec5633603e",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Data/Components/Types.luau": {
+    "mtime": 1792265613.6786923,
+    "seen": 1792687334.119297,
+    "ast_hash": "e2862d368c050369a9b212167626f3cb",
+    "semantic_hash": "e2862d368c050369a9b212167626f3cb"
+  },
+  "ServerScriptService/server/Data/init.luau": {
+    "mtime": 1792265613.6756902,
+    "seen": 1792687334.119297,
+    "ast_hash": "9be45a492da15a1b9f94d7ab5548accf",
+    "semantic_hash": "9be45a492da15a1b9f94d7ab5548accf"
+  },
+  "ServerScriptService/server/Services/AdminService.luau": {
+    "mtime": 1792440102.8246548,
+    "seen": 1792687334.119297,
+    "ast_hash": "dc5477d35d79315dac7ac52c3a2a2e7a",
+    "semantic_hash": "dc5477d35d79315dac7ac52c3a2a2e7a"
+  },
+  "ServerScriptService/server/Services/AnalyticsService.luau": {
+    "mtime": 1792581923.5777576,
+    "seen": 1792687334.119297,
+    "ast_hash": "95b2f056fcd29850875b5fed7daa8d8a",
+    "semantic_hash": "95b2f056fcd29850875b5fed7daa8d8a"
+  },
+  "ServerScriptService/server/Services/BundleService.luau": {
+    "mtime": 1792947512.6978512,
+    "seen": 1792948538.2671804,
+    "ast_hash": "c8b543817c2b9495cf762415d84a404f",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/BuyerService.luau": {
+    "mtime": 1792701974.212075,
+    "seen": 1792702034.7943616,
+    "ast_hash": "7c704374ffbbbf7a94159ecbe050a436",
+    "semantic_hash": "7c704374ffbbbf7a94159ecbe050a436"
+  },
+  "ServerScriptService/server/Services/CarDealService.luau": {
+    "mtime": 1792265613.7107663,
+    "seen": 1792687334.119297,
+    "ast_hash": "d01cb9e8305bb19e974b94ada26f6748",
+    "semantic_hash": "d01cb9e8305bb19e974b94ada26f6748"
+  },
+  "ServerScriptService/server/Services/CarryService.luau": {
+    "mtime": 1792265613.732331,
+    "seen": 1792687334.119297,
+    "ast_hash": "58bde0561f0e19f07e93fcb2a6d091a9",
+    "semantic_hash": "58bde0561f0e19f07e93fcb2a6d091a9"
+  },
+  "ServerScriptService/server/Services/CashService.luau": {
+    "mtime": 1792265613.7212934,
+    "seen": 1792687334.119297,
+    "ast_hash": "d37b15c0680670d0974bba0da680bace",
+    "semantic_hash": "d37b15c0680670d0974bba0da680bace"
+  },
+  "ServerScriptService/server/Services/CodesService.luau": {
+    "mtime": 1792265613.7463677,
+    "seen": 1792687334.119297,
+    "ast_hash": "6a151fff734ab937fe8989889cc89fa9",
+    "semantic_hash": "6a151fff734ab937fe8989889cc89fa9"
+  },
+  "ServerScriptService/server/Services/CustomerService.luau": {
+    "mtime": 1792676545.4008167,
+    "seen": 1792687334.119297,
+    "ast_hash": "02688122285044adc309060f374f371f",
+    "semantic_hash": "02688122285044adc309060f374f371f"
+  },
+  "ServerScriptService/server/Services/DailyRewardService.luau": {
+    "mtime": 1792946619.8973777,
+    "seen": 1792948538.2671804,
+    "ast_hash": "00f8aff6f5eae40e61d198a558261cb3",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/EncounterService.luau": {
+    "mtime": 1792707015.4856744,
+    "seen": 1792707462.2367423,
+    "ast_hash": "17450f6fc14bc8332982ce5d9f68880d",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/FirstCarService.luau": {
+    "mtime": 1792707015.4866958,
+    "seen": 1792707462.2367423,
+    "ast_hash": "ff363dbe231e9491009d3dca19958c09",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/GameplayFeedbackService.luau": {
+    "mtime": 1792265613.7428484,
+    "seen": 1792687334.119297,
+    "ast_hash": "692a0cd6ec01812d0d50ee8f0e86c03e",
+    "semantic_hash": "692a0cd6ec01812d0d50ee8f0e86c03e"
+  },
+  "ServerScriptService/server/Services/GarageService.luau": {
+    "mtime": 1792947511.384261,
+    "seen": 1792948538.2671804,
+    "ast_hash": "b8c642db039d1efe671eb723fd0b55e0",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/GetawayService.luau": {
+    "mtime": 1792265613.6872134,
+    "seen": 1792687334.119297,
+    "ast_hash": "1397a10a65e1333b566654bd045fad36",
+    "semantic_hash": "1397a10a65e1333b566654bd045fad36"
+  },
+  "ServerScriptService/server/Services/GiftService.luau": {
+    "mtime": 1792265613.7303305,
+    "seen": 1792687334.119297,
+    "ast_hash": "892ed5957ef5d302c634e8cb3f933832",
+    "semantic_hash": "892ed5957ef5d302c634e8cb3f933832"
+  },
+  "ServerScriptService/server/Services/GroupRewardService.luau": {
+    "mtime": 1792265613.7483752,
+    "seen": 1792687334.119297,
+    "ast_hash": "aa3dcd871b7bf7348013691bcda68d42",
+    "semantic_hash": "aa3dcd871b7bf7348013691bcda68d42"
+  },
+  "ServerScriptService/server/Services/IndexRewardService.luau": {
+    "mtime": 1792265613.7493756,
+    "seen": 1792687334.119297,
+    "ast_hash": "2ca3a9e177752d90bf9ac7be5297ed55",
+    "semantic_hash": "2ca3a9e177752d90bf9ac7be5297ed55"
+  },
+  "ServerScriptService/server/Services/KnockableService.luau": {
+    "mtime": 1792265613.7443583,
+    "seen": 1792687334.119297,
+    "ast_hash": "69c138139867fc76be220e51ec7126b8",
+    "semantic_hash": "69c138139867fc76be220e51ec7126b8"
+  },
+  "ServerScriptService/server/Services/LeaderboardService.luau": {
+    "mtime": 1792676539.2788565,
+    "seen": 1792687334.119297,
+    "ast_hash": "c1c4a5bc2ed1a86909d8c8086411ac22",
+    "semantic_hash": "c1c4a5bc2ed1a86909d8c8086411ac22"
+  },
+  "ServerScriptService/server/Services/LobbyCarService.luau": {
+    "mtime": 1792265613.6902158,
+    "seen": 1792687334.119297,
+    "ast_hash": "d0f59800e34cf4a4ec92be2a463421b9",
+    "semantic_hash": "d0f59800e34cf4a4ec92be2a463421b9"
+  },
+  "ServerScriptService/server/Services/MusicService.luau": {
+    "mtime": 1792265613.7107663,
+    "seen": 1792687334.119297,
+    "ast_hash": "df48bd8b244e902467447754798b2c62",
+    "semantic_hash": "df48bd8b244e902467447754798b2c62"
+  },
+  "ServerScriptService/server/Services/ObstacleService.luau": {
+    "mtime": 1792265613.6836946,
+    "seen": 1792687334.119297,
+    "ast_hash": "6df1a16693393c29f355b0eb4df1694c",
+    "semantic_hash": "6df1a16693393c29f355b0eb4df1694c"
+  },
+  "ServerScriptService/server/Services/OfflineService.luau": {
+    "mtime": 1792676545.4018173,
+    "seen": 1792687334.119297,
+    "ast_hash": "685159134b3b34adf32e0d6cd1a8aaa6",
+    "semantic_hash": "685159134b3b34adf32e0d6cd1a8aaa6"
+  },
+  "ServerScriptService/server/Services/PassService.luau": {
+    "mtime": 1792265613.7263231,
+    "seen": 1792687334.119297,
+    "ast_hash": "0e0b10bc43db87ea4ecc4e9e771dbfce",
+    "semantic_hash": "0e0b10bc43db87ea4ecc4e9e771dbfce"
+  },
+  "ServerScriptService/server/Services/PlaytesterService.luau": {
+    "mtime": 1792265613.7212934,
+    "seen": 1792687334.119297,
+    "ast_hash": "2a0697db2e17e683e2e9782f5769fc49",
+    "semantic_hash": "2a0697db2e17e683e2e9782f5769fc49"
+  },
+  "ServerScriptService/server/Services/PlotService.luau": {
+    "mtime": 1792265613.6872134,
+    "seen": 1792687334.119297,
+    "ast_hash": "42833b27f632c54b7914356394574b2a",
+    "semantic_hash": "42833b27f632c54b7914356394574b2a"
+  },
+  "ServerScriptService/server/Services/PoliceService.luau": {
+    "mtime": 1792581923.5777576,
+    "seen": 1792687334.119297,
+    "ast_hash": "097a36f414c0eb44d53d294d9f00d8ff",
+    "semantic_hash": "097a36f414c0eb44d53d294d9f00d8ff"
+  },
+  "ServerScriptService/server/Services/QuestService.luau": {
+    "mtime": 1792265613.6997335,
+    "seen": 1792687334.119297,
+    "ast_hash": "3125d24721b17d4364d24b5f9d32d9b7",
+    "semantic_hash": "3125d24721b17d4364d24b5f9d32d9b7"
+  },
+  "ServerScriptService/server/Services/RaceService.luau": {
+    "mtime": 1792538428.2923756,
+    "seen": 1792687334.119297,
+    "ast_hash": "f6009bf90ea605b301a322a737549f1f",
+    "semantic_hash": "f6009bf90ea605b301a322a737549f1f"
+  },
+  "ServerScriptService/server/Services/RadioService.luau": {
+    "mtime": 1792265613.7182941,
+    "seen": 1792687334.119297,
+    "ast_hash": "397321d42f743572312d5b0549b03d5a",
+    "semantic_hash": "397321d42f743572312d5b0549b03d5a"
+  },
+  "ServerScriptService/server/Services/RandomCarService.luau": {
+    "mtime": 1792317388.9542048,
+    "seen": 1792687334.119297,
+    "ast_hash": "003aa557bd796c705c3af4452eb8dc78",
+    "semantic_hash": "003aa557bd796c705c3af4452eb8dc78"
+  },
+  "ServerScriptService/server/Services/RelocationService.luau": {
+    "mtime": 1792265613.7037349,
+    "seen": 1792687334.119297,
+    "ast_hash": "e5145b83a9ff965098d793c44949a167",
+    "semantic_hash": "e5145b83a9ff965098d793c44949a167"
+  },
+  "ServerScriptService/server/Services/ReviveService.luau": {
+    "mtime": 1792946619.900406,
+    "seen": 1792948538.2671804,
+    "ast_hash": "e29fa9e70e306bd0810f777a52f1b9ad",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/RewardService.luau": {
+    "mtime": 1792527665.4267185,
+    "seen": 1792687334.119297,
+    "ast_hash": "10d4ce331bc71440a8298094a555a46d",
+    "semantic_hash": "10d4ce331bc71440a8298094a555a46d"
+  },
+  "ServerScriptService/server/Services/RoadService.luau": {
+    "mtime": 1792581923.5787642,
+    "seen": 1792687334.119297,
+    "ast_hash": "d702405e825636b2a86f8090985ef6c8",
+    "semantic_hash": "d702405e825636b2a86f8090985ef6c8"
+  },
+  "ServerScriptService/server/Services/SellService.luau": {
+    "mtime": 1792265613.7192924,
+    "seen": 1792687334.119297,
+    "ast_hash": "9d1432673cf3d842e7df2f0a393f7ec7",
+    "semantic_hash": "9d1432673cf3d842e7df2f0a393f7ec7"
+  },
+  "ServerScriptService/server/Services/SellerService.luau": {
+    "mtime": 1792265613.7463677,
+    "seen": 1792687334.119297,
+    "ast_hash": "39d9dfaaad3b293c636f8299bd309d68",
+    "semantic_hash": "39d9dfaaad3b293c636f8299bd309d68"
+  },
+  "ServerScriptService/server/Services/SettingsService.luau": {
+    "mtime": 1792265613.7238107,
+    "seen": 1792687334.119297,
+    "ast_hash": "874805bd52d24c184567624d7f992a7e",
+    "semantic_hash": "874805bd52d24c184567624d7f992a7e"
+  },
+  "ServerScriptService/server/Services/ShowcaseService.luau": {
+    "mtime": 1792265613.741848,
+    "seen": 1792687334.119297,
+    "ast_hash": "548814cdd1509170f44d90493e2e24be",
+    "semantic_hash": "548814cdd1509170f44d90493e2e24be"
+  },
+  "ServerScriptService/server/Services/SpeedTrapService.luau": {
+    "mtime": 1792265613.7398472,
+    "seen": 1792687334.119297,
+    "ast_hash": "e036812a70c3006524f0ac5dbd605b00",
+    "semantic_hash": "e036812a70c3006524f0ac5dbd605b00"
+  },
+  "ServerScriptService/server/Services/StartCarService.luau": {
+    "mtime": 1792265613.7037349,
+    "seen": 1792687334.119297,
+    "ast_hash": "0b726b9c937fc1bda5a4135d5887268d",
+    "semantic_hash": "0b726b9c937fc1bda5a4135d5887268d"
+  },
+  "ServerScriptService/server/Services/StarterGuiService.luau": {
+    "mtime": 1792581923.5787642,
+    "seen": 1792687334.119297,
+    "ast_hash": "415dba67f10dda75589680debf508185",
+    "semantic_hash": "415dba67f10dda75589680debf508185"
+  },
+  "ServerScriptService/server/Services/StealService.luau": {
+    "mtime": 1792265613.6851974,
+    "seen": 1792687334.119297,
+    "ast_hash": "aa28dab3b084f5b27d6981c6c9240c8e",
+    "semantic_hash": "aa28dab3b084f5b27d6981c6c9240c8e"
+  },
+  "ServerScriptService/server/Services/TipsService.luau": {
+    "mtime": 1792265613.705241,
+    "seen": 1792687334.119297,
+    "ast_hash": "a9c394db5ac7a2f6a2cf7e158bc38f38",
+    "semantic_hash": "a9c394db5ac7a2f6a2cf7e158bc38f38"
+  },
+  "ServerScriptService/server/Services/TrafficService.luau": {
+    "mtime": 1792707015.4922922,
+    "seen": 1792707462.2367423,
+    "ast_hash": "942a097d51e787e25120c4cfaaad271b",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/TutorialService.luau": {
+    "mtime": 1792701974.213076,
+    "seen": 1792702034.7943616,
+    "ast_hash": "3b43c1c7a332858eff78594992dfe231",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/UpgradeService.luau": {
+    "mtime": 1792527665.429223,
+    "seen": 1792687334.119297,
+    "ast_hash": "aef7057bceafba16744cba4846115051",
+    "semantic_hash": "aef7057bceafba16744cba4846115051"
+  },
+  "ServerScriptService/server/Services/WeatherService.luau": {
+    "mtime": 1792265613.7117653,
+    "seen": 1792687334.119297,
+    "ast_hash": "76d3747e1aa507519ef703b754f46b3f",
+    "semantic_hash": "76d3747e1aa507519ef703b754f46b3f"
+  },
+  "ServerScriptService/server/Services/WorkshopService.luau": {
+    "mtime": 1792265613.7388492,
+    "seen": 1792687334.119297,
+    "ast_hash": "cd87697b08e489fe2c1ef3a89e8ee25b",
+    "semantic_hash": "cd87697b08e489fe2c1ef3a89e8ee25b"
+  },
+  "ServerScriptService/server/Services/WorldService.luau": {
+    "mtime": 1792265613.6912158,
+    "seen": 1792687334.119297,
+    "ast_hash": "2b12e803af34133b1ce94f9462e78bea",
+    "semantic_hash": "2b12e803af34133b1ce94f9462e78bea"
+  },
+  "ServerScriptService/server/Services/init.legacy.luau": {
+    "mtime": 1792265613.680693,
+    "seen": 1792687334.119297,
+    "ast_hash": "bc0497cf8d68a956c3b06583728cc537",
+    "semantic_hash": "bc0497cf8d68a956c3b06583728cc537"
+  },
+  "StarterPlayerScripts/GamebeastClient.local.luau": {
+    "mtime": 1792265655.9220579,
+    "seen": 1792687334.119297,
+    "ast_hash": "c1e042e5ba7a03ae6658b852a15c857e",
+    "semantic_hash": "c1e042e5ba7a03ae6658b852a15c857e"
+  },
+  "StarterPlayerScripts/boot.local.luau": {
+    "mtime": 1792265655.921057,
+    "seen": 1792687334.119297,
+    "ast_hash": "bc3b1ec931327ab6475e4be7abae15df",
+    "semantic_hash": "bc3b1ec931327ab6475e4be7abae15df"
+  },
+  "ReplicatedStorage/shared/Configs/PlaytimeRewardConfig.luau": {
+    "mtime": 1792947315.623643,
+    "seen": 1792948538.2661812,
+    "ast_hash": "ea089962a120dd27328390db866fd611",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/PlaytimeRewardController.luau": {
+    "mtime": 1792947314.743123,
+    "seen": 1792948538.2661812,
+    "ast_hash": "bfc80548acaa65590cd1173e32e2786a",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/PlaytimeRewardService.luau": {
+    "mtime": 1792946619.8993948,
+    "seen": 1792948538.2671804,
+    "ast_hash": "6a691f479181ca8950efe7c1f47d59e6",
+    "semantic_hash": ""
+  },
+  "tests/playtime/harness.luau": {
+    "mtime": 1792947384.7418423,
+    "seen": 1792948538.2671804,
+    "ast_hash": "397860ce5b9c3ffa4384b679116e88da",
+    "semantic_hash": ""
+  },
+  "tests/playtime/run.sh": {
+    "mtime": 1792707015.5123029,
+    "seen": 1792707462.2367423,
+    "ast_hash": "42852ef970ee598d1551c15661a78df3",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/HopController.luau": {
+    "mtime": 1792947576.398832,
+    "seen": 1792948538.2661812,
+    "ast_hash": "3925d082b073e945a412e37cbaa7e75f",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Configs/ConvoyConfig.luau": {
+    "mtime": 1792946618.2073388,
+    "seen": 1792948538.2661812,
+    "ast_hash": "fc4691f0a2accc3e673d93b55e876bd3",
+    "semantic_hash": ""
+  },
+  "tests/convoy/harness.luau": {
+    "mtime": 1792756699.2541037,
+    "seen": 1792756718.441609,
+    "ast_hash": "d6740bd5e343445f3ef5de5e05989b7f",
+    "semantic_hash": ""
+  },
+  "tests/convoy/run.sh": {
+    "mtime": 1792707015.5110369,
+    "seen": 1792707462.2367423,
+    "ast_hash": "e8f55f78d4b3caa2a9a86440bd800357",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/UIController/PagesV2/PlayMenu.luau": {
+    "mtime": 1792947726.9131103,
+    "seen": 1792948538.2661812,
+    "ast_hash": "ad252d85690bdbfb89fe038b343e966a",
+    "semantic_hash": ""
+  }
+}

@@ -467,14 +467,15 @@ end
 WorldConfig.LegacyBodies = { ["Model 3"] = "S15", ["M3 GTR"] = "M4", ["SUPRA MK4"] = "Supra MK4", ["EVO 10"] = "BRZ/FRS/GT86", ["F&F EVO"] = "BRZ/FRS/GT86" }
 
 --[[ LIMITED EVENT CARS (2026-10-22, the Roadster Limited Event). Off every ladder, so they ride the
-	legacy path just above: priced, ranked and stat-resolved as `PricedAs` (a fixed world-3 top car,
-	whatever world it was found in), published as a shell, never in a dealer or ladder pool.
+	legacy path just above: priced and ranked as `PricedAs`, whatever world it was found in.
+	Driving and health come from the body's own `CarConfig` row, independently of that price.
+	Published as a shell, never in a dealer or ladder pool.
 	  • `SpawnChance`: per traffic car, in ANY world (`EncounterService._roll`). Repeatable.
 	  • `Paid`: never on the road; only its shop bundle grants it (`ShopConfig.Bundles`).
 	  • `Hop`: driving it gives the in-run hop (`HopController`, `DriveConfig.Hop`).
 	Its rarity word is "Limited" (`CarRarity.of`); its on-screen name is `CarNameConfig`'s. ]]
 WorldConfig.EventBodies = {
-	["Tesla Roadster"] = { PricedAs = "F40", SpawnChance = 1 / 300, Hop = true },
+	["Tesla Roadster"] = { PricedAs = "M5", SpawnChance = 1 / 300, Hop = true }, -- City Legendary economy; F40 driving row retained.
 	--- The Rocket Edition: its own model in Studio (body kit, thruster FX under `Body/`).
 	["Tesla Roadster Rocket"] = { PricedAs = "F40", Paid = true, Hop = true },
 }

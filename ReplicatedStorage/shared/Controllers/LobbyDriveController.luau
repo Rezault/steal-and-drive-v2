@@ -580,6 +580,11 @@ function LobbyDriveController.getCar(self): Model?
 	return self._car
 end
 
+--- PUBLIC (HopController): the driver's steer right now, -1..1, positive toward `DriveConfig.PositiveSteerIsLeft`.
+function LobbyDriveController.getSteer(self): number
+	return math.clamp(self._raw or 0, -1, 1)
+end
+
 --- Follow one character's seat: install on the driver's seat of a lobby car, tear down on leaving.
 function LobbyDriveController._watch(self, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)

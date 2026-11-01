@@ -52,8 +52,30 @@ local Shard = require(ReplicatedStorage.Packages.Shard)
 local GarageConfig = require(ReplicatedStorage.shared.Configs.GarageConfig)
 local StartCarConfig = require(ReplicatedStorage.shared.Configs.StartCarConfig)
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
+local UIRoot = require(ReplicatedStorage.shared.Modules.UIRoot)
 
 local StartCarController = Shard.new("StartCarController")
+
+--- Whether Play is the one screen (`StartCarConfig.OneScreenPlay`); the old UI never is.
+function StartCarController.oneScreen(_self): boolean
+	return StartCarConfig.OneScreenPlay == true and UIRoot.isNewUI()
+end
+
+--[[ Public (`RaceEntryController`, and `preselect` below): put the one Play screen up, on the world
+	the player is in. Forgetting the last pick here is the same promise the X makes on the old
+	screens: closing without driving leaves nothing behind. ]]
+function StartCarController.openPlay(self)
+	self._world = nil
+	self._mode = "race"
+	Dispatcher:Publish("OpenPage", StartCarConfig.PlayPageName)
+end
+
+--- The Cars Inventory's "drive this one", taken once by the Play screen as its first selection.
+function StartCarController.takePending(self): string?
+	local key = self._pendingCar
+	self._pendingCar = nil
+	return key
+end
 
 -- === What the cards are drawn from ==========================================
 
@@ -138,6 +160,12 @@ function StartCarController.choose(self, world: number?)
 	self._world = world
 	self._mode = "race"
 
+	--- On the one screen a world card SELECTS the world; DRIVE is the press that starts the run.
+	if self:oneScreen() then
+		Dispatcher:Publish(StartCarConfig.WorldChosenEvent, world)
+		return
+	end
+
 	--[[ A CAR ALREADY CHOSEN FROM THE INVENTORY (`preselect`) skips this screen and drives — the
 		world was the only question left. Consumed here whatever happens, so it can only ever apply to
 		the world press that followed it. A car that may not be driven in THIS world (`WorldLadderOnly`)
@@ -165,6 +193,11 @@ function StartCarController.preselect(self, key: string?)
 		return
 	end
 	self._pendingCar = key
+	if self:oneScreen() then
+		--- The car arrives already selected (`takePending`); the world is still the player's to pick.
+		self:openPlay()
+		return
+	end
 	Dispatcher:Publish("OpenPage", WorldConfig.PageName)
 
 	if self._watchingWorldPage then

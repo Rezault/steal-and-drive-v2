@@ -784,12 +784,10 @@ PickupConfig.StarTimer = {
 	speedo's top for phones, and Aleafo then asked for the same on PC with nitro in it for good
 	("add boost as the powerup there too and it takes up a permanent slot"), on every device.
 
-	So `DrivingHud.PowerupTimers` is ONE row on keyboard, pad and touch alike: its left edge on the
-	speedo's, its bottom `Gap` px over the speedo's top, `NitroConfig.Hud.Badge.Height` of the screen
-	tall. The NITRO BADGE is slot 1 and never leaves; each timed pack fills in to its right while it
-	runs (`LayoutOrder` = its place in `PickupConfig.Names`) with `Spacing` px between, and a hidden
-	one takes no room. A ROW AND NOT A SLOT because the star is only the first timed pack: the next
-	joins by being parented in (`DrivingHudController._layoutTimers`), nothing here changes.
+	So `DrivingHud.PowerupTimers` is a compact grid on keyboard, pad and touch alike: its left edge on
+	the speedo's and its bottom `Gap` px over the speedo's top. The NITRO BADGE is slot 1 and never
+	leaves; timed indicators fill the first `Columns` slots, then wrap underneath. A hidden indicator
+	takes no room, so future indicators only need to be parented in by `DrivingHudController._layoutTimers`.
 
 	WHAT MOVED TO MAKE ROOM: on desktop the nitro badge stood centred over the speedo
 	(`NitroConfig.Hud.Badge.Margin`), on a phone beside it (`DrivingHudController._layoutReadouts`).
@@ -797,13 +795,14 @@ PickupConfig.StarTimer = {
 	nitro at `StarTimer.Offset`. ]]
 PickupConfig.TimerRow = {
 	Enabled = true,
-	--[[ The row's height, and so every badge in it, as a share of `NitroConfig.Hud.Badge.Height`
-		(0.135 of the screen). 0.75 = ~0.10 of the screen (2026-10-16, the owner: "make them
+	--[[ Every badge's size as a share of `NitroConfig.Hud.Badge.Height` (0.135 of the screen).
+		0.7 = ~0.095 of the screen (2026-10-23, the owner: "make them a tiny bit
 		smaller"); the full badge over a speedo read as two stacked panels of equal weight. 1 = the
 		nitro badge's own authored size. ]]
-	Scale = 0.75,
+	Scale = 0.7,
 	Gap = 6,
 	Spacing = 8,
+	Columns = 3,
 }
 
 return PickupConfig

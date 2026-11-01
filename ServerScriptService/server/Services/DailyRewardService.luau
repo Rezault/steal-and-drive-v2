@@ -6,11 +6,10 @@
 
 	TRUST. The client sends two messages and both are bare: "claim" and "send me the calendar". It
 	cannot name a day, a reward or an amount. Every claim is checked against the server's own clock and
-	the saved record — `LastDay` must be before today — and the record is WRITTEN BEFORE THE REWARD IS
-	PAID, so a double press, or a press racing a second server, is one reward: the second claim finds
-	today already taken. ProfileStore's session lock is what makes "a second server" impossible in the
-	first place; this ordering is the belt to its braces. A payout that fails after the write (a service
-	missing) costs the player that one reward and is logged; it can never cost the game a duplicate.
+	the saved record — `LastDay` must be before today. A per-player lock covers yielding payouts.
+	The day is committed immediately after the reward's profile write, before notifications. Failed
+	grants stay claimable, and presentation errors after a grant cannot pay it twice. ProfileStore's
+	session lock prevents a second server from holding the same player's record.
 
 	What is knowingly NOT closed: the day comes from `os.time()` on the server, so nothing a client does
 	moves it. Nothing else is open.
@@ -45,7 +44,7 @@ DailyRewardService:withSignals({ "Claimed" })
 --- an open or a midnight. Anything faster is a held key or a script, and is dropped.
 local MESSAGE_COOLDOWN = 1
 
-type Record = { Day: number, LastDay: number }
+type Record = { Day: number, LastDay: number, Receipts: { [string]: { [string]: any } } }
 
 DailyRewardService:withRemoteEvents({
 	DailyRewardConfig.Remotes.State,
@@ -72,15 +71,33 @@ end
 --- The saved record, shape-checked. A fresh or malformed one is "never claimed".
 function DailyRewardService._record(self, player: Player): Record?
 	local profile = self:_profile(player)
-	if not profile then
-		return nil
-	end
+	if not profile then return nil end
 	local stored = profile:Get(DailyRewardConfig.ProfileKey)
 	local day = type(stored) == "table" and stored.Day
 	local last = type(stored) == "table" and stored.LastDay
+	local claimed = if type(day) == "number" and day == day then math.clamp(math.floor(day), 0, #DailyRewardConfig.Days) else 0
+	local receipts = {}
+	local saved = type(stored) == "table" and stored.Receipts
+	for index = 1, claimed do
+		local receipt = if type(saved) == "table" then saved[tostring(index)] else nil
+		-- Accept the one-receipt format too, without inventing any older payouts.
+		if receipt == nil and index == claimed and type(stored) == "table" then receipt = stored.Receipt end
+		if type(receipt) == "table" then
+			local kind, amount, body = receipt.Kind, receipt.Amount, receipt.Body
+			if (kind == "Cash" or kind == "Revive" or (kind == "Car" and type(body) == "string"))
+				and type(amount) == "number" and amount == amount and amount >= 0 and amount < math.huge then
+				receipts[tostring(index)] = {
+					Kind = kind, Amount = amount, Body = if kind == "Car" then body else nil,
+					ConvertedFrom = if kind == "Cash" and type(receipt.ConvertedFrom) == "string" then receipt.ConvertedFrom else nil,
+					Reason = if receipt.Reason == "Full" or receipt.Reason == "Duplicate" then receipt.Reason else nil,
+				}
+			end
+		end
+	end
 	return {
-		Day = if type(day) == "number" then math.clamp(math.floor(day), 0, #DailyRewardConfig.Days) else 0,
-		LastDay = if type(last) == "number" then math.floor(last) else -1,
+		Day = claimed,
+		LastDay = if type(last) == "number" and last == last and math.abs(last) < math.huge then math.floor(last) else -1,
+		Receipts = receipts,
 	}
 end
 
@@ -141,16 +158,26 @@ end
 function DailyRewardService._payload(self, player: Player, record: Record, claimed: number?)
 	local today = QuestConfig.dayIndex()
 	local current, claimable = self:_standing(record, today)
+	local claimedThrough = if claimable then current - 1 else current
 	local days = {}
 	for index, spec in DailyRewardConfig.Days do
 		local kind, amount, body = self:_rewardFor(player, index)
-		days[index] = { Kind = kind, Amount = amount, Body = body, Big = spec.Big == true }
+		local actual = if index <= claimedThrough and record.Receipts then record.Receipts[tostring(index)] else nil
+		if actual then
+			days[index] = table.clone(actual)
+			days[index].Big = spec.Big == true
+		elseif index <= claimedThrough then
+			-- Legacy claims have no recoverable receipt; never invent an amount or a received car.
+			days[index] = { Kind = "Legacy", Big = spec.Big == true }
+		else
+			days[index] = { Kind = kind, Amount = amount, Body = body, Big = spec.Big == true }
+		end
 	end
 	return {
 		days = days,
 		current = current,
 		claimable = claimable,
-		claimedThrough = if claimable then current - 1 else current,
+		claimedThrough = claimedThrough,
 		nextAt = QuestConfig.resetAt(),
 		claimed = claimed,
 	}
@@ -176,35 +203,43 @@ end
 
 --[[ PUBLIC (2026-10-19, shared with `PlaytimeRewardService`): pay one priced reward. Answers whether
 	it landed. `source` names the car's origin on `awardCar` ("DailyReward", "Playtime"). Moved out of
-	`_claim` unchanged, so the daily payout is exactly what it was; the caller has already WRITTEN its
-	own record (header "TRUST"), which is what makes a double press one reward. ]]
-function DailyRewardService.pay(self, player: Player, kind: string, amount: number, body: string?, source: string): boolean
+	`_claim` uses the confirmation callback to commit its exact receipt at the payout write. Converted
+	car rewards report cash, the original body and the reason before notifications can fail. ]]
+function DailyRewardService.pay(self, player: Player, kind: string, amount: number, body: string?, source: string, onGranted: (({ [string]: any }?) -> ())?): boolean
 	if kind == "Cash" then
 		local Garage = Shard.get("GarageService")
-		return Garage ~= nil and (Garage:addCash(player, amount) or 0) >= 0
+		if not Garage then return false end
+		local granted = false
+		Garage:addCash(player, amount, function()
+			granted = true
+			if onGranted then onGranted() end
+		end)
+		return granted
 	elseif kind == "Revive" then
 		local Revive = Shard.get("ReviveService")
-		return Revive ~= nil and Revive:grantLife(player, amount)
+		return Revive ~= nil and Revive:grantLife(player, amount, onGranted)
 	elseif kind == "Car" and body then
 		local Garage = Shard.get("GarageService")
 		local tier = GarageConfig.TierOfBody[body]
 		if Garage and tier then
-			return Garage:awardCar(player, tier, body, nil, nil, source) ~= "rejected"
+			return Garage:awardCar(player, tier, body, nil, nil, source, nil, function(outcome, cash, reason)
+				if onGranted then
+					onGranted(if outcome == "sold" then {
+						Kind = "Cash", Amount = cash, ConvertedFrom = body, Reason = reason,
+					} else nil)
+				end
+			end) ~= "rejected"
 		end
 	end
 	return false
 end
 
---- Header "TRUST", in order: throttle, check, WRITE, then pay.
+--- Throttle and lock the claim; consume the day only at the confirmed payout write.
 function DailyRewardService._claim(self, player: Player)
-	if not DailyRewardConfig.Enabled or self:_throttled(player) then
-		return
-	end
+	if not DailyRewardConfig.Enabled or self:_throttled(player) or self._claiming[player] then return end
 	local profile = self:_profile(player)
 	local record = self:_record(player)
-	if not (profile and record) then
-		return
-	end
+	if not (profile and record) then return end
 	local today = QuestConfig.dayIndex()
 	local day, claimable = self:_standing(record, today)
 	if not claimable then
@@ -212,16 +247,37 @@ function DailyRewardService._claim(self, player: Player)
 		return
 	end
 
-	local kind, amount, body = self:_rewardFor(player, day)
-	profile:Set(DailyRewardConfig.ProfileKey, { Day = day, LastDay = today })
-
-	local paid = self:pay(player, kind, amount, body, "DailyReward")
-	if paid then
-		self.log:info(string.format("%s claimed daily reward day %d: %s %s.", player.Name, day, kind, body or tostring(amount)))
-		self:getSignal("Claimed"):Fire(player, day, kind, amount, body)
-	else
-		self.log:warn(string.format("%s claimed daily reward day %d (%s %s) but it could not be paid; the day is still marked taken.", player.Name, day, kind, body or tostring(amount)))
+	self._claiming[player] = true
+	local committed = false
+	local kind, amount, body
+	local receipt
+	local receipts = if day == 1 then {} else table.clone(record.Receipts or {})
+	local ok, result = pcall(function()
+		kind, amount, body = self:_rewardFor(player, day)
+		receipt = { Kind = kind, Amount = amount, Body = body }
+		return self:pay(player, kind, amount, body, "DailyReward", function(delivered)
+			if committed then return end
+			-- Same payout boundary as playtime gifts: ownership first, record before any UI/signals.
+			if delivered then
+				receipt = table.clone(delivered)
+				kind, amount, body = receipt.Kind, receipt.Amount, receipt.Body
+			end
+			committed = true
+			receipts[tostring(day)] = receipt
+			profile:Set(DailyRewardConfig.ProfileKey, { Day = day, LastDay = today, Receipts = receipts })
+		end)
+	end)
+	self._claiming[player] = nil
+	if not committed then
+		self.log:warn(string.format("%s's daily reward day %d was not granted; it remains claimable (%s).", player.Name, day, tostring(result)))
+		self:_send(player)
+		return
 	end
+	if not ok then
+		self.log:warn(string.format("%s's daily reward day %d was granted, but its notification failed: %s.", player.Name, day, tostring(result)))
+	end
+	self.log:info(string.format("%s claimed daily reward day %d: %s %s.", player.Name, day, kind, body or tostring(amount)))
+	self:getSignal("Claimed"):Fire(player, day, kind, amount, body)
 	self:_send(player, day)
 end
 
@@ -231,6 +287,7 @@ DailyRewardService:withLifecycle({
 	init = function(self)
 		self._profiles = {} :: { [Player]: any }
 		self._lastMessage = {} :: { [Player]: number }
+		self._claiming = {} :: { [Player]: boolean }
 	end,
 
 	start = function(self)
@@ -253,6 +310,7 @@ DailyRewardService:withLifecycle({
 		Players.PlayerRemoving:Connect(function(player)
 			self._profiles[player] = nil
 			self._lastMessage[player] = nil
+			self._claiming[player] = nil
 		end)
 	end,
 })

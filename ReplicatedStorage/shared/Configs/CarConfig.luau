@@ -106,8 +106,8 @@ CarConfig.Cars = {
 	["SUPRA MK4"] = { ["MaxSteer"] = 0.99, ["MaxHealth"] = 126, ["MaxSpeed"] = 77.76, ["WheelFriction"] = 1.742, ["LaneAccelScale"] = 1.06, ["LaneSpeedScale"] = 1.05, ["DrivingTorque"] = 58300, ["BrakingTorque"] = 143300 },
 	["EVO 10"] = { ["MaxSteer"] = 0.998, ["MaxHealth"] = 111, ["MaxSpeed"] = 62.64, ["WheelFriction"] = 1.742, ["LaneAccelScale"] = 1.093, ["LaneSpeedScale"] = 1.063, ["DrivingTorque"] = 52300, ["BrakingTorque"] = 127300 },
 	["F&F EVO"] = { ["MaxSteer"] = 0.998, ["MaxHealth"] = 111, ["MaxSpeed"] = 62.64, ["WheelFriction"] = 1.742, ["LaneAccelScale"] = 1.093, ["LaneSpeedScale"] = 1.063, ["DrivingTorque"] = 52300, ["BrakingTorque"] = 127300 },
-	-- Limited event cars (`WorldConfig.EventBodies`): the free one drives as its F40 price tag; the Rocket
-	-- Edition keeps that top speed and buys the "more responsive movement" in grip, lane snap and torque.
+	-- Limited event cars (`WorldConfig.EventBodies`): driving rows are independent of economic price.
+	-- The free Floater keeps F40 driving and hop with City Legendary value; the Rocket stays excluded.
 	["Tesla Roadster"] = { ["MaxSteer"] = 0.984, ["MaxHealth"] = 130, ["MaxSpeed"] = 97.2, ["WheelFriction"] = 1.716, ["LaneAccelScale"] = 1.06, ["LaneSpeedScale"] = 1.04, ["DrivingTorque"] = 63000, ["BrakingTorque"] = 160000 },
 	["Tesla Roadster Rocket"] = { ["MaxSteer"] = 1.02, ["MaxHealth"] = 140, ["MaxSpeed"] = 97.2, ["WheelFriction"] = 1.86, ["LaneAccelScale"] = 1.16, ["LaneSpeedScale"] = 1.1, ["DrivingTorque"] = 70000, ["BrakingTorque"] = 175000 },
 }

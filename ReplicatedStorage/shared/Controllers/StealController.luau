@@ -1985,6 +1985,10 @@ function StealController._canBail(self): boolean
 	if not (self._active and self._state == "idle" and not self._wrecked and not self._downed) then
 		return false
 	end
+	local hop = Shard.get("HopController")
+	if hop and hop:isFlying() then
+		return false
+	end
 	--[[ THE TUTORIAL OWNS THE JUMP UNTIL THE BEAT THAT TEACHES IT.
 
 		A first-timer who presses Space on BOOST, STEER or SURVIVE is jumping out of a car the next
@@ -3820,6 +3824,12 @@ end
 
 	Returned as three values rather than a table because it is read every frame and none of them is
 	worth an allocation. ]]
+--- Game-time road speed while the driver is in the scripted steal arc.
+function StealController.roadSpeed(self): number?
+	local flight = self._flight
+	return if self._active and self._state ~= "idle" and flight then flight.alongVel else nil
+end
+
 function StealController.getFlight(self): (string, boolean, number)
 	local rec = self._candidate
 	return self._state or "idle", rec ~= nil, if rec then self._candidateAt or 0 else math.huge
