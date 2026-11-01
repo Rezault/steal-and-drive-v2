@@ -59,6 +59,12 @@ local function env(path)
 		Color3 = { fromRGB = function(r, g, b) return { r, g, b } end, new = function(r, g, b) return { r, g, b } end },
 		UDim2 = { fromOffset = function(x, y) return { x, y } end, fromScale = function(x, y) return { x, y } end },
 		Enum = proxy("Enum"),
+		Instance = { new = function()
+			local o = { Name = "", attrs = {} }
+			function o:SetAttribute(k, v) self.attrs[k] = v end
+			function o:Destroy() self.destroyed = true end
+			return o
+		end },
 		Random = { new = function() return { NextNumber = function(_, a, b) return a or 0 end, NextInteger = function(_, a) return a end } end },
 		os = setmetatable({ clock = function() return clock end }, { __index = os }),
 		task = { spawn = function() end, wait = function() end, delay = function() end },
@@ -74,7 +80,10 @@ local upgradesOf = {} -- [player] = { Trainer = level }
 modules["ReplicatedStorage.shared.Configs.UpgradeConfig"] = {
 	levelOf = function(upgrades, key) return (type(upgrades) == "table" and upgrades[key]) or 0 end,
 }
-modules["ReplicatedStorage.shared.Configs.WorldConfig"] = { TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 } }
+modules["ReplicatedStorage.shared.Configs.WorldConfig"] = {
+	TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 },
+	get = function() return { Cars = { "Civic", "Civic", "Civic", "Civic", "Civic", "Civic", "Civic", "Civic", "M5", "M5" } } end,
+}
 modules["ReplicatedStorage.shared.Configs.GarageConfig"] = {
 	valueOf = function(tier) return values[tier] end,
 	TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 },
@@ -122,7 +131,8 @@ do
 	local a, b = vec(0, 0, 0), vec(100, 0, 0)
 	check(Collector.positionAt(a, b, 10, 20, 5).X == 0, "before the leg: at A")
 	check(Collector.positionAt(a, b, 10, 20, 25).X == 100, "after the leg: at B")
-	check(math.abs(Collector.positionAt(a, b, 10, 20, 15).X - 50) < 1e-6, "halfway (smoothstep is symmetric)")
+	check(math.abs(Collector.positionAt(a, b, 10, 20, 15).X - 50) < 1e-6, "halfway")
+	check(math.abs(Collector.positionAt(a, b, 10, 20, 12.5).X - 25) < 1e-6, "linear: a car on the highway is already at speed")
 	check(Collector.positionAt(a, b, 10, 10, 10).X == 100, "zero-length leg is at B")
 	local c = Collector.Corridor
 	check(Collector.zoneAt(vec(c.CenterX, c.FloorY, c.StartZ + 10)) == 0, "the hub is zone 0")
@@ -169,7 +179,9 @@ modules["ReplicatedStorage.Packages.Shard"] = {
 	end,
 	get = function(n) return registry[n] end,
 }
-for _, name in { "WeatherConfig", "PaintConfig", "TrafficConfig" } do
+modules["ReplicatedStorage.shared.Configs.WeatherConfig"] = { roll = function() return nil end, sanitize = function(x) return x end }
+modules["ReplicatedStorage.shared.Configs.PaintConfig"] = { roll = function() return 1 end }
+for _, name in { "TrafficConfig" } do
 	modules["ReplicatedStorage.shared.Configs." .. name] = {}
 end
 modules["ServerScriptService.server.Services.RoamingCarService.CollectorWorld"] = { build = function() end }
@@ -289,6 +301,89 @@ do
 	ready = false
 	check(s:awardRoadSteal(rider, { tier = 1, body = "Civic", paint = 1 }) == false and #awards == n + 1, "no award before the profile loads")
 	ready = true
+end
+
+
+-- === Config + service: the highway ==========================================
+do
+	local road, c = Collector.Road, Collector.Corridor
+	local lanes = #road.LaneSpeeds
+	check(math.abs((Collector.laneX(1) + Collector.laneX(lanes)) / 2 - c.CenterX) < 1e-6, "lanes are centred on the corridor")
+	check(math.abs(Collector.laneX(2) - Collector.laneX(1) - road.LaneWidth) < 1e-6, "lanes are a lane width apart")
+	check(Collector.roadHalfWidth() < c.HalfWidth, "the road fits between the canyon walls")
+	local z1s, z1e = Collector.zoneRoad(1)
+	local z2s = Collector.zoneRoad(2)
+	check(z1s == c.StartZ - road.EndMargin and z1e == c.StartZ - c.ZoneLength + road.EndMargin, "zone 1 road runs arch to arch")
+	check(z2s < z1e, "zone 2's cars start past zone 1's end")
+	for lane = 1, lanes do
+		check(road.LaneSpeeds[lane] == road.LaneSpeeds[lanes + 1 - lane], "lane speeds mirror across the road (" .. lane .. ")")
+	end
+
+	-- A fresh service: no cars, all arches clear.
+	local t = loadstring(SOURCES.RoamingCarService)
+	setfenv(t, env("ServerScriptService.server.Services.RoamingCarService"))
+	local r = t()
+	r.lifecycle.init(r)
+	r._folder = {}
+	r._drawable = function() return true end
+	serverNow = 5000
+
+	-- The spawn interval keeps about CarsPerZone on a zone's road.
+	local length = z1s - z1e
+	local mean = 0
+	for _, speed in road.LaneSpeeds do mean += length / speed / lanes end
+	check(math.abs(r:_spawnEvery() * Collector.Spawn.CarsPerZone - mean) < 1e-6, "spawn interval x count = average crossing time")
+
+	-- Out of the arch: the stub rolls rung 1, which prefers the slowest lane.
+	local first = r:_newCar(1, false)
+	check(first ~= nil and road.LaneSpeeds[first.lane] == math.min(table.unpack(road.LaneSpeeds)), "a common car takes a slow lane")
+	check(first.a.Z == z1s and first.b.Z == z1e and first.a.X == Collector.laneX(first.lane), "its leg is its lane, arch to arch")
+	check(math.abs((first.t1 - first.t0) - length / road.LaneSpeeds[first.lane]) < 1e-6, "at its lane's speed")
+	check(first.inst.attrs.A == first.a and first.inst.attrs.T1 == first.t1, "the leg is replicated")
+	local second = r:_newCar(1, false)
+	check(second ~= nil and second.lane ~= first.lane, "the next car does not stack on the first in its lane")
+	for _ = 1, lanes do r:_newCar(1, false) end
+	check(r:_newCar(1, false) == nil, "with every lane just used, nothing comes out of the arch")
+	serverNow += road.MinGap / math.min(table.unpack(road.LaneSpeeds)) + 0.01
+	check(r:_newCar(1, false) ~= nil, "once the gap opens, cars flow again")
+
+	-- The end of the road: an ordinary car leaves, a secret laps.
+	local secret = r:_newCar(2, true, 3, 0)
+	check(secret ~= nil and secret.secret, "a secret car can be placed")
+	serverNow = math.max(secret.t1, first.t1) + 0.1
+	local leftBefore = first.inst.destroyed
+	r:_stepTraffic(serverNow)
+	check(not leftBefore and first.inst.destroyed and r._cars[first.id] == nil, "a car at the far arch is removed")
+	check(r._cars[secret.id] ~= nil and secret.t0 == serverNow and secret.a.Z == Collector.zoneRoad(2), "a secret goes round again")
+
+	-- Fill: no two cars in one lane closer than MinGap, nobody off the road.
+	local fresh = loadstring(SOURCES.RoamingCarService)
+	setfenv(fresh, env("ServerScriptService.server.Services.RoamingCarService"))
+	local f2 = fresh()
+	f2.lifecycle.init(f2)
+	f2._folder = {}
+	f2._drawable = function() return true end
+	f2:_fill(3)
+	local byLane, count = {}, 0
+	for _, car in f2._cars do
+		count += 1
+		byLane[car.lane] = byLane[car.lane] or {}
+		table.insert(byLane[car.lane], car.a.Z)
+	end
+	check(count >= Collector.Spawn.CarsPerZone / 2, "a filled zone has traffic (" .. count .. ")")
+	local spaced, inside = true, true
+	local s3, e3 = Collector.zoneRoad(3)
+	for _, zs in byLane do
+		table.sort(zs)
+		for i = 2, #zs do
+			if zs[i] - zs[i - 1] < road.MinGap - 1e-6 then spaced = false end
+		end
+		for _, z in zs do
+			if z > s3 or z < e3 then inside = false end
+		end
+	end
+	check(spaced, "filled cars keep MinGap in their lane")
+	check(inside, "filled cars are on their zone's road")
 end
 
 print(string.format("%d passed, %d failed", passes, failures))

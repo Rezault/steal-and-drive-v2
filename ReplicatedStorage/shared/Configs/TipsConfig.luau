@@ -145,17 +145,18 @@ TipsConfig.Tips = {
 	"Tap the brake to slip into a gap. Let go and you speed back up.",
 }
 
--- Car collector (2026-11-01): the road is the steal now and Steal Power trains on the kiddie ride, so
--- the chat line teaches that loop. CollectorConfig.Enabled = false brings the race tips back.
+-- Car collector (2026-11-01): the highway past the START ZONE is the steal now and Steal Power trains on
+-- the kiddie ride, so the chat line teaches that loop. CollectorConfig.Enabled = false brings the race
+-- tips back.
 if require(game:GetService("ReplicatedStorage").shared.Configs.CollectorConfig).Enabled then
 	TipsConfig.Tips = {
-		"Press PLAY, catch a car and press SPACE to jump into it. It's yours, keep driving!",
+		"Walk onto the highway past the START ZONE. Get close to a car and JUMP to land on it. It's yours!",
 		"Park stolen cars on your podiums. They earn cash every second. Walk over the pad to collect.",
 		"Every car shows the STEAL POWER it needs. Green means you can take it.",
 		"Sit on the kiddie ride at your plot to train STEAL POWER.",
 		"Tap the + on your power meter to upgrade the kiddie ride and train faster.",
 		"Same car, new colour? That's a new car for your collection.",
-		"Rarer cars drive further down the road. Keep going!",
+		"Each zone down the highway has rarer cars, and the rarest ones take the fast middle lanes.",
 	}
 end
 

@@ -22,19 +22,25 @@ local CollectorConfig = {}
 
 CollectorConfig.Enabled = true
 
---[[ WHERE THE CARS ARE (2026-11-01, owner after the first playtest: "one wide road with cars spawning
-	from the start of the road, and I need to drive and catch and jump into them"; "I'm not able to do
-	the satisfying jump and land in a car").
+--[[ WHERE THE CARS ARE. Three owner calls on 2026-11-01, in order:
+	  1. on-foot herds in the canyon south of the plots ("nothing like the video");
+	  2. the race highway behind the PLAY button, stealing traffic with the race's jump-and-land;
+	  3. "remove the play button altogether … in the video there's just an area in the map where dinos
+	     spawn and you go in and jump into one" — the one in force.
 
-	`RoadSteal`: the race highway is the collector. Its traffic is what you steal, with the existing
-	jump-and-land, and a landed car is YOURS on the spot (`StealService` -> `RoamingCarService.
-	awardRoadSteal`): straight to the hotbar, no getaway truck, keep driving it to the next one. A car
-	whose ⚡ requirement you do not meet cannot be locked or taken.
+	`Roaming` is (3): the canyon is ONE WIDE HIGHWAY (`Road`), cars drive straight down its lanes out of
+	each zone's arch, and you walk in and LEAP onto one (`Leap`). Nothing teleports you anywhere and
+	there is no race: `RaceService.enterRace` refuses while this is on, and the PLAY button is hidden.
 
-	`Roaming`: the first build's on-foot herds in the canyon south of the plots. Off; kept because it
-	works and the corridor may come back as a lobby feature. ]]
-CollectorConfig.RoadSteal = true
-CollectorConfig.Roaming = false
+	`RoadSteal` is (2), kept switchable: the race traffic is stolen with the race's own jump and awarded
+	by `RoamingCarService.awardRoadSteal`. Turn `Roaming` off and this on to go back to it. ]]
+CollectorConfig.RoadSteal = false
+CollectorConfig.Roaming = true
+
+--- Whether the race (PLAY, the lobby pad, the getaway truck) exists at all.
+function CollectorConfig.racesOn(): boolean
+	return not (CollectorConfig.Enabled and CollectorConfig.Roaming)
+end
 
 -- === The corridor ============================================================
 --[[ Measured in the place, 2026-11-01: the canyon south of the plots is flat at Y = -90 from the
@@ -72,15 +78,6 @@ function CollectorConfig.zoneAt(position: Vector3): number
 	end
 	local index = math.floor(into / c.ZoneLength) + 1
 	return if index <= #CollectorConfig.Zones then index else 0
-end
-
---- The rectangle cars roam in for a zone: (centre, half size X, half size Z), with a margin so herds
---- do not sit on a zone line.
-function CollectorConfig.zoneRect(index: number): (Vector3, number, number)
-	local c = CollectorConfig.Corridor
-	local z0 = c.StartZ - (index - 1) * c.ZoneLength
-	local centre = Vector3.new(c.CenterX, c.FloorY, z0 - c.ZoneLength / 2)
-	return centre, c.HalfWidth, c.ZoneLength / 2 - 24
 end
 
 --- Metres from the start line, for the zone strip readout (studs / `Meter`).
@@ -203,34 +200,58 @@ end
 
 -- === Spawning ================================================================
 CollectorConfig.Spawn = {
-	CarsPerZone = 14,
-	HerdSize = { 2, 4 }, -- inclusive
+	CarsPerZone = 14, -- roughly how many are on a zone's road at once (`Road.SpawnEvery` is derived from it)
 	--[[ Rung odds inside a zone (rung 1 = the world's cheapest car). NOT `BalanceConfig.RungWeights`:
 		those are tuned for a road that throws hundreds of cars a run, where a 1-in-2,000 Legendary is
 		still seen. A zone holds fourteen cars at a time, so the top rungs are lifted until a
 		Legendary is a few-minutes sight rather than a never. ]]
 	RungWeights = { 30, 25, 16, 12, 7, 4, 2.6, 1.6, 1.0, 0.6 },
-	RespawnDelay = { 6, 12 }, -- seconds before a stolen car's slot refills
 	MutationChance = 1, -- x `WeatherConfig.roll`'s own odds; 1 = the road's odds
 }
 
--- === Movement ================================================================
---[[ Herds move in LEGS: pick a point, run to it, idle, repeat. A leg is replicated once as
-	(from, to, startTime, endTime) and every client — and the server, for distance checks — computes
-	the position from the shared clock, so a moving car costs one attribute write per leg, not per
-	frame. Rarer cars run faster so the best ones need chasing; all of them stay under a player's
-	`WalkSpeed` (16) on average because a leg is followed by an idle. ]]
-CollectorConfig.Move = {
-	LegDistance = { 30, 90 },
-	Speed = { 10, 18 }, -- rung 1 .. rung 10
-	Idle = { 1.5, 4.5 },
-	FormationSpacing = 16,
-	Lift = 0.35, -- studs between the floor and a shell's lowest point: clears the zone overlay
+-- === The road ================================================================
+--[[ ONE WIDE HIGHWAY down the middle of the canyon. Each zone runs its own traffic: a car comes out of
+	the zone's arch (`StartZ` side), drives straight down its lane at its lane's speed, and goes into the
+	next arch, where it is removed — so the zone line is where cars appear and disappear, under the arch
+	that hides it.
+
+	LANES HAVE SPEEDS, CARS DO NOT, so nothing in a lane ever drives through the car ahead of it. The
+	outer lanes run just over walking pace (`WalkSpeed` 16), so a car there can be walked alongside;
+	the middle ones need a run-up and a good jump. Rarer cars prefer faster lanes (`laneFor`), so the
+	best car on the road is also the hardest one to land on. ]]
+CollectorConfig.Road = {
+	LaneWidth = 20,
+	LaneSpeeds = { 18, 26, 34, 34, 26, 18 }, -- studs/s, lane 1 is the west edge (-X)
+	EndMargin = 14, -- studs inside each arch where a car appears / disappears
+	MinGap = 45, -- studs between consecutive cars in one lane
+	FastRungs = { 5, 9 }, -- rung >= [1] prefers the 26 lanes, >= [2] the 34 lanes
+	LanePreference = 0.7, -- chance a car takes its preferred speed, otherwise any lane
+	Lift = 0.45, -- studs between the floor and a shell's lowest point: clears the road paint
 }
 
+--- How far the lanes reach either side of the corridor's centre.
+function CollectorConfig.roadHalfWidth(): number
+	local r = CollectorConfig.Road
+	return #r.LaneSpeeds * r.LaneWidth / 2
+end
+
+--- The X of lane `lane`'s centre line.
+function CollectorConfig.laneX(lane: number): number
+	local r = CollectorConfig.Road
+	return CollectorConfig.Corridor.CenterX - CollectorConfig.roadHalfWidth() + (lane - 0.5) * r.LaneWidth
+end
+
+--- Where a zone's traffic starts and ends (Z), arch to arch.
+function CollectorConfig.zoneRoad(zone: number): (number, number)
+	local c = CollectorConfig.Corridor
+	local z0 = c.StartZ - (zone - 1) * c.ZoneLength
+	local margin = CollectorConfig.Road.EndMargin
+	return z0 - margin, z0 - c.ZoneLength + margin
+end
+
 --[[ Where a car on leg (a -> b, t0 -> t1) is at server time `now`. THE ONE COPY: the server's
-	distance check and every client's drawing call this, so they cannot disagree about where a car
-	is. Smoothstep, so a herd sets off and pulls up rather than snapping to speed. ]]
+	distance check, every client's drawing and the leap's landing prediction call this, so they cannot
+	disagree about where a car is. Linear: a car on the highway is already at speed. ]]
 function CollectorConfig.positionAt(a: Vector3, b: Vector3, t0: number, t1: number, now: number): Vector3
 	if now >= t1 or t1 <= t0 then
 		return b
@@ -238,17 +259,29 @@ function CollectorConfig.positionAt(a: Vector3, b: Vector3, t0: number, t1: numb
 	if now <= t0 then
 		return a
 	end
-	local x = (now - t0) / (t1 - t0)
-	return a:Lerp(b, x * x * (3 - 2 * x))
+	return a:Lerp(b, (now - t0) / (t1 - t0))
 end
 
 -- === Capturing ===============================================================
+--[[ THE LEAP (owner: "you go in and jump into one"). With a car you can steal inside `Range`, it is
+	outlined and tagged JUMP!; press jump (Space, the mobile jump button, gamepad A) and you leap in an
+	arc with a front flip and land on its roof, aimed at where the car WILL be when you come down (the
+	leg is deterministic, so the prediction is exact). On the roof the client asks the server; the car
+	bursts into the hotbar on "ok", and you drop to the road and go again.
+
+	The arc is all client-side presentation. What the server checks is unchanged: the character is
+	where the car is, give or take `Radius + Slack + speed x LatencySeconds`. ]]
+CollectorConfig.Leap = {
+	Range = 42, -- studs, flat, from you to the car at the moment you press jump
+	Speed = 60, -- studs/s along the ground: sets the flight time from the distance
+	Time = { 0.5, 0.85 }, -- flight seconds, clamped
+	Height = { 9, 16 }, -- arc peak over the straight line, short jump .. long jump
+	Ride = 0.45, -- seconds on the roof waiting for the server before letting go regardless
+	Fov = 8, -- degrees added to the camera FOV mid-flight
+}
+
 CollectorConfig.Capture = {
-	--[[ Stand within `Radius` of a car you can steal and a ring fills over `HoldSeconds`; leave and
-		it drains. The reference reads as instant-on-contact; a half-second fill keeps that pace but
-		gives the moment a beat and makes it deliberate on mobile, where there is no key to press. ]]
 	Radius = 13,
-	HoldSeconds = 0.45,
 	--[[ SERVER SLACK. The server checks the distance between the character and where the car is
 		NOW by the shared clock. The client measured it up to a ping ago against a car that has since
 		moved, so the server allows `Radius + Slack + speed x LatencySeconds`. ]]

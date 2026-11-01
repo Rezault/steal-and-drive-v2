@@ -1,27 +1,38 @@
 # Car Collector Rework — Progress
 
 Branch: `feature/open-world-collector-rework` · remote `v2` = https://github.com/Rezault/steal-and-drive-v2
-Studio place used for build/test: "steal car v2" (placeId 103274860383115) — owner confirmed safe to edit.
+Studio place used for build/test: "steal car v2" (placeId 103274860383115). The owner confirmed it is safe to edit.
 Studio playtests use the ProfileStore mock (`Data/Components/Settings.luau` `DEBUG_MOCK = true`), so no production saves are touched.
 Nothing was published. Originals of every Studio script that was overwritten are in `ServerStorage.CollectorReworkBackup_2026_11_01`.
 
 ## Design now (owner direction, 2026-11-01)
 
-The first build (walk into roaming herds on foot) was rejected in playtest: "nothing like the game in the
-video". The loop was rebuilt around the existing race highway:
+History: on-foot herds were rejected ("nothing like the game in the video"). The PLAY-button race highway
+with jump-to-steal came next. Then the owner asked to remove PLAY altogether: "theres just an area in the map
+where dinos spawn and you go in and jump into one ... make that race area be one big lane". So:
 
-1. **Press PLAY.** Traffic spawns ahead on the one wide highway and drives straight.
-2. **Catch a car and press SPACE.** The existing jump-and-land steal flies you into it. The car is yours
-   instantly: "IT'S YOURS!" toast, SECURED tray, into the hotbar (`GarageService.awardCar`). You keep driving
-   the stolen car. There is no getaway truck (`GetawayConfig.Enabled` is off while `RoadSteal` is on).
-3. **Steal Power (⚡) gates which cars you can take.** Every traffic car shows "Required: ⚡N", green if you
-   can, red if not. Cars above your ⚡ are never locked or offered as a jump target. The server re-checks.
-4. **Train ⚡ on the kiddie ride** (our take on the reference's toy horse). Each plot has a coin-op kiddie
-   ride car. Sit on it and it rocks back and forth while ⚡ rises every half second ("+1" pops). The **+** on the ⚡ pill buys
-   kiddie ride levels (24) for a faster rate: 2 ⚡/s at level 0, ×1.277 per level.
-5. **Park cars on podiums** for $/s (unchanged from the first build). Wrecking ends the run and returns home.
+1. **No PLAY button, no races.** `CollectorConfig.racesOn()` is false while `Enabled and Roaming`.
+   - `RaceEntryController` hides PLAY.
+   - `RaceService.enterRace` refuses every entry: button, lobby pad, admin.
+2. **The highway.** The canyon corridor south of the plots is a six-lane road through the five zones, with
+   lane paint from `CollectorWorld`.
+   - Cars enter at each zone's arch and drive straight down their lane at 18 / 26 / 34 studs/s (outer lanes
+     slowest).
+   - A car is removed at the next arch. Secrets loop their zone.
+   - Rarer cars prefer the fast middle lanes (`Road.FastRungs`, `LanePreference`).
+   - Each zone holds about `Spawn.CarsPerZone` cars, spaced at least `Road.MinGap` apart per lane.
+3. **Walk in and JUMP.** Within `Leap.Range` (42) of a car you have the ⚡ for, it gets a green outline
+   and a "SPACE · JUMP!" tag. Jump leaps you in an arc with a front flip and lands you on its roof. The car
+   bursts into your hotbar: toast, "N SECURED" tray.
+   - The server re-checks distance against the car's deterministic lane position, ⚡, and the cooldown.
+   - A weak jump shows "You need ⚡N".
+4. **Steal Power (⚡)** gates cars: every label shows "Required: ⚡N", green if you can, red if not. Zone arches
+   block you until you meet the zone's minimum.
+5. **Train ⚡ on the kiddie ride** at your plot. It rocks while ⚡ rises every half second. The **+** on the ⚡
+   pill buys ride levels.
+6. **Park cars on podiums** for $/s (unchanged).
 
-On-foot roaming herds are switched off (`CollectorConfig.Roaming = false`) but kept in code.
+The PLAY-mode road steal (`RoadSteal`) and the getaway truck are switched off but kept in code.
 
 ## Reference video analysis (Screen Recording 2026-11-01 113528.mp4, 26 s, 1 fps frames)
 
@@ -38,58 +49,69 @@ Confirmed from footage:
 | Milestone | State |
 |---|---|
 | 1. Audit | Done. 2,097 scripts mirrored from Studio; graphify graph built. |
-| 2. Vertical slice (road → steal → hotbar) | Done, verified in Studio play. |
+| 2. Vertical slice (highway → leap → hotbar) | Done, verified in Studio play. |
 | 3. Dealership (park → $/s → collect) | Done (first build), reuses the podiums. |
 | 4. Progression (⚡ gate + kiddie ride) | Done, verified in Studio play. |
-| 5. Events & polish | Toast/tray, tips, red/green labels. Herd reset/secret events belong to the off Roaming mode. |
-| 6. Testing & hardening | Headless harness 139/139. Single-player Studio play only. |
+| 5. Events & polish | Toast/tray, tips, red/green labels, reset and rush events, secret laps. |
+| 6. Testing & hardening | Headless harness 165/165. Single-player Studio play only. |
 
 ### Files
 New:
-- `ServerScriptService/server/Services/PowerTrainerService.luau`: builds the kiddie rides, loads/saves ⚡ (`StealPower` profile key), pays riders each second.
-- `ReplicatedStorage/shared/Controllers/PowerTrainerController.luau`: ride bounce and "+⚡" pops (cosmetic).
+- `PowerTrainerService` / `PowerTrainerController`: kiddie rides, the ⚡ stat, its rocking and "+1" pops.
 - From the first build: `CollectorConfig`, `RoamingCarService` (+ `CollectorWorld`), `RoamingCarController`, `CollectorHudController`, `tests/collector/`.
 
-Changed:
-- `CollectorConfig`: `RoadSteal = true`, `Roaming = false`; ⚡ is now a stored stat (`Power`), trained by `Trainer` (rate, price ladder); `requiredForBody`.
-- `StealController`: `_canTake` keeps cars above your ⚡ out of the lock and the jump target.
-- `StealService`: after a successful steal, `RoamingCarService:awardRoadSteal` awards the car (server ⚡ check).
-- `CarRarityBadge`: "Required: ⚡N" line, green/red, in road-steal mode.
-- `GetawayConfig.Enabled = not (Collector.Enabled and Collector.RoadSteal)`: no truck.
-- `UpgradeConfig`/`UpgradeService`: the `Trainer` upgrade ("KIDDIE RIDE"). The earlier `Power` key never shipped.
-- `CollectorHudController`: ⚡ pill and kiddie ride panel; SECURED tray clears when a run starts.
-- `TipsConfig`: tips teach the road + kiddie ride loop.
+Changed for the highway:
+- `CollectorConfig`: `Roaming = true`, `RoadSteal = false`, `racesOn()`, `Road` (lanes, speeds, gaps), `Leap`, linear `positionAt`.
+- `RoamingCarService`: herds replaced by lane traffic (`_pickLane`, `_setLeg`, `_fill`, `_stepTraffic`).
+- `CollectorWorld`: lane paint per zone. It also moves the authored median props (trees, rocks, bushes) that
+  stand on the highway into `ServerStorage.CollectorRoadScenery` at boot (228 props). That is runtime only;
+  the place file keeps them.
+- `RoamingCarController`: rewritten for targeting, the leap, the landing ride and the capture poof.
+- `RaceEntryController`: hides PLAY. `RaceService`: refuses entry while `racesOn()` is false.
+- `GetawayConfig`: off while either collector steal mode is on. `TipsConfig`: tips teach the highway.
 
 ### Decisions
-- **⚡ is its own saved number, not an upgrade level**, because it now grows continuously (riding), not in steps. New and old profiles start at 10, enough for every tier-1 car.
-- **The landing is not gated.** Coming down on a car you are too weak for still puts you in it (no wreck), but the server does not award it and you get "You need ⚡N". The lock and jump target never offer such a car, so this only happens when one drifts under you.
-- **Rates:** world 1's best car (tier 10, ⚡30) is about 10 s of riding at level 0 (raised 10× after the owner found 0.2/s too slow); level 1 costs $600.
+- **The leap is client-animated, server-judged.** The client flies the character (PlatformStand + per-frame
+  CFrame) and fires the capture on landing. The server checks the player against the car's position, which
+  both sides compute from the same lane leg (A, B, T0, T1), with slack for latency.
+- **Cars never stop or swerve.** Each one is one straight leg, so there is no physics and no network traffic per car.
+- **⚡ is its own saved number** that grows continuously while riding. New and old profiles start at 10.
+- **The median is moved, not deleted**, so turning the collector off brings the authored map back as it was.
 
 ### Test results
-- Headless harness (`sh tests/collector/run.sh`): **139 passed, 0 failed**. Covers the ⚡ ladder, ride rates and prices, `requiredForBody`, road-steal awards (weak, enough power, profile not ready), and the Roaming-mode capture validation.
-- Studio play (single player, mock profile), all observed:
-  - Boot clean; 6 kiddie rides built.
-  - Sat on the ride: ⚡ 10 → 11 in 5 s at the first rate (0.2/s); after the speed-up, ⚡ 10 → 23 in 5 s (2.6/s with ride level 1), "+1" pops twice a second, car rocks ±12°.
-  - Badge layout check on a live run: 16 labels, 5 with three lines, 0 overlapping rows.
-  - Bought kiddie ride level 1 for $600: rate rose to 0.255/s.
-  - PLAY → drove → SPACE at a Civic 59 studs ahead: flew in, "Rezault banked a Red Civic (Tier 1) into their inventory", now driving it, tray "1 SECURED".
-  - ⚡ forced to 5: every label turned red, the jump had no target (red reticle).
-  - Driving into traffic wrecks; the run ends and returns home.
+- Headless harness (`sh tests/collector/run.sh`): **165 passed, 0 failed**. Includes:
+  - lanes centred and mirrored, and zone road ends;
+  - spawn interval, lane preference and MinGap;
+  - arch blocking and reopening;
+  - removal at the far arch and secret laps;
+  - `_fill` spacing;
+  - linear `positionAt`;
+  - plus the earlier ⚡, ride and capture-validation tests.
+- Studio play (single player, mock profile), all observed this build:
+  - Boot clean, no errors. 7–9 cars per zone; 228 median props moved off the road.
+  - PLAY hidden (`MainUIV2.HUD.Play.Visible = false`).
+  - Standing on zone 1: the nearest car with ⚡10 needed got the green outline within 4 s.
+  - SPACE: flew an arc onto a red Civaro's roof. Server log "banked a Stock Civic (Tier 1) into their inventory",
+    then the "Discovered! CIVARO" toast, "1 SECURED" tray, and the car in hotbar slot 2.
+  - A car needing ⚡11 showed red and was never targeted.
 
 ### Bugs found and fixed during play
-- `PowerTrainerController` failed to load (Luau "ambiguous syntax" on a line starting with `(`).
-- `StealController` is over Studio's 200K `Source` limit; synced with `ScriptEditorService:UpdateSourceAsync`.
-- Kiddie ride never rocked: with streaming on, its seat arrived after the controller looked for it. The ride now streams in whole (`Atomic`) and the controller waits for the seat.
-- "Required: ⚡N" was hidden on some cars: the collection hint ("NEW!", "▶ NEARBY") was drawn in the same row, and the rarity word jumped onto it when the hint cleared. Badges now use three rows when all three lines show.
+- PLAY stayed up: nothing restated its visibility at boot. Fixed: `_watchPlayRoom` restates it.
+- Highway traffic drove through the authored tree median. Fixed: the median props are moved aside (see Files).
+- Earlier builds:
+  - `PowerTrainerController` Luau "ambiguous syntax".
+  - `StealController` was over the 200K `Source` limit (synced with `UpdateSourceAsync`).
+  - The kiddie ride never rocked (streaming; now `Atomic`).
+  - "Required" labels were hidden behind the hint row (now three rows).
 
 ### Not done / known gaps
-- A weak landing (see Decisions) still refills health like any steal.
-- The ⚡ pill overlaps the CONTROLS card for the first seconds of a run.
-- The "+1 ⚡" pop drops the ⚡ glyph in Fredoka One.
-- The wreck panel still shows the race payout line ("+$56 · kept 25%").
-- Multiplayer, rejoin persistence of ⚡ (mock store), and mobile layout not checked in play.
+- Multiplayer (two players leaping at one car), rejoin persistence of ⚡ (mock store), and mobile/gamepad
+  jump not checked in play.
+- Zones 2–5 and the arch barriers were not walked through in this build's play test.
+- The gamepad X shortcut for the hidden PLAY may still be bound; the server refuses the race anyway.
+- The old race HUD pieces (zone distance strip "▲ 60 m") still show on the highway.
 
 ### Next steps
 1. Two-player Studio test (Test → Clients and Servers).
-2. Tune `Trainer.BaseRate`/`RateGrowth` and prices against a real session.
-3. Decide whether a weak landing should refuse the refill, and what the wreck panel should show.
+2. Tune lane speeds, `CarsPerZone` and `Leap.Range` against a real session.
+3. Walk every zone with enough ⚡ and check arches, secrets and the rush event.

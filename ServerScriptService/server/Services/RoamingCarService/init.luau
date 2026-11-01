@@ -1,8 +1,8 @@
---[[ RoamingCarService — every car roaming the collector zones, and who stole it
+--[[ RoamingCarService — every car on the collector highway, and who stole it
 	==========================================================================
 
-	THE SERVER IS THE ONLY PLACE A ROAMING CAR EXISTS. It rolls what each car is (body, paint,
-	mutation, requirement), moves the herds, and decides who stole what. Clients only draw it. This
+	THE SERVER IS THE ONLY PLACE A HIGHWAY CAR EXISTS. It rolls what each car is (body, paint,
+	mutation, requirement), drives it down its lane, and decides who stole what. Clients only draw it. This
 	is the opposite of the road run, where traffic was client-local and the server could only bound
 	a client's claims with single-use tokens (`EncounterService`); nothing here trusts a client's
 	word about a car, so none of that machinery is reused.
@@ -10,9 +10,9 @@
 	REPLICATION: one `Configuration` per car in `ReplicatedStorage.RoamingCars` (not Workspace —
 	the place streams, and a car you cannot see must still be a car you were told about). Its
 	attributes are the car (`Body`, `Paint`, `Mutation`, `Tier`, `Rung`, `Required`, `Zone`,
-	`Secret`) and its current LEG (`A`, `B`, `T0`, `T1`, server-clock seconds). A herd costs one
-	attribute write per car per leg — every few seconds — and everyone, including the server's own
-	distance check, computes the position with `CollectorConfig.positionAt`.
+	`Secret`) and its LEG (`A`, `B`, `T0`, `T1`, server-clock seconds): arch to arch down its lane, written
+	once when it spawns. Everyone, including the server's own distance check, computes the position with
+	`CollectorConfig.positionAt`, so a driving car costs no replication at all after its first frame.
 
 	A CAPTURE (`RoamCapture(id)`) is accepted only if, in this order:
 	  1. the request is well-formed and the player is off cooldown;
@@ -57,21 +57,12 @@ type Car = {
 	mutation: string?,
 	required: number,
 	secret: boolean,
-	herd: Herd?,
-	offset: Vector3,
+	lane: number,
 	a: Vector3,
 	b: Vector3,
 	t0: number,
 	t1: number,
 	claimed: boolean,
-}
-
-type Herd = {
-	zone: number,
-	members: { Car },
-	centre: Vector3,
-	speed: number,
-	nextAt: number,
 }
 
 local Service = Shard.new("RoamingCarService")
@@ -137,7 +128,30 @@ function Service._rollMutation(self, zone: number): string?
 	return nil
 end
 
-function Service._newCar(self, zone: number, position: Vector3, secret: boolean): Car?
+--[[ A lane for a car of `rung` coming out of `zone`'s arch now, or nil when every lane's last car is
+	still within `MinGap` of the arch. Prefers the lane speed its rarity asks for (`Road.FastRungs`). ]]
+function Service._pickLane(self, zone: number, rung: number): number?
+	local road = CollectorConfig.Road
+	local t = now()
+	local last = self._laneAt[zone]
+	local want = if rung >= road.FastRungs[2] then 3 elseif rung >= road.FastRungs[1] then 2 else 1
+	local speedsByRank = { road.LaneSpeeds[1], road.LaneSpeeds[2], road.LaneSpeeds[3] }
+	local free, preferred = {}, {}
+	for lane, speed in road.LaneSpeeds do
+		if (t - (last[lane] or -math.huge)) * speed >= road.MinGap then
+			table.insert(free, lane)
+			if speed == speedsByRank[want] then
+				table.insert(preferred, lane)
+			end
+		end
+	end
+	local pool = if #preferred > 0 and self._rng:NextNumber() < road.LanePreference then preferred else free
+	return if #pool > 0 then pool[self._rng:NextInteger(1, #pool)] else nil
+end
+
+--[[ Roll a car for `zone` and put it on the road. `lane`/`along` place it mid-road (the fill after a
+	reset); without them it comes out of the arch in a free lane, or not at all. ]]
+function Service._newCar(self, zone: number, secret: boolean, lane: number?, along: number?): Car?
 	local cars = WorldConfig.get(zone).Cars
 	local rung, body
 	for _ = 1, 8 do
@@ -164,6 +178,11 @@ function Service._newCar(self, zone: number, position: Vector3, secret: boolean)
 		mutation = self:_rollMutation(zone)
 	end
 
+	lane = lane or self:_pickLane(zone, rung)
+	if not lane then
+		return nil
+	end
+
 	self._serial += 1
 	local id = string.format("%d", self._serial)
 	local inst = Instance.new("Configuration")
@@ -179,14 +198,17 @@ function Service._newCar(self, zone: number, position: Vector3, secret: boolean)
 		mutation = mutation,
 		required = CollectorConfig.requiredFor(tier),
 		secret = secret,
-		herd = nil,
-		offset = Vector3.zero,
-		a = position,
-		b = position,
-		t0 = now(),
-		t1 = now(),
+		lane = lane,
+		a = Vector3.zero,
+		b = Vector3.zero,
+		t0 = 0,
+		t1 = 0,
 		claimed = false,
 	}
+	self:_setLeg(car, along or 0)
+	if not along then
+		self._laneAt[zone][lane] = now()
+	end
 	inst:SetAttribute("Body", body)
 	inst:SetAttribute("Tier", tier)
 	inst:SetAttribute("Rung", rung)
@@ -195,7 +217,6 @@ function Service._newCar(self, zone: number, position: Vector3, secret: boolean)
 	inst:SetAttribute("Required", car.required)
 	inst:SetAttribute("Zone", zone)
 	inst:SetAttribute("Secret", secret)
-	self:_writeLeg(car)
 	self._cars[id] = car
 	inst.Parent = self._folder
 	return car
@@ -208,117 +229,94 @@ function Service._writeLeg(self, car: Car)
 	car.inst:SetAttribute("T1", car.t1)
 end
 
+--- Arch to arch down the car's lane, starting `along` studs past its zone's arch.
+function Service._setLeg(self, car: Car, along: number)
+	local zStart, zEnd = CollectorConfig.zoneRoad(car.zone)
+	local x = CollectorConfig.laneX(car.lane)
+	local y = CollectorConfig.Corridor.FloorY
+	local speed = CollectorConfig.Road.LaneSpeeds[car.lane]
+	car.a = Vector3.new(x, y, zStart - along)
+	car.b = Vector3.new(x, y, zEnd)
+	car.t0 = now()
+	car.t1 = car.t0 + math.max(car.a.Z - car.b.Z, 0) / speed
+	self:_writeLeg(car)
+end
+
 function Service._remove(self, car: Car)
 	self._cars[car.id] = nil
-	local herd = car.herd
-	if herd then
-		local index = table.find(herd.members, car)
-		if index then
-			table.remove(herd.members, index)
-		end
-		if #herd.members == 0 then
-			local list = self._herds
-			local at = table.find(list, herd)
-			if at then
-				table.remove(list, at)
-			end
-		end
-	end
 	car.inst:Destroy()
 end
 
--- === Herds ===================================================================
+-- === Traffic =================================================================
 
-function Service._randomPoint(self, zone: number, margin: number): Vector3
-	local centre, hx, hz = CollectorConfig.zoneRect(zone)
-	return centre
-		+ Vector3.new(
-			self._rng:NextNumber(-hx + margin, hx - margin),
-			CollectorConfig.Move.Lift,
-			self._rng:NextNumber(-hz + margin, hz - margin)
-		)
+--[[ Seconds between cars out of one zone's arch, so that about `Spawn.CarsPerZone` are on its road at
+	once: that count is (spawn rate) x (average time a car spends crossing), and the average is over the
+	lanes because a car is equally likely to end up in any of them. ]]
+function Service._spawnEvery(self): number
+	local road = CollectorConfig.Road
+	local zStart, zEnd = CollectorConfig.zoneRoad(1)
+	local length = zStart - zEnd
+	local total = 0
+	for _, speed in road.LaneSpeeds do
+		total += length / speed
+	end
+	return (total / #road.LaneSpeeds) / CollectorConfig.Spawn.CarsPerZone
 end
 
-function Service._spawnHerd(self, zone: number, size: number, secret: boolean): Herd?
-	local spacing = CollectorConfig.Move.FormationSpacing
-	local herd: Herd = {
-		zone = zone,
-		members = {},
-		centre = self:_randomPoint(zone, spacing * 2),
-		speed = 0,
-		nextAt = now() + self._rng:NextNumber(0.5, 3),
-	}
-	local speeds = CollectorConfig.Move.Speed
-	for i = 1, size do
-		-- A loose wedge behind the leader, jittered so a herd never looks like a parade.
-		local row = math.floor((i - 1) / 2)
-		local side = if i % 2 == 0 then 1 else -1
-		local offset = Vector3.new(
-			(if i == 1 then 0 else side * spacing * 0.6) + self._rng:NextNumber(-3, 3),
-			0,
-			row * spacing + self._rng:NextNumber(-3, 3)
-		)
-		local car = self:_newCar(zone, herd.centre + offset, secret)
-		if car then
-			car.herd = herd
-			car.offset = offset
-			table.insert(herd.members, car)
-			local speed = speeds[1] + (speeds[2] - speeds[1]) * (car.rung - 1) / 9
-			herd.speed = math.max(herd.speed, speed)
+--- Fill a zone's road mid-flow (boot, reset, rush), at the spacing the spawner would have left.
+function Service._fill(self, zone: number)
+	local road = CollectorConfig.Road
+	local zStart, zEnd = CollectorConfig.zoneRoad(zone)
+	local length = zStart - zEnd
+	local every = self:_spawnEvery()
+	local t = now()
+	for lane, speed in road.LaneSpeeds do
+		-- Cars already in this lane (a secret kept through a rush) keep their room.
+		local taken = {}
+		for _, car in self._cars do
+			if car.zone == zone and car.lane == lane then
+				table.insert(taken, zStart - CollectorConfig.positionAt(car.a, car.b, car.t0, car.t1, t).Z)
+			end
+		end
+		-- Each lane gets 1 in #lanes of the spawns, so its cars are `speed x every x #lanes` apart.
+		local spacing = speed * every * #road.LaneSpeeds
+		local along = self._rng:NextNumber(0, spacing)
+		while along < length - road.MinGap do
+			local clear = true
+			for _, other in taken do
+				if math.abs(other - along) < road.MinGap then
+					clear = false
+				end
+			end
+			if clear then
+				self:_newCar(zone, false, lane, along)
+			end
+			along += math.max(road.MinGap, spacing * self._rng:NextNumber(0.6, 1.4))
+		end
+		-- The next car out of this arch keeps its distance from the last one filled near it.
+		self._laneAt[zone][lane] = now()
+	end
+end
+
+--- One tick of the road: cars that reached the far arch leave (a SECRET goes round again), and each
+--- zone's arch lets out its next car when it is due.
+function Service._stepTraffic(self, t: number)
+	for _, car in table.clone(self._cars) do
+		if t >= car.t1 and not car.claimed then
+			if car.secret then
+				self:_setLeg(car, 0)
+			else
+				self:_remove(car)
+			end
 		end
 	end
-	if #herd.members == 0 then
-		return nil
-	end
-	table.insert(self._herds, herd)
-	return herd
-end
-
-function Service._stepHerd(self, herd: Herd, t: number)
-	local move = CollectorConfig.Move
-	local spacing = move.FormationSpacing
-	local centre, hx, hz = CollectorConfig.zoneRect(herd.zone)
-	local distance = self._rng:NextNumber(move.LegDistance[1], move.LegDistance[2])
-	local angle = self._rng:NextNumber(0, math.pi * 2)
-	local target = herd.centre + Vector3.new(math.cos(angle), 0, math.sin(angle)) * distance
-	target = Vector3.new(
-		math.clamp(target.X, centre.X - hx + spacing * 2, centre.X + hx - spacing * 2),
-		herd.centre.Y,
-		math.clamp(target.Z, centre.Z - hz + spacing * 2, centre.Z + hz - spacing * 2)
-	)
-	-- The formation turns with the herd, so the leader is always in front.
-	local facing = CFrame.lookAt(herd.centre, target + Vector3.new(0, 0, 1e-3))
-	local duration = 0
-	for _, car in herd.members do
-		local from = CollectorConfig.positionAt(car.a, car.b, car.t0, car.t1, t)
-		local to = target + facing:VectorToWorldSpace(car.offset)
-		car.a, car.b = from, to
-		duration = math.max(duration, (to - from).Magnitude / herd.speed)
-	end
-	duration = math.max(duration, 0.5)
-	for _, car in herd.members do
-		car.t0, car.t1 = t, t + duration
-		self:_writeLeg(car)
-	end
-	herd.centre = target
-	herd.nextAt = t + duration + self._rng:NextNumber(move.Idle[1], move.Idle[2])
-end
-
-function Service._populate(self, zone: number)
-	local count = 0
-	for _, car in self._cars do
-		if car.zone == zone and not car.secret then
-			count += 1
+	local every = self:_spawnEvery()
+	for zone = 1, #CollectorConfig.Zones do
+		if t >= (self._nextSpawn[zone] or 0) then
+			local car = self:_newCar(zone, false)
+			-- No free lane: try again shortly rather than waiting a whole interval.
+			self._nextSpawn[zone] = t + if car then every * self._rng:NextNumber(0.6, 1.4) else 0.3
 		end
-	end
-	local want = CollectorConfig.Spawn.CarsPerZone
-	local sizes = CollectorConfig.Spawn.HerdSize
-	local guard = 0
-	while count < want and guard < 20 do
-		guard += 1
-		local size = math.min(self._rng:NextInteger(sizes[1], sizes[2]), want - count)
-		local herd = self:_spawnHerd(zone, size, false)
-		count += if herd then #herd.members else 0
 	end
 end
 
@@ -334,14 +332,18 @@ function Service._reset(self)
 			self:_remove(car)
 		end
 	end
-	table.clear(self._herds)
-	self._refillAt = {}
-	for zone = 1, #CollectorConfig.Zones do
-		self:_populate(zone)
-	end
 
-	-- Secret cars: one each in a few distinct random zones.
+	-- Secret cars first, one each in a few distinct random zones, in a fast lane partway down the road
+	-- (so they are on screen at once); the fill then leaves them room. They lap until the next reset.
 	local events = CollectorConfig.Events
+	local road = CollectorConfig.Road
+	local fastest = math.max(table.unpack(road.LaneSpeeds))
+	local fastLanes = {}
+	for lane, speed in road.LaneSpeeds do
+		if speed == fastest then
+			table.insert(fastLanes, lane)
+		end
+	end
 	local zones = {}
 	for zone = 1, #CollectorConfig.Zones do
 		table.insert(zones, zone)
@@ -349,11 +351,16 @@ function Service._reset(self)
 	local secrets = {}
 	for _ = 1, self._rng:NextInteger(events.SecretsMin, events.SecretsMax) do
 		local zone = table.remove(zones, self._rng:NextInteger(1, #zones))
-		local herd = zone and self:_spawnHerd(zone, 1, true)
-		local car = herd and herd.members[1]
+		local zStart, zEnd = CollectorConfig.zoneRoad(zone or 1)
+		local lane = fastLanes[self._rng:NextInteger(1, #fastLanes)]
+		local car = zone and self:_newCar(zone, true, lane, self._rng:NextNumber(0, (zStart - zEnd) * 0.5))
 		if car then
 			table.insert(secrets, { body = car.body, zone = zone, mutation = car.mutation })
 		end
+	end
+
+	for zone = 1, #CollectorConfig.Zones do
+		self:_fill(zone)
 	end
 
 	workspace:SetAttribute(CollectorConfig.NextResetAttribute, now() + events.ResetPeriod)
@@ -372,7 +379,7 @@ function Service._startRush(self)
 			self:_remove(car)
 		end
 	end
-	self:_populate(zone)
+	self:_fill(zone)
 	self:_announce({ kind = "rush", zone = zone, endsAt = endsAt })
 end
 
@@ -429,10 +436,6 @@ function Service._onCapture(self, player: Player, id: unknown)
 	-- THE CLAIM. Nothing above yields, so nobody else can have got here for this car.
 	car.claimed = true
 	self:_remove(car)
-	if not car.secret then
-		local delay = CollectorConfig.Spawn.RespawnDelay
-		self._refillAt[car.zone] = math.max(self._refillAt[car.zone] or 0, t + self._rng:NextNumber(delay[1], delay[2]))
-	end
 
 	local outcome, amount, carId = Garage:awardCar(player, car.tier, car.body, car.paint, car.mutation, capture.Source)
 	if outcome == "rejected" then
@@ -539,14 +542,18 @@ Service:withLifecycle({
 		self._rng = Random.new()
 		self._serial = 0
 		self._cars = {} :: { [string]: Car }
-		self._herds = {} :: { Herd }
-		self._refillAt = {} :: { [number]: number }
+		-- [zone][lane] = when the last car came out of that arch in that lane
+		self._laneAt = {} :: { [number]: { [number]: number } }
+		for zone = 1, #CollectorConfig.Zones do
+			self._laneAt[zone] = {}
+		end
+		self._nextSpawn = {} :: { [number]: number }
 		self._cooldowns = {} :: { [Player]: number }
 		self._rush = nil
 	end,
 
 	start = function(self)
-		-- Road steals (`awardRoadSteal`) need nothing started; the herds below are the Roaming mode.
+		-- Road steals (`awardRoadSteal`) need nothing started; the highway below is the Roaming mode.
 		if not (CollectorConfig.Enabled and CollectorConfig.Roaming) then
 			return
 		end
@@ -576,17 +583,7 @@ Service:withLifecycle({
 			local nextSync = 0
 			while self._folder.Parent do
 				local t = now()
-				for _, herd in table.clone(self._herds) do
-					if t >= herd.nextAt then
-						self:_stepHerd(herd, t)
-					end
-				end
-				for zone = 1, #CollectorConfig.Zones do
-					if t >= (self._refillAt[zone] or 0) then
-						self:_populate(zone)
-						self._refillAt[zone] = t + 1
-					end
-				end
+				self:_stepTraffic(t)
 				if t >= (workspace:GetAttribute(CollectorConfig.NextResetAttribute) or math.huge) then
 					self:_reset()
 					nextRush = t + events.RushEvery
@@ -604,7 +601,7 @@ Service:withLifecycle({
 						task.spawn(self._syncPlayer, self, player)
 					end
 				end
-				task.wait(0.2)
+				task.wait(0.1)
 			end
 		end)
 	end,

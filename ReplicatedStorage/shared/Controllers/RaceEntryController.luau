@@ -108,6 +108,7 @@ local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local CarryConfig = require(ReplicatedStorage.shared.Configs.CarryConfig)
 local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 --- The tutorial's arrow art, reused over Play (`_beckonArrow`).
 local UIAssets = require(ReplicatedStorage.shared.Configs.UIAssets)
 local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
@@ -294,7 +295,8 @@ function RaceEntryController._applyButtonVisible(self, animate: boolean?)
 	end
 
 	local hiddenForRace = self._racing and RaceConfig.HidePlayDuringRace
-	local shown = not (hiddenForRace or self._playSuppressed)
+	-- No PLAY at all while the collector highway is the game: you walk in instead.
+	local shown = CollectorConfig.racesOn() and not (hiddenForRace or self._playSuppressed)
 	--[[ Nothing to do, and it has to be checked BEFORE the tween rather than left to look like a
 		no-op: re-running the entrance on a button that is already home would replay the animation
 		every time either fact was restated. `RaceEnd` restates both. ]]
@@ -469,6 +471,10 @@ end
 function RaceEntryController._watchPlayRoom(self)
 	local function place()
 		self:_placePlay()
+		-- Nothing else restates Play at boot, so the authored Visible = true would stand.
+		if not CollectorConfig.racesOn() then
+			self:_applyButtonVisible()
+		end
 	end
 	local camera = workspace.CurrentCamera
 	if camera then

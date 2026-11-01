@@ -85,6 +85,7 @@ local PaintConfig = require(ReplicatedStorage.shared.Configs.PaintConfig)
 --- For its `Cause` alone: the one ending whose car was never actually hit. See `wreckRace`.
 local PoliceConfig = require(ReplicatedStorage.shared.Configs.PoliceConfig)
 local RaceConfig = require(ReplicatedStorage.shared.Configs.RaceConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 local ReviveConfig = require(ReplicatedStorage.shared.Configs.ReviveConfig)
 --- Whether this player's run is a tutorial one that may not be lost (`wreckRace`). A config, not
 --- `TutorialService`, which is reached lazily: it requires nothing back, so it cannot cycle.
@@ -903,6 +904,11 @@ end
 	from any trusted trigger. ]]
 function RaceService.enterRace(self, player: Player)
 	if self._cars[player] or self._pending[player] then
+		return
+	end
+	-- No races while the collector highway is the game (owner: "remove the play button altogether").
+	-- Every way in — PLAY, the lobby pad, the admin panel — comes through here.
+	if not CollectorConfig.racesOn() then
 		return
 	end
 

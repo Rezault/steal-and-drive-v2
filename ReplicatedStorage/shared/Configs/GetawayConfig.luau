@@ -37,10 +37,10 @@
 local GetawayConfig = {}
 
 -- Master switch. Off = no truck ever spawns; a run ends only by wrecking, exactly as before.
--- Off while the collector banks every steal on landing (`CollectorConfig.RoadSteal`): a truck would
--- bank the same car twice and is a step the owner asked to drop ("it's yours instantly, keep driving").
+-- Off whenever the collector is on: with `RoadSteal` every landing banks the car (a truck would bank it
+-- twice; owner: "it's yours instantly, keep driving"), and with `Roaming` there is no race at all.
 local Collector = require(script.Parent.CollectorConfig)
-GetawayConfig.Enabled = not (Collector.Enabled and Collector.RoadSteal)
+GetawayConfig.Enabled = not (Collector.Enabled and (Collector.RoadSteal or Collector.Roaming))
 
 -- === Names ==================================================================
 
