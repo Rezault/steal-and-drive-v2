@@ -258,6 +258,12 @@ RarityBadgeConfig.OddsRow = { Centre = 0.755, Height = 0.31 }
 --- ...and the single line a one-line marker uses, centred and taller than either of them.
 RarityBadgeConfig.SoloRow = { Centre = 0.5, Height = 0.6 }
 
+--- Three lines (collector road: collection cue on top, rarity, then "Required: ⚡N"), so the cue never
+--- lands on the Required line it used to share a row with.
+RarityBadgeConfig.CueTopRow = { Centre = 0.15, Height = 0.26 }
+RarityBadgeConfig.MidRow = { Centre = 0.46, Height = 0.34 }
+RarityBadgeConfig.BottomRow = { Centre = 0.8, Height = 0.3 }
+
 --- How much of the width a line of type may use. Almost all of it: there are no rounded ends to
 --- crowd any more, and `TextScaled` will not overflow it.
 RarityBadgeConfig.TextWidth = 0.98

@@ -1,9 +1,9 @@
 --[[ PowerTrainerController — the kiddie ride's bounce and the "+⚡" pops
 
 	`PowerTrainerService` builds the rides and pays the ⚡; this is the cosmetic half. A ride with somebody
-	on it bobs and rocks like a coin-op car (its `Car` model only, moved locally every frame: anchored
+	on it rocks back and forth like a coin-op car (its `Car` model only, moved locally every frame: anchored
 	parts, so nothing replicates and the rider, welded to the seat, goes along). While YOU ride, each
-	gain floats up as "+0.2 ⚡" over your head. ]]
+	gain floats up as "+1 ⚡" over your head. ]]
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -17,15 +17,18 @@ local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig
 local Controller = Shard.new("PowerTrainerController")
 
 local TAG = "KiddieRide"
-local BOB_HEIGHT = 0.35 -- studs
-local BOB_RATE = 2.2 -- bounces a second
-local ROCK = math.rad(5)
+-- A coin-op ride rocks nose-to-tail on its spring: tip forward, slide, tip back.
+local ROCK_RATE = 1.3 -- full back-and-forth swings a second
+local ROCK = math.rad(12) -- tip each way, about the spring
+local SWAY = 0.6 -- studs of slide along the car each way
+local LIFT = 0.15 -- small hop at each end of the swing
 
 type Ride = { car: Model, rest: CFrame, seat: Seat, moved: boolean? }
 
 function Controller._track(self, model: Instance)
 	local car = model:WaitForChild("Car", 10)
-	local seat = car and car:FindFirstChild("Seat")
+	-- Waited for, not looked up: with streaming on, the parts can land after the tagged model does.
+	local seat = car and car:WaitForChild("Seat", 10)
 	if car and car:IsA("Model") and seat and seat:IsA("Seat") then
 		self._rides[model] = { car = car, rest = car:GetPivot(), seat = seat }
 	end
@@ -48,7 +51,7 @@ function Controller._pop(self, amount: number)
 	label.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
 	label.TextScaled = true
 	label.TextColor3 = Color3.fromRGB(255, 220, 60)
-	label.Text = string.format("+%s ⚡", if amount >= 10 then tostring(math.floor(amount)) else string.format("%.1f", amount))
+	label.Text = "+" .. (if amount >= 1 then CollectorConfig.formatPower(amount) else string.format("%.1f", amount)) .. " ⚡"
 	Instance.new("UIStroke", label).Thickness = 2
 	label.Parent = gui
 	gui.Parent = self._player:WaitForChild("PlayerGui")
@@ -103,9 +106,10 @@ Controller:withLifecycle({
 				if not ride.car.Parent then
 					self._rides[model] = nil
 				elseif ride.seat.Occupant then
-					local phase = t * BOB_RATE * math.pi * 2
-					local lift = math.abs(math.sin(phase)) * BOB_HEIGHT
-					ride.car:PivotTo(ride.rest * CFrame.new(0, lift, 0) * CFrame.Angles(math.sin(phase * 0.5) * ROCK, 0, 0))
+					local swing = math.sin(t * ROCK_RATE * math.pi * 2)
+					ride.car:PivotTo(ride.rest
+						* CFrame.new(0, math.abs(swing) * LIFT, swing * SWAY)
+						* CFrame.Angles(swing * ROCK, 0, 0))
 					ride.moved = true
 				elseif ride.moved then
 					ride.car:PivotTo(ride.rest)

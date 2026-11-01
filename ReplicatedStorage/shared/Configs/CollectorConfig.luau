@@ -108,16 +108,17 @@ CollectorConfig.Power = {
 	rises by `rateAt(level)` every second, AFK included — that is the point of the reference's horse.
 
 	THE RATE TRACKS THE LADDER. Requirements grow x1.13 a tier, so x1.277 is two tiers; each Trainer
-	level multiplies the rate by that, and level L is "the ride for tier ~2L". Level 0 trains the
-	Civic -> Golf step (10 -> 11) in five seconds and world 1's top car (30) in under two minutes.
+	level multiplies the rate by that, and level L is "the ride for tier ~2L". Level 0 pays +1 every
+	half second, so world 1's top car (30) is ten seconds of riding: the owner wanted the number to
+	visibly race (0.2/s ticking once a second, the first version, read as broken).
 	PRICES follow the car the level is for, like the old Power ladder: `factor` x the market value of
 	tier 2L, never less than `MinStep` x the previous price. The first level costs one Civic. ]]
 CollectorConfig.Trainer = {
 	UpgradeKey = "Trainer",
 	MaxLevel = 24,
-	BaseRate = 0.2, -- ⚡ per second at level 0
+	BaseRate = 2, -- ⚡ per second at level 0
 	RateGrowth = 1.277,
-	TickSeconds = 1,
+	TickSeconds = 0.5,
 	EarlyFactors = { 0.1, 0.25, 0.4, 0.6 },
 	CostFactor = 0.8,
 	MinStep = 1.15,

@@ -104,6 +104,9 @@ function Service._buildRide(self, at: CFrame, plotName: string): Model
 	local seat = part(car, { ClassName = "Seat", Name = "Seat", Size = Vector3.new(2.4, 0.4, 2.2),
 		Color = Color3.fromRGB(40, 40, 50) })
 	place(seat, CFrame.new(0, 4.1, 1.4))
+	-- Rock about the spring in the ride's frame. Unset, the pivot takes the first part's (the spring's,
+	-- turned 90°), and the client's nose-to-tail rock would come out as a sideways roll.
+	car.WorldPivot = at * CFrame.new(0, 1.7, 0.4)
 
 	-- A ProximityPrompt as well as touch-to-sit: on a phone, walking into a small seat is fiddly.
 	local prompt = Instance.new("ProximityPrompt")
@@ -149,6 +152,8 @@ function Service._buildRide(self, at: CFrame, plotName: string): Model
 	sign.Parent = box
 
 	model.PrimaryPart = base
+	-- Streamed whole, so a client never sees the ride without its car and seat.
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	CollectionService:AddTag(model, TAG)
 	return model
 end

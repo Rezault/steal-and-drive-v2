@@ -543,9 +543,19 @@ function CarRarityBadge.setCue(car: Model, text: string)
  write(cue, (string.gsub(text," ",NBSP)))
  cue.TextColor3 = Color3.fromRGB(149,244,162)
  cue.Visible = text ~= ""
- if cue.Visible then
+ -- The odds/"Required" line keeps the bottom row; the cue must never be drawn over it.
+ local odds = badge:FindFirstChild("Odds")
+ local hasOdds = odds ~= nil and odds.Visible
+ if cue.Visible and hasOdds then
+  placeRow(cue, RarityBadgeConfig.CueTopRow)
+  placeRow(rarity, RarityBadgeConfig.MidRow)
+  placeRow(odds, RarityBadgeConfig.BottomRow)
+ elseif cue.Visible then
   placeRow(rarity, RarityBadgeConfig.RarityRow)
   placeRow(cue, RarityBadgeConfig.OddsRow)
+ elseif hasOdds then
+  placeRow(rarity, RarityBadgeConfig.RarityRow)
+  placeRow(odds, RarityBadgeConfig.OddsRow)
  else
   placeRow(rarity, RarityBadgeConfig.SoloRow)
  end

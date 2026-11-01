@@ -192,10 +192,10 @@
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/GetawayConfig.luau": {
-    "mtime": 1793534373.9473236,
-    "seen": 1793534844.810617,
-    "ast_hash": "84ea01cad633992fcf93a33de5dead5d",
-    "semantic_hash": "84ea01cad633992fcf93a33de5dead5d"
+    "mtime": 1793537785.2884955,
+    "seen": 1793538925.5648186,
+    "ast_hash": "bcfee7038de7921ccf897a90d37cd34d",
+    "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/GiftConfig.luau": {
     "mtime": 1793534373.9483314,
@@ -462,9 +462,9 @@
     "semantic_hash": "85a2bb2c597c84acdc8ce256fbcb2155"
   },
   "ReplicatedStorage/shared/Configs/TipsConfig.luau": {
-    "mtime": 1793536346.0795548,
-    "seen": 1793537133.503771,
-    "ast_hash": "41bb24ac39c22be043fd9bc9c7ac42f9",
+    "mtime": 1793538823.6268508,
+    "seen": 1793538925.5648186,
+    "ast_hash": "c1ff87fc6311a9968db77fee91afa098",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/TrafficConfig.luau": {
@@ -498,9 +498,9 @@
     "semantic_hash": "2d75e9c64a8f2033121c79843d0db718"
   },
   "ReplicatedStorage/shared/Configs/UpgradeConfig.luau": {
-    "mtime": 1793535175.1223428,
-    "seen": 1793537133.503771,
-    "ast_hash": "d8fc397d99de4f48a3f0e6a605608535",
+    "mtime": 1793537736.7221255,
+    "seen": 1793538925.5648186,
+    "ast_hash": "bb8436498f246b1b4d11f9068e41a08b",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/WeatherConfig.luau": {
@@ -930,10 +930,10 @@
     "semantic_hash": "b08c7c03e9424b3ad17120a447c7922d"
   },
   "ReplicatedStorage/shared/Controllers/StealController.luau": {
-    "mtime": 1793534374.1103034,
-    "seen": 1793534844.810617,
-    "ast_hash": "acca9f9b27eb3acea7b9c0cae6e1c7c3",
-    "semantic_hash": "acca9f9b27eb3acea7b9c0cae6e1c7c3"
+    "mtime": 1793538173.167179,
+    "seen": 1793538925.5648186,
+    "ast_hash": "26eb0ec85cb2577fbf03c7a30dbf4247",
+    "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/StealNudgeController.luau": {
     "mtime": 1793534374.1113036,
@@ -1608,10 +1608,10 @@
     "semantic_hash": "4c61819966c43e647c29b4525b309dab"
   },
   "ReplicatedStorage/shared/Modules/CarRarityBadge.luau": {
-    "mtime": 1793534374.2992496,
-    "seen": 1793534844.810617,
-    "ast_hash": "10077a041df735dda50fd713d3331527",
-    "semantic_hash": "10077a041df735dda50fd713d3331527"
+    "mtime": 1793538193.6400933,
+    "seen": 1793538925.5658185,
+    "ast_hash": "e8ac8a9a915f65910099beb97e695d84",
+    "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Modules/CarRoster.luau": {
     "mtime": 1793534374.3002474,
@@ -2208,10 +2208,10 @@
     "semantic_hash": "009e44ce648e7ad79c01f2b1b608c7bd"
   },
   "ServerScriptService/server/Services/StealService.luau": {
-    "mtime": 1793534374.4473026,
-    "seen": 1793534844.810617,
-    "ast_hash": "2becb369c5dd305c5124525c6bbb2c93",
-    "semantic_hash": "2becb369c5dd305c5124525c6bbb2c93"
+    "mtime": 1793537776.14588,
+    "seen": 1793538925.5658185,
+    "ast_hash": "08b98db008378345b2918e1dd31517d3",
+    "semantic_hash": ""
   },
   "ServerScriptService/server/Services/TipsService.luau": {
     "mtime": 1793534374.4483123,
@@ -2232,9 +2232,9 @@
     "semantic_hash": "b9fd3cc34bccd97368b4e7517878510a"
   },
   "ServerScriptService/server/Services/UpgradeService.luau": {
-    "mtime": 1793535185.7518592,
-    "seen": 1793537133.5042763,
-    "ast_hash": "05e6e435c9ecbe3dd3ab452573b9e2ab",
+    "mtime": 1793537736.7595775,
+    "seen": 1793538925.5658185,
+    "ast_hash": "518e64de97a7fd45933350327702ffce",
     "semantic_hash": ""
   },
   "ServerScriptService/server/Services/WeatherService.luau": {
@@ -2388,27 +2388,27 @@
     "semantic_hash": "c6293303d33d904d4b73b8ea256d7446"
   },
   "IMPLEMENTATION_PROGRESS.md": {
-    "mtime": 1793537123.869885,
-    "seen": 1793537133.5042763,
-    "ast_hash": "28b033c2a49798efb5bfdf2c7e8edb12",
+    "mtime": 1793538917.5949025,
+    "seen": 1793538925.5658185,
+    "ast_hash": "df8de2de51b6b0fb81824b78c7145f59",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/CollectorConfig.luau": {
-    "mtime": 1793536882.142315,
-    "seen": 1793537133.503771,
-    "ast_hash": "4ccc2ccb6d142b01b399222390f53dd2",
+    "mtime": 1793538172.6396885,
+    "seen": 1793538925.5648186,
+    "ast_hash": "560fb9a8e7e2cee65a43c9008b6da66c",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/CollectorHudController.luau": {
-    "mtime": 1793536428.7849872,
-    "seen": 1793537133.503771,
-    "ast_hash": "0f713e38cd061812cfd895a4abbbb572",
+    "mtime": 1793538843.5409944,
+    "seen": 1793538925.5648186,
+    "ast_hash": "676f6ea255e706fe5caed7e3e10ded82",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/RoamingCarController.luau": {
-    "mtime": 1793536800.5977838,
-    "seen": 1793537133.503771,
-    "ast_hash": "e5045848965503c9f0b513f98d06c40b",
+    "mtime": 1793538113.343518,
+    "seen": 1793538925.5648186,
+    "ast_hash": "d089b837f21698dcba0fa54fcf297aef",
     "semantic_hash": ""
   },
   "ServerScriptService/server/Services/RoamingCarService/CollectorWorld.luau": {
@@ -2418,21 +2418,33 @@
     "semantic_hash": ""
   },
   "ServerScriptService/server/Services/RoamingCarService/init.luau": {
-    "mtime": 1793535319.3540232,
-    "seen": 1793537133.5042763,
-    "ast_hash": "e9e137f19d6d5a6e1f2b095c41a2ba39",
+    "mtime": 1793538179.7182176,
+    "seen": 1793538925.5658185,
+    "ast_hash": "dccb083026d241fc8fbd0a1619517aed",
     "semantic_hash": ""
   },
   "tests/collector/harness.luau": {
-    "mtime": 1793535631.0779135,
-    "seen": 1793537133.5042763,
-    "ast_hash": "c69169bb2a6e470d609e5108cd1de80f",
+    "mtime": 1793538351.7362604,
+    "seen": 1793538925.5658185,
+    "ast_hash": "87d9ec60afbc80b92d2a2587c1143781",
     "semantic_hash": ""
   },
   "tests/collector/run.sh": {
     "mtime": 1793535622.745874,
     "seen": 1793537133.5042763,
     "ast_hash": "cfd191a0f556e4b1df8027a72db7a0e6",
+    "semantic_hash": ""
+  },
+  "ReplicatedStorage/shared/Controllers/PowerTrainerController.luau": {
+    "mtime": 1793538419.7402043,
+    "seen": 1793538925.5648186,
+    "ast_hash": "1dd86c727e894e489dd9fde405a426f7",
+    "semantic_hash": ""
+  },
+  "ServerScriptService/server/Services/PowerTrainerService.luau": {
+    "mtime": 1793537915.1654704,
+    "seen": 1793538925.5658185,
+    "ast_hash": "ecdb40e33bfa038be4d0e0510f355976",
     "semantic_hash": ""
   }
 }

@@ -17,8 +17,8 @@ video". The loop was rebuilt around the existing race highway:
 3. **Steal Power (⚡) gates which cars you can take.** Every traffic car shows "Required: ⚡N", green if you
    can, red if not. Cars above your ⚡ are never locked or offered as a jump target. The server re-checks.
 4. **Train ⚡ on the kiddie ride** (our take on the reference's toy horse). Each plot has a coin-op kiddie
-   ride car. Sit on it and ⚡ rises every second, with a bounce and "+0.2" pops. The **+** on the ⚡ pill buys
-   kiddie ride levels (24) for a faster rate: 0.2 ⚡/s at level 0, ×1.277 per level.
+   ride car. Sit on it and it rocks back and forth while ⚡ rises every half second ("+1" pops). The **+** on the ⚡ pill buys
+   kiddie ride levels (24) for a faster rate: 2 ⚡/s at level 0, ×1.277 per level.
 5. **Park cars on podiums** for $/s (unchanged from the first build). Wrecking ends the run and returns home.
 
 On-foot roaming herds are switched off (`CollectorConfig.Roaming = false`) but kept in code.
@@ -63,13 +63,14 @@ Changed:
 ### Decisions
 - **⚡ is its own saved number, not an upgrade level**, because it now grows continuously (riding), not in steps. New and old profiles start at 10, enough for every tier-1 car.
 - **The landing is not gated.** Coming down on a car you are too weak for still puts you in it (no wreck), but the server does not award it and you get "You need ⚡N". The lock and jump target never offer such a car, so this only happens when one drifts under you.
-- **Rates:** world 1's best car (tier 10, ⚡30) is about 100 s of riding at level 0; level 1 costs $600.
+- **Rates:** world 1's best car (tier 10, ⚡30) is about 10 s of riding at level 0 (raised 10× after the owner found 0.2/s too slow); level 1 costs $600.
 
 ### Test results
 - Headless harness (`sh tests/collector/run.sh`): **139 passed, 0 failed**. Covers the ⚡ ladder, ride rates and prices, `requiredForBody`, road-steal awards (weak, enough power, profile not ready), and the Roaming-mode capture validation.
 - Studio play (single player, mock profile), all observed:
   - Boot clean; 6 kiddie rides built.
-  - Sat on the ride: ⚡ 10 → 11 in 5 s (0.2/s), "+0.2" pops, prompt hidden while seated.
+  - Sat on the ride: ⚡ 10 → 11 in 5 s at the first rate (0.2/s); after the speed-up, ⚡ 10 → 23 in 5 s (2.6/s with ride level 1), "+1" pops twice a second, car rocks ±12°.
+  - Badge layout check on a live run: 16 labels, 5 with three lines, 0 overlapping rows.
   - Bought kiddie ride level 1 for $600: rate rose to 0.255/s.
   - PLAY → drove → SPACE at a Civic 59 studs ahead: flew in, "Rezault banked a Red Civic (Tier 1) into their inventory", now driving it, tray "1 SECURED".
   - ⚡ forced to 5: every label turned red, the jump had no target (red reticle).
@@ -78,11 +79,13 @@ Changed:
 ### Bugs found and fixed during play
 - `PowerTrainerController` failed to load (Luau "ambiguous syntax" on a line starting with `(`).
 - `StealController` is over Studio's 200K `Source` limit; synced with `ScriptEditorService:UpdateSourceAsync`.
+- Kiddie ride never rocked: with streaming on, its seat arrived after the controller looked for it. The ride now streams in whole (`Atomic`) and the controller waits for the seat.
+- "Required: ⚡N" was hidden on some cars: the collection hint ("NEW!", "▶ NEARBY") was drawn in the same row, and the rarity word jumped onto it when the hint cleared. Badges now use three rows when all three lines show.
 
 ### Not done / known gaps
 - A weak landing (see Decisions) still refills health like any steal.
 - The ⚡ pill overlaps the CONTROLS card for the first seconds of a run.
-- The "+0.2 ⚡" pop drops the ⚡ glyph in Fredoka One.
+- The "+1 ⚡" pop drops the ⚡ glyph in Fredoka One.
 - The wreck panel still shows the race payout line ("+$56 · kept 25%").
 - Multiplayer, rejoin persistence of ⚡ (mock store), and mobile layout not checked in play.
 
