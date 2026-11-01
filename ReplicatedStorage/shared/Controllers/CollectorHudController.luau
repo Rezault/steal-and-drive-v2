@@ -471,6 +471,9 @@ end
 
 function Controller._show(self, lines: { string }, seconds: number)
 	local banner = self._banner
+	if not banner then
+		return -- an announcement that beat the HUD's build at join; nothing to show it on yet
+	end
 	for _, child in banner:GetChildren() do
 		if child:IsA("TextLabel") then
 			child:Destroy()

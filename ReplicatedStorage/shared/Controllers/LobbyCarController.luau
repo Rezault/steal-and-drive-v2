@@ -304,6 +304,11 @@ function LobbyCarController._jumpExit(self)
 	local ok, seating = pcall(require, module)
 	if ok and type(seating) == "table" and type(seating.ExitSeat) == "function" then
 		seating.ExitSeat()
+		-- Collector highway: with a car highlighted, the exit is the take-off of a leap onto it.
+		local Roaming = Shard.get("RoamingCarController")
+		if Roaming then
+			Roaming:leapFromSeat()
+		end
 	end
 end
 

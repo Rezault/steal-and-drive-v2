@@ -23,9 +23,15 @@ where dinos spawn and you go in and jump into one ... make that race area be one
    - Each zone holds about `Spawn.CarsPerZone` cars, spaced at least `Road.MinGap` apart per lane.
 3. **Walk in and JUMP.** Within `Leap.Range` (42) of a car you have the ⚡ for, it gets a green outline
    and a "SPACE · JUMP!" tag. Jump leaps you in an arc with a front flip and lands you on its roof. The car
-   bursts into your hotbar: toast, "N SECURED" tray.
+   goes into your hotbar (toast, "N SECURED" tray) **and you are put in its driver's seat** where it was.
    - The server re-checks distance against the car's deterministic lane position, ⚡, and the cooldown.
    - A weak jump shows "You need ⚡N".
+   - **Drive and chain.** You keep driving the car you took. Space in the driver's seat with a car
+     highlighted leaps from your car to that one, and it replaces yours. With nothing highlighted, Space
+     exits the car as before. (Owner: "let me drive it until i decide to jump into another".)
+   - **Starter car.** Anyone with no car gets their start car (`StartCarService:carFor`, world 1) parked
+     beside them: on join, respawn, Back to Base, or selling theirs. It is free and never added to the
+     inventory. This is `LobbyCarService`'s open-world car, one per player (`CollectorConfig.Drive`).
 4. **Steal Power (⚡)** gates cars: every label shows "Required: ⚡N", green if you can, red if not. Zone arches
    block you until you meet the zone's minimum.
 5. **Train ⚡ on the kiddie ride** at your plot. It rocks while ⚡ rises every half second. The **+** on the ⚡
@@ -53,7 +59,7 @@ Confirmed from footage:
 | 3. Dealership (park → $/s → collect) | Done (first build), reuses the podiums. |
 | 4. Progression (⚡ gate + kiddie ride) | Done, verified in Studio play. |
 | 5. Events & polish | Toast/tray, tips, red/green labels, reset and rush events, secret laps. |
-| 6. Testing & hardening | Headless harness 165/165. Single-player Studio play only. |
+| 6. Testing & hardening | Headless harness 172/172. Single-player Studio play only. |
 
 ### Files
 New:
@@ -69,6 +75,16 @@ Changed for the highway:
 - `RoamingCarController`: rewritten for targeting, the leap, the landing ride and the capture poof.
 - `RaceEntryController`: hides PLAY. `RaceService`: refuses entry while `racesOn()` is false.
 - `GetawayConfig`: off while either collector steal mode is on. `TipsConfig`: tips teach the highway.
+
+Changed for driving:
+- `CollectorConfig.Drive` (Starter, StarterDelay, Swap, SeatDelay).
+- `RoamingCarService`:
+  - `_driveCaptured` swaps you into the captured car;
+  - `_ensureCar` / `_watchStarter` give the starter (on CharacterAdded and on `LobbyCarService.CarDespawned`).
+- `LobbyCarService`: a server-only `free` spawn option that skips the ownership check. The client remote
+  still carries only a key.
+- `LobbyCarController._jumpExit` calls `RoamingCarController:leapFromSeat()` after exiting.
+- `RoamingCarController`: `leapFromSeat`; an accepted capture no longer hops you off the roof.
 
 ### Decisions
 - **The leap is client-animated, server-judged.** The client flies the character (PlatformStand + per-frame
@@ -94,9 +110,20 @@ Changed for the highway:
   - SPACE: flew an arc onto a red Civaro's roof. Server log "banked a Stock Civic (Tier 1) into their inventory",
     then the "Discovered! CIVARO" toast, "1 SECURED" tray, and the car in hotbar slot 2.
   - A car needing ⚡11 showed red and was never targeted.
+- Studio play, driving build:
+  - On join, a starter Civic was parked beside the player at their plot.
+  - On-foot leap onto a Civic: banked as `Civic:8#1`, the starter was replaced, and I was seated in the new
+    car on the highway.
+  - Held W: it drove about 170 studs in 2.5 s. With a target highlighted, Space in the driver's seat leapt
+    onto a GNX: banked `GNX:1#2`, the Civic was removed, I was seated in the GNX, and the tray showed
+    "2 SECURED".
+  - Died: after respawn, a fresh starter Civic was parked 14 studs away.
+- Harness: **172 passed, 0 failed** (adds the swap: key, seated, facing down the lane, standing where the
+  car was; and the starter: given when carless, not when you have a car or are dead).
 
 ### Bugs found and fixed during play
 - PLAY stayed up: nothing restated its visibility at boot. Fixed: `_watchPlayRoom` restates it.
+- `CollectorHudController:474` errored when an announcement arrived before the HUD was built at join. Fixed: guarded.
 - Highway traffic drove through the authored tree median. Fixed: the median props are moved aside (see Files).
 - Earlier builds:
   - `PowerTrainerController` Luau "ambiguous syntax".
@@ -110,6 +137,11 @@ Changed for the highway:
 - Zones 2–5 and the arch barriers were not walked through in this build's play test.
 - The gamepad X shortcut for the hidden PLAY may still be bound; the server refuses the race anyway.
 - The old race HUD pieces (zone distance strip "▲ 60 m") still show on the highway.
+- A captured car starts from rest; it does not inherit the roaming car's speed.
+- Respawning gives the starter back, not the last car you drove (that one is in your inventory).
+- Mobile: no on-screen jump button was checked while driving; the leap from a seat is bound to Space and
+  gamepad A only (`LobbyCarConfig.JumpExit.Keys`).
+- If a roaming body has no rig in `CarSystem`, the swap fails (logged) and you keep your old car.
 
 ### Next steps
 1. Two-player Studio test (Test → Clients and Servers).

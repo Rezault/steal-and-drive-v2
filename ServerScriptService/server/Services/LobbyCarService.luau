@@ -133,6 +133,9 @@ type SpawnOptions = {
 	seat: boolean?,
 	--- Seconds to let the rig settle before sitting them. See `_seatDriver`.
 	seatDelay: number?,
+	--- Skip the ownership check: the collector's free starter car, or a capture the garage sold
+	--- because the inventory was full. Server callers only — the remote never carries options.
+	free: boolean?,
 }
 
 -- === The roster =============================================================
@@ -1250,7 +1253,7 @@ function LobbyCarService.setLobbyCar(self, player: Player, key: string?, options
 	end
 	--[[ Checked BEFORE the key is taken apart, so a client sending a colour it does not own fails
 		here rather than being normalised into one it does. The same order `setBayCar` uses. ]]
-	if not GarageService:owns(player, key) then
+	if not (options and options.free) and not GarageService:owns(player, key) then
 		return false, "not owned"
 	end
 

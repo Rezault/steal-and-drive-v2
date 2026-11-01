@@ -24,6 +24,7 @@ V.__sub = function(a, b) return vec(a.X - b.X, a.Y - b.Y, a.Z - b.Z) end
 V.__mul = function(a, s) return vec(a.X * s, a.Y * s, a.Z * s) end
 V.__index = function(self, k)
 	if k == "Magnitude" then return math.sqrt(self.X ^ 2 + self.Y ^ 2 + self.Z ^ 2) end
+	if k == "Unit" then local m = self.Magnitude; return vec(self.X / m, self.Y / m, self.Z / m) end
 	return V[k]
 end
 function V.Lerp(a, b, t) return a + (b - a) * t end
@@ -56,6 +57,7 @@ local function env(path)
 		require = function(p) return modules[rawget(p, "__path")] or error("no stub " .. tostring(rawget(p, "__path"))) end,
 		workspace = workspaceStub,
 		Vector3 = Vector3,
+		CFrame = { lookAt = function(at, to) return { Position = at, LookVector = (to - at).Unit } end },
 		Color3 = { fromRGB = function(r, g, b) return { r, g, b } end, new = function(r, g, b) return { r, g, b } end },
 		UDim2 = { fromOffset = function(x, y) return { x, y } end, fromScale = function(x, y) return { x, y } end },
 		Enum = proxy("Enum"),
@@ -82,11 +84,13 @@ modules["ReplicatedStorage.shared.Configs.UpgradeConfig"] = {
 }
 modules["ReplicatedStorage.shared.Configs.WorldConfig"] = {
 	TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 },
+	carKey = function(body, paint, mutation) return body .. ":" .. tostring(paint) .. (if mutation then ":" .. mutation else "") end,
 	get = function() return { Cars = { "Civic", "Civic", "Civic", "Civic", "Civic", "Civic", "Civic", "Civic", "M5", "M5" } } end,
 }
 modules["ReplicatedStorage.shared.Configs.GarageConfig"] = {
 	valueOf = function(tier) return values[tier] end,
 	TierOfBody = { Civic = 1, M5 = 10, Jesko = 50 },
+	carKey = function(body, paint, mutation) return body .. ":" .. tostring(paint) .. (if mutation then ":" .. mutation else "") end,
 }
 
 local cfgFn = loadstring(SOURCES.CollectorConfig)
@@ -181,6 +185,7 @@ modules["ReplicatedStorage.Packages.Shard"] = {
 }
 modules["ReplicatedStorage.shared.Configs.WeatherConfig"] = { roll = function() return nil end, sanitize = function(x) return x end }
 modules["ReplicatedStorage.shared.Configs.PaintConfig"] = { roll = function() return 1 end }
+modules["ReplicatedStorage.shared.Configs.LobbyCarConfig"] = { KeyAttribute = "LobbyCarKey" }
 for _, name in { "TrafficConfig" } do
 	modules["ReplicatedStorage.shared.Configs." .. name] = {}
 end
@@ -384,6 +389,46 @@ do
 	end
 	check(spaced, "filled cars keep MinGap in their lane")
 	check(inside, "filled cars are on their zone's road")
+end
+
+
+-- === Driving: a capture swaps your car, and a carless player gets the starter =========
+do
+	local spawned = {}
+	local current = nil
+	registry.LobbyCarService = {
+		getLobbyCar = function() return current end,
+		setLobbyCar = function(_, player, key, options)
+			table.insert(spawned, { player = player, key = key, options = options })
+			return true, "spawned"
+		end,
+	}
+	registry.StartCarService = { carFor = function() return "Civic", 1, nil end }
+
+	local driver = player("Driver", 7490, -1300)
+	driver.Parent = {} -- in the game
+	local lane = addCar("d1", 1, vec(7490, -90, -1300))
+	lane.a, lane.b, lane.t0, lane.t1 = vec(7490, -90, -1250), vec(7490, -90, -1350), serverNow - 5, serverNow + 5
+	capture(driver, "d1")
+	local swap = spawned[#spawned]
+	check(lastReply().ok == true and swap and swap.key == "Civic#1", "a capture puts the player in the car they took")
+	check(swap and swap.options.seat == true and swap.options.free == false, "seated, and owned so not free")
+	check(swap and math.abs(swap.options.ground.LookVector.Z + 1) < 1e-6, "facing down its lane")
+	check(swap and math.abs(swap.options.ground.Position.Z + 1300) < 1e-6, "standing where the car was")
+
+	local count = #spawned
+	s:_ensureCar(driver)
+	check(#spawned == count + 1 and spawned[#spawned].key == "Civic:1" and spawned[#spawned].options.free == true,
+		"a player with no car gets the free starter")
+	current = {}
+	s:_ensureCar(driver)
+	check(#spawned == count + 1, "a player who has a car gets no starter")
+	current = nil
+	driver.humanoid.Health = 0
+	s:_ensureCar(driver)
+	check(#spawned == count + 1, "a dead player gets no starter")
+
+	registry.LobbyCarService, registry.StartCarService = nil, nil
 end
 
 print(string.format("%d passed, %d failed", passes, failures))

@@ -395,6 +395,26 @@ function Controller._onJump(self)
 	end
 end
 
+--[[ Public: Space in the driver's seat (`LobbyCarController._jumpExit`, which sinks the jump so
+	`JumpRequest` never fires). The caller has already asked to leave the seat; this waits for the
+	seat to let go, then leaps at whatever was highlighted. No target: nothing, a plain exit. ]]
+function Controller.leapFromSeat(self)
+	local target = self._target
+	local humanoid = self._player.Character and self._player.Character:FindFirstChildOfClass("Humanoid")
+	if not (target and humanoid) or self._leaping then
+		return
+	end
+	task.spawn(function()
+		local deadline = os.clock() + 0.5
+		while humanoid.SeatPart and os.clock() < deadline do
+			RunService.Heartbeat:Wait()
+		end
+		if target.inst.Parent then
+			self:_leap(target)
+		end
+	end)
+end
+
 function Controller._leap(self, rec: Rec)
 	local character = self._player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -492,7 +512,7 @@ function Controller._landed(self, rec: Rec, humanoid: Humanoid, root: BasePart, 
 end
 
 --- Let go: stand the character back up, hop it off the roof, restore the camera.
-function Controller._release(self, rec: Rec, humanoid: Humanoid, root: BasePart, fov: number)
+function Controller._release(self, rec: Rec, humanoid: Humanoid, root: BasePart, fov: number, stay: boolean?)
 	if self._riding == rec then
 		self._riding = nil
 	end
@@ -508,7 +528,7 @@ function Controller._release(self, rec: Rec, humanoid: Humanoid, root: BasePart,
 		humanoid.PlatformStand = false
 		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	end
-	if root.Parent then
+	if root.Parent and not stay then
 		root.AssemblyLinearVelocity = Vector3.new(0, 22, 0)
 	end
 	local camera = workspace.CurrentCamera
@@ -548,7 +568,8 @@ function Controller._onResult(self, result: { [string]: any })
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		if humanoid and root and root:IsA("BasePart") then
-			self:_release(riding, humanoid, root, self._fov or workspace.CurrentCamera.FieldOfView)
+			-- Taken: stay on the roof, the server is about to seat you in it.
+			self:_release(riding, humanoid, root, self._fov or workspace.CurrentCamera.FieldOfView, result.ok == true)
 		end
 	end
 	if not result.ok then

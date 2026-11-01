@@ -42,6 +42,7 @@ local WorldConfig = require(ReplicatedStorage.shared.Configs.WorldConfig)
 local WeatherConfig = require(ReplicatedStorage.shared.Configs.WeatherConfig)
 local PaintConfig = require(ReplicatedStorage.shared.Configs.PaintConfig)
 local TrafficConfig = require(ReplicatedStorage.shared.Configs.TrafficConfig)
+local LobbyCarConfig = require(ReplicatedStorage.shared.Configs.LobbyCarConfig)
 local CollectorWorld = require(script.CollectorWorld)
 
 local Remotes = CollectorConfig.Remotes
@@ -459,8 +460,83 @@ function Service._onCapture(self, player: Player, id: unknown)
 		zone = car.zone,
 	})
 	self:getSignal("CarCaptured"):Fire(player, car.body, car.tier, car.mutation, car.secret)
+	if CollectorConfig.Drive.Swap then
+		-- A full inventory sells the car (no id); they still get to drive it.
+		self:_driveCaptured(player, car, carId or GarageConfig.carKey(car.body, car.paint, car.mutation), carId == nil)
+	end
 	if car.secret then
 		self:_announce({ kind = "stolen", player = player.DisplayName, body = car.body, zone = car.zone, mutation = car.mutation })
+	end
+end
+
+-- === Driving (CollectorConfig.Drive) ===========================================
+
+--- Replace the player's car with the one they just took, standing where it was, nose down its lane.
+function Service._driveCaptured(self, player: Player, car: Car, key: string, free: boolean)
+	local Lobby = Shard.get("LobbyCarService")
+	if not Lobby then
+		return
+	end
+	local current = Lobby:getLobbyCar(player)
+	if current and current:GetAttribute(LobbyCarConfig.KeyAttribute) == key then
+		return -- same key would read as "put it away"
+	end
+	local p = CollectorConfig.positionAt(car.a, car.b, car.t0, car.t1, now())
+	local floor = Vector3.new(p.X, CollectorConfig.Corridor.FloorY + 0.3, p.Z)
+	local ahead = Vector3.new(car.b.X - car.a.X, 0, car.b.Z - car.a.Z)
+	if ahead.Magnitude < 0.5 then
+		ahead = Vector3.new(0, 0, -1) -- the way every lane runs
+	end
+	local ok, reason = Lobby:setLobbyCar(player, key, {
+		ground = CFrame.lookAt(floor, floor + ahead.Unit),
+		seat = true,
+		seatDelay = CollectorConfig.Drive.SeatDelay,
+		free = free,
+	})
+	if not ok then
+		self.log:warn(string.format("%s could not drive their %s: %s", player.Name, key, reason))
+	end
+end
+
+--- Park the start car beside a player who has none. Free, and not added to their inventory.
+function Service._ensureCar(self, player: Player)
+	local Lobby = Shard.get("LobbyCarService")
+	local Starts = Shard.get("StartCarService")
+	if not (player.Parent and Lobby and Starts) or Lobby:getLobbyCar(player) then
+		return
+	end
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	local body, paint, mutation = Starts:carFor(player, 1)
+	local ok, reason = Lobby:setLobbyCar(player, GarageConfig.carKey(body, paint, mutation), { free = true })
+	if not ok then
+		self.log:warn(string.format("No starter car for %s: %s", player.Name, reason))
+	end
+end
+
+function Service._watchStarter(self)
+	local delay = CollectorConfig.Drive.StarterDelay
+	local function later(player: Player)
+		task.delay(delay, self._ensureCar, self, player)
+	end
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function()
+			later(player)
+		end)
+		if player.Character then
+			later(player)
+		end
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+	-- Death, Back to Base, selling it: any despawn that is not a swap leaves them with no car.
+	local Lobby = Shard.get("LobbyCarService")
+	if Lobby then
+		Lobby:getSignal("CarDespawned"):Connect(later)
 	end
 end
 
@@ -568,6 +644,9 @@ Service:withLifecycle({
 		self._folder = folder
 
 		CollectorWorld.build()
+		if CollectorConfig.Drive.Starter then
+			self:_watchStarter()
+		end
 
 		self._playerLeft = Players.PlayerRemoving:Connect(function(player)
 			self._cooldowns[player] = nil

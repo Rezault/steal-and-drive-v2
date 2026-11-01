@@ -267,7 +267,7 @@ end
 	outlined and tagged JUMP!; press jump (Space, the mobile jump button, gamepad A) and you leap in an
 	arc with a front flip and land on its roof, aimed at where the car WILL be when you come down (the
 	leg is deterministic, so the prediction is exact). On the roof the client asks the server; the car
-	bursts into the hotbar on "ok", and you drop to the road and go again.
+	goes into the hotbar on "ok", and you are put in its driver's seat (`Drive`).
 
 	The arc is all client-side presentation. What the server checks is unchanged: the character is
 	where the car is, give or take `Radius + Slack + speed x LatencySeconds`. ]]
@@ -289,6 +289,20 @@ CollectorConfig.Capture = {
 	LatencySeconds = 0.6,
 	Cooldown = 0.35, -- per player, between accepted requests
 	Source = "Capture", -- the `awardCar` source; not a carry source, so the car lands in the hotbar
+}
+
+--[[ DRIVING (owner: "give me a starter car ... let me drive it until i decide to jump into another").
+	Both halves are `LobbyCarService`'s open-world car, one per player:
+	  • Starter: whenever you have no car (join, respawn, Back to Base, sold it), your start car
+	    (`StartCarService:carFor`, world 1) is parked beside you a moment later. Free; not added to the
+	    inventory.
+	  • Swap: a capture also replaces your car with the one you landed on, where it was, and seats you.
+	    Space in the driver's seat with a car highlighted leaps from your car to it. ]]
+CollectorConfig.Drive = {
+	Starter = true,
+	StarterDelay = 1.5, -- seconds after spawn / despawn, so LobbyCarService's own respawn clean-up runs first
+	Swap = true,
+	SeatDelay = 0.1,
 }
 
 -- === World events ============================================================
