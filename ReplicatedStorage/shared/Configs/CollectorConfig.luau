@@ -52,7 +52,11 @@ CollectorConfig.Corridor = {
 	HalfWidth = 230,
 	FloorY = -89.5, -- the TOP of the authored ground (a raycast floored to -90 hid the half stud)
 	StartZ = -1060, -- the START ZONE line; the hub is everything north of it
-	ZoneLength = 360,
+	ZoneLength = 720, -- doubled 2026-11-01 (owner: "make each zone longer"); the map past -2900 is cloned, see MapTile
+	--[[ The authored corridor is one tile of this many studs along Z (its ground strips run exactly Z -886
+		to -2905). `CollectorWorld` clones the light pieces of it (ground, cliffs, lamp rows; not the
+		12k-part tree belts) one tile further at a time until the last zone is covered. ]]
+	MapTile = { ZTop = -886, ZBottom = -2905, XMin = 5900, XMax = 9100, MaxParts = 500 },
 }
 
 --[[ One per `WorldConfig.Worlds` entry, same index. Colours are the zone strip tile, the ground
@@ -200,7 +204,7 @@ end
 
 -- === Spawning ================================================================
 CollectorConfig.Spawn = {
-	CarsPerZone = 14, -- roughly how many are on a zone's road at once (`Road.SpawnEvery` is derived from it)
+	CarsPerZone = 28, -- roughly how many are on a zone's road at once (`Road.SpawnEvery` is derived from it)
 	--[[ Rung odds inside a zone (rung 1 = the world's cheapest car). NOT `BalanceConfig.RungWeights`:
 		those are tuned for a road that throws hundreds of cars a run, where a 1-in-2,000 Legendary is
 		still seen. A zone holds fourteen cars at a time, so the top rungs are lifted until a
@@ -297,12 +301,16 @@ CollectorConfig.Capture = {
 	    (`StartCarService:carFor`, world 1) is parked beside you a moment later. Free; not added to the
 	    inventory.
 	  • Swap: a capture also replaces your car with the one you landed on, where it was, and seats you.
-	    Space in the driver's seat with a car highlighted leaps from your car to it. ]]
+	  • Jump in the driver's seat is the race's bail (`StealController.bailLobby`, owner: "re-use the
+	    previous jumping system"): you are thrown out and glide, the car in reach is marked, E takes it.
+	    Land on nothing and you are on your feet. The car's own exit button is the plain way out. ]]
 CollectorConfig.Drive = {
 	Starter = true,
 	StarterDelay = 1.5, -- seconds after spawn / despawn, so LobbyCarService's own respawn clean-up runs first
 	Swap = true,
+	AutoThrottle = true, -- in your car you always drive forward (S still brakes); LobbyDriveController
 	SeatDelay = 0.1,
+	BailCruise = 40, -- studs/s the bail's throw and glide are sized against (the race used its cruise speed)
 }
 
 -- === World events ============================================================

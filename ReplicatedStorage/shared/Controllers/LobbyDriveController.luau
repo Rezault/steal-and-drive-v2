@@ -53,6 +53,7 @@ local RunService = game:GetService("RunService")
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local DriveConfig = require(ReplicatedStorage.shared.Configs.DriveConfig)
 local LobbyCarConfig = require(ReplicatedStorage.shared.Configs.LobbyCarConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 local ArcadeKit = require(ReplicatedStorage.shared.Modules.ArcadeKit)
 --- For `StudsPerMaxSpeed`: the `MaxSpeed` attribute is not studs/s, and the conversion lives there.
 local WindConfig = require(ReplicatedStorage.shared.Configs.WindConfig)
@@ -494,9 +495,15 @@ function LobbyDriveController._install(self, car: Model, seat: VehicleSeat): boo
 		the TOUCH button is held; the keyboard and gamepad keep their own throttle. ]]
 	local stockThrottle = chassis.UpdateThrottle
 	self._stockThrottle = stockThrottle
+	--- Collector (owner, 2026-11-01: "auto drive forward, but i can control direction"): full gas unless
+	--- the player is braking or reversing, so S still stops the car.
+	local auto = CollectorConfig.Enabled and CollectorConfig.Drive.AutoThrottle
 	if type(stockThrottle) == "function" then
 		chassis.UpdateThrottle = function(speed, throttle)
-			return stockThrottle(speed, if self._touchDrift then 1 else throttle)
+			if self._touchDrift or (auto and not (type(throttle) == "number" and throttle < 0)) then
+				throttle = 1
+			end
+			return stockThrottle(speed, throttle)
 		end
 	end
 

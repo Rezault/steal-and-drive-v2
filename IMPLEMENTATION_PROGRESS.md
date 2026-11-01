@@ -26,14 +26,20 @@ where dinos spawn and you go in and jump into one ... make that race area be one
    goes into your hotbar (toast, "N SECURED" tray) **and you are put in its driver's seat** where it was.
    - The server re-checks distance against the car's deterministic lane position, ⚡, and the cooldown.
    - A weak jump shows "You need ⚡N".
-   - **Drive and chain.** You keep driving the car you took. Space in the driver's seat with a car
-     highlighted leaps from your car to that one, and it replaces yours. With nothing highlighted, Space
-     exits the car as before. (Owner: "let me drive it until i decide to jump into another".)
+   - **Drive and chain.** You keep driving the car you took (owner: "let me drive it until i decide to jump
+     into another"). It **drives forward on its own**; you steer, and S still brakes (`Drive.AutoThrottle`).
+   - **Space in the driver's seat is the old race bail** (owner: "re-use the previous jumping system ... he
+     glides around and he gets to choose what car to hop into with E"). You are thrown out and glide; the car
+     in reach is locked and marked, and E takes it. Landing on a roof takes it too (`StealConfig.Prompt.AutoSteal`).
+     The car is captured exactly like an on-foot leap and replaces yours. Land on nothing and you are on your
+     feet; your old car coasts on.
    - **Starter car.** Anyone with no car gets their start car (`StartCarService:carFor`, world 1) parked
      beside them: on join, respawn, Back to Base, or selling theirs. It is free and never added to the
      inventory. This is `LobbyCarService`'s open-world car, one per player (`CollectorConfig.Drive`).
-4. **Steal Power (⚡)** gates cars: every label shows "Required: ⚡N", green if you can, red if not. Zone arches
-   block you until you meet the zone's minimum.
+4. **Steal Power (⚡)** gates cars: every label shows "Required: ⚡N", green if you can, red if not. **No zone
+   barriers** (owner: "remove barreirs i should be able to go to the next zone"); the ⚡ on each car is the
+   only gate. **Zones are 720 studs long.** Past the authored map, the corridor's light pieces are cloned
+   along at boot (`CollectorWorld.extendMap`, runtime only), and an invisible wall ends the road.
 5. **Train ⚡ on the kiddie ride** at your plot. It rocks while ⚡ rises every half second. The **+** on the ⚡
    pill buys ride levels.
 6. **Park cars on podiums** for $/s (unchanged).
@@ -83,8 +89,18 @@ Changed for driving:
   - `_ensureCar` / `_watchStarter` give the starter (on CharacterAdded and on `LobbyCarService.CarDespawned`).
 - `LobbyCarService`: a server-only `free` spawn option that skips the ownership check. The client remote
   still carries only a key.
-- `LobbyCarController._jumpExit` calls `RoamingCarController:leapFromSeat()` after exiting.
-- `RoamingCarController`: `leapFromSeat`; an accepted capture no longer hops you off the roof.
+- `LobbyCarController._jumpExit` calls `StealController:bailLobby(car, ExitSeat)` (plain exit if it cannot start).
+- `StealController.bailLobby` runs the race bail with stand-ins:
+  - a road frame along the car's heading;
+  - the roaming cars as traffic (`RoamingCarController.stealTargets`);
+  - no-op drive, camera, wind and obstacles.
+  The car you left is not frozen. `_lobbyEnd` hands a mounted car to `RoamingCarController.landOn`, which
+  rides the roof and asks the server like a leap. No race remote (StealLanded/Failed/Missed) is fired.
+  `_activate` is split out of `_onRaceStart` so both share it.
+- `RoamingCarController`: an accepted capture no longer hops you off the roof; no outline while seated or gliding.
+- `LobbyDriveController`: `Drive.AutoThrottle` holds the throttle at 1 unless you brake.
+- `CollectorConfig`: `ZoneLength = 720`, `MapTile`, `CarsPerZone = 28`, `Drive.AutoThrottle`, `Drive.BailCruise`.
+- `CollectorWorld` / `RoamingCarController`: the zone barriers are gone.
 
 ### Decisions
 - **The leap is client-animated, server-judged.** The client flies the character (PlatformStand + per-frame
@@ -121,6 +137,15 @@ Changed for driving:
 - Harness: **172 passed, 0 failed** (adds the swap: key, seated, facing down the lane, standing where the
   car was; and the starter: given when carless, not when you have a car or are dead).
 
+- Studio play, bail build (2026-11-01):
+  - Auto-drive: the car went 90 → 96 studs/s with no keys held.
+  - Zones: 529 map pieces cloned, 22–25 cars per zone, ground under Z −4200; the car stopped at the road-end wall.
+  - Space at ~80 studs/s with ⚡10 (nothing takeable): thrown out, glided ~1 s, landed on foot; the car coasted on.
+  - Space with ⚡100K: glide, target locked and outlined, taken. Server "banked a Stock WRX STI", "1 SECURED",
+    hotbar slot 2, seated in the WRX. Second run: bail at 6.5 s, flight end 8.7 s, new car 8.8 s, seated 8.9 s,
+    still seated 11 s later. No console errors.
+  - E pressed once you are already in the new car exits it (the car kit's own E key), as before.
+
 ### Bugs found and fixed during play
 - PLAY stayed up: nothing restated its visibility at boot. Fixed: `_watchPlayRoom` restates it.
 - `CollectorHudController:474` errored when an announcement arrived before the HUD was built at join. Fixed: guarded.
@@ -134,13 +159,14 @@ Changed for driving:
 ### Not done / known gaps
 - Multiplayer (two players leaping at one car), rejoin persistence of ⚡ (mock store), and mobile/gamepad
   jump not checked in play.
-- Zones 2–5 and the arch barriers were not walked through in this build's play test.
+- Zones 2–5 were driven through by an unsteered test car only, not walked by a player.
+- The bail glide is sized for the race; `Drive.BailCruise` (40) stands in for the race's cruise speed. Tune it in play.
 - The gamepad X shortcut for the hidden PLAY may still be bound; the server refuses the race anyway.
 - The old race HUD pieces (zone distance strip "▲ 60 m") still show on the highway.
 - A captured car starts from rest; it does not inherit the roaming car's speed.
 - Respawning gives the starter back, not the last car you drove (that one is in your inventory).
-- Mobile: no on-screen jump button was checked while driving; the leap from a seat is bound to Space and
-  gamepad A only (`LobbyCarConfig.JumpExit.Keys`).
+- Mobile: the bail from a seat is bound to Space and gamepad A only (`LobbyCarConfig.JumpExit.Keys`); the
+  touch HUD's JUMP/STEAL button is not wired to it and was not checked.
 - If a roaming body has no rig in `CarSystem`, the swap fails (logged) and you keep your old car.
 
 ### Next steps

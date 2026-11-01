@@ -1948,7 +1948,7 @@ end
 	exactly on the flight's road coordinates instead of a constant couple of studs off them. ]]
 function StealController._flyCar(self, dt: number)
 	local car = self._car
-	if not (car and car.Parent and car.PrimaryPart) then
+	if self._lobby or not (car and car.Parent and car.PrimaryPart) then
 		return
 	end
 	local f = self._flight
@@ -2100,7 +2100,8 @@ function StealController._onBail(self)
 		is holding the car, which is every ordinary bail. ]]
 	local drive = self._drive
 	self._carAnchors = {}
-	for _, part in car:GetDescendants() do
+	-- Collector highway (`bailLobby`): the car you left is a real one in the open world; it coasts.
+	for _, part in (if self._lobby then {} else car:GetDescendants()) do
 		if part:IsA("BasePart") then
 			local prior = if drive then drive:frozenAnchor(part) else nil
 			self._carAnchors[part] = if prior ~= nil then prior else part.Anchored
@@ -2616,6 +2617,9 @@ function StealController._step(self, realDt: number)
 		self._avatar:PivotTo(CFrame.lookAt(pos, pos + info.forward))
 	end
 	self:_flyCar(dt)
+	if self._lobby then
+		self:_pinRider()
+	end
 
 	--- With the lock on, the marker is up from the launch to the end of the perch: the target is named
 	--- the moment you leave the car and stays named until E takes it (`StealConfig.Lock`).
@@ -2736,7 +2740,7 @@ function StealController._mount(self, rec)
 	end
 	CarBody.discardPrepared(self._preparedBody)
 	self._preparedBody = nil
-	if StealConfig.Handoff.PrepareBody then
+	if StealConfig.Handoff.PrepareBody and not self._lobby then
 		self._preparedBody = CarBody.prepare(self._car, rec.model)
 	end
 	-- Placed this frame rather than next: the generic placement in `_step` skips mounted flights, so
@@ -2900,6 +2904,10 @@ end
 	     velocity — the write is thrown away, and the car would come out of the steal at a dead
 	     stop. Same ordering, for the same reason, as `TrafficController._knock`. ]]
 function StealController._finish(self)
+	if self._lobby then
+		self:_lobbyEnd(self._target)
+		return
+	end
 	local rec = self._target
 	local car = self._car
 	local info = self._info
@@ -3581,6 +3589,10 @@ function StealController.downedAvatar(self): Model?
 end
 
 function StealController._whiff(self)
+	if self._lobby then
+		self:_lobbyEnd(nil) -- no race to wreck: you come down on your feet
+		return
+	end
 	--[[ THE TUTORIAL DOES NOT WHIFF (`TutorialConfig.Unlosable.Catch`, 2026-10-05). The flight is
 		called off right here — `_abort`, the restore an interrupted flight already gets — so the player
 		is back in the seat of the car they left, driving, with no ragdoll, no wreck and no revive to
@@ -3618,6 +3630,10 @@ end
 	still exists and get out. Nothing is reported to the server: whatever ended the race has already
 	told it. ]]
 function StealController._abort(self)
+	if self._lobby then
+		self:_lobbyEnd(nil)
+		return
+	end
 	self:_unanchorCar()
 	self:_endFlight(false)
 end
@@ -4096,6 +4112,154 @@ function StealController.steal(self)
 	self:_onSteal()
 end
 
+-- === The collector highway's bail ===========================================
+
+--- Answers any method with a no-op, so the race systems the flight pokes can be stood in for.
+local QUIET = setmetatable({}, {
+	__index = function()
+		return function() end
+	end,
+})
+local function quiet(methods)
+	return setmetatable(methods, { __index = QUIET })
+end
+
+--[[ Space in the open-world car (`LobbyCarController._jumpExit`): the race's own bail, glide and E
+	steal (owner, 2026-11-01: "re-use the previous jumping system... he gets to choose what car to hop
+	into with E").
+
+	There is no race, so the flight is pointed at stand-ins: the road is a frame laid along the car's
+	heading at bail time, the traffic is the roaming cars (`RoamingCarController.stealTargets`), and
+	the drive, camera, wind and obstacles are no-ops. The car you left is NOT frozen or flown; it is a
+	real car in the world and coasts on. The outcome never reaches the race remotes: `_lobbyEnd` hands
+	a mounted car to `RoamingCarController.landOn`, which asks `RoamingCarService` for it exactly as an
+	on-foot leap does. Returns false when it could not start, and the caller falls back to a plain exit. ]]
+function StealController.bailLobby(self, car: Model, exitSeat: () -> ()): boolean
+	local character = Players.LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local primary = car and car.PrimaryPart
+	local roaming = Shard.get("RoamingCarController")
+	if self._active or not (StealConfig.Enabled and roaming and primary and humanoid and root and root:IsA("BasePart")) then
+		return false
+	end
+
+	local velocity = primary.AssemblyLinearVelocity
+	local forward = Vector3.new(velocity.X, 0, velocity.Z)
+	if forward.Magnitude < 5 then
+		local look = primary.CFrame.LookVector
+		forward = Vector3.new(look.X, 0, look.Z)
+	end
+	forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.new(0, 0, -1)
+	local cross = Vector3.yAxis:Cross(forward)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { car, character }
+	local ground = workspace:Raycast(primary.Position + Vector3.yAxis * 5, Vector3.yAxis * -60, params)
+	local info = {
+		forward = forward,
+		cross = cross,
+		driveCenter = primary.Position:Dot(cross),
+		deckY = if ground then ground.Position.Y else CollectorConfig.Corridor.FloorY,
+	}
+
+	self._lobby = {
+		road = self._road,
+		traffic = self._traffic,
+		drive = self._drive,
+		obstacles = self._obstacles,
+		cam = self._cam,
+		wind = self._wind,
+	}
+	self._road = quiet({
+		getRoadInfo = function()
+			return info
+		end,
+		getCar = function()
+			return car
+		end,
+	})
+	self._traffic = quiet({
+		getCars = function()
+			return roaming:stealTargets(info)
+		end,
+	})
+	self._drive = quiet({
+		getCruiseSpeed = function()
+			return CollectorConfig.Drive.BailCruise
+		end,
+		getSteerInput = function()
+			return 0
+		end,
+		getThrottleInput = function()
+			return 0
+		end,
+	})
+	self._obstacles, self._cam, self._wind = nil, nil, nil
+	self:_activate()
+
+	-- Out of the seat now, locally, so the flight starts from it (see `_pinRider` for the server's half).
+	exitSeat()
+	for _, joint in root:GetJoints() do
+		if joint.Name == "SeatWeld" then
+			joint:Destroy()
+		end
+	end
+	humanoid.Sit = false
+	humanoid.PlatformStand = true
+
+	self:_onBail()
+	if self._state == "idle" then
+		self:_lobbyEnd(nil)
+	end
+	return true
+end
+
+--[[ The real character rides along under the (anchored) flight avatar, hidden: the default camera
+	follows it, and the server's capture check measures it. Written every frame, so the kit's
+	unseat teleport landing mid-flight is overwritten the frame after. ]]
+function StealController._pinRider(self)
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if self._avatar and root and root:IsA("BasePart") then
+		root.CFrame = self._avatar:GetPivot()
+		root.AssemblyLinearVelocity = Vector3.zero
+	end
+end
+
+--- A highway flight is over: put the race systems back, show the rider where the avatar was, and
+--- hand a mounted car (`rec`, a `stealTargets` record) to the roaming leap's capture.
+function StealController._lobbyEnd(self, rec)
+	local lobby = self._lobby
+	if not lobby then
+		return
+	end
+	local pose = if self._avatar then self._avatar:GetPivot() else nil
+	-- Restored by the teardown as leaving the car, so the legs the seat hid come back.
+	self._pendingRestore = self._pendingRestore or self._riderHidden
+	self._riderHidden = nil
+	self:_teardown()
+	self._lobby = nil
+	self._road, self._traffic, self._drive = lobby.road, lobby.traffic, lobby.drive
+	self._obstacles, self._cam, self._wind = lobby.obstacles, lobby.cam, lobby.wind
+
+	local character = Players.LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not (humanoid and root and root:IsA("BasePart")) then
+		return
+	end
+	if pose then
+		root.CFrame = pose
+	end
+	local roaming = Shard.get("RoamingCarController")
+	if rec and rec.roam and roaming and roaming:landOn(rec.roam) then
+		return
+	end
+	humanoid.PlatformStand = false
+	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+end
+
 --[[ Is that button showing JUMP or STEAL this frame?
 
 	The same question `_onSteal` opens by asking itself, and deliberately read off the same
@@ -4300,7 +4464,13 @@ function StealController._onRaceStart(self)
 		self.log:warn("RoadController unavailable; the steal is off for this race.")
 		return
 	end
+	self:_activate()
+	self:_bind()
+end
 
+--- On for a flight: the folder, this run's JUMP levels, the frame loop. A race's start and the
+--- collector highway's bail (`bailLobby`) both come through here.
+function StealController._activate(self)
 	local folder = Instance.new("Folder")
 	folder.Name = FLIGHT_FOLDER
 	folder.Parent = workspace
@@ -4322,7 +4492,6 @@ function StealController._onRaceStart(self)
 
 	self._active = true
 	self._wrecked = false
-	self:_bind()
 	self._conn = RunService.Heartbeat:Connect(function(dt)
 		self:_step(dt)
 	end)

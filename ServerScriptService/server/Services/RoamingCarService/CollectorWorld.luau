@@ -8,8 +8,7 @@
 
 	The pieces, per zone: a tinted floor overlay (on top of the authored grass and road, never
 	replacing them) and a gate arch over the zone's first line naming it and its cheapest car's
-	Steal Power. The barriers that stop a player walking into a zone they cannot steal in yet are
-	NOT here: they are per-player, so `RoamingCarController` builds them locally. ]]
+	Steal Power. There are no zone barriers (owner, 2026-11-01); every zone is open. ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -105,6 +104,66 @@ end
 	lanes go, so traffic would drive through trees. Anything that stands up off the floor inside the
 	road is moved into ServerStorage for this server's life. The place file is never touched, and
 	`CollectorConfig.Enabled = false` leaves the median where it was. Returns how many moved. ]]
+local function bounds(item: Instance): (CFrame?, Vector3?)
+	if item:IsA("Model") then
+		return item:GetBoundingBox()
+	elseif item:IsA("BasePart") then
+		return item.CFrame, item.Size
+	end
+	return nil, nil
+end
+
+--[[ Longer zones run past the end of the authored map (Z ~ -2905, then void). The corridor's light
+	pieces (ground strips, cliffs, lamp rows: anything under `MapTile.MaxParts` instances, so not the
+	tree belts) are cloned one tile further along -Z at a time until the last zone is covered. Into
+	this build's folder, so the place file is untouched and a rebuild starts clean. Returns the count. ]]
+local function extendMap(folder: Instance): number
+	local map = workspace:FindFirstChild("Map")
+	local c = CollectorConfig.Corridor
+	local tile = c.MapTile
+	if not map then
+		return 0
+	end
+	local roadEnd = c.StartZ - #CollectorConfig.Zones * c.ZoneLength
+	local period = tile.ZTop - tile.ZBottom
+	local copies = math.ceil((tile.ZBottom - roadEnd) / period)
+	if copies <= 0 then
+		return 0
+	end
+
+	local sources = {}
+	for _, item in map:GetChildren() do
+		local cf = bounds(item)
+		if cf and #item:GetDescendants() <= tile.MaxParts then
+			local p = cf.Position
+			if p.X > tile.XMin and p.X < tile.XMax and p.Z < tile.ZTop and p.Z > tile.ZBottom then
+				table.insert(sources, item)
+			end
+		end
+	end
+
+	local extension = Instance.new("Folder")
+	extension.Name = "MapExtension"
+	extension.Parent = folder
+	local made = 0
+	for k = 1, copies do
+		local offset = Vector3.new(0, 0, -period * k)
+		for _, item in sources do
+			local copy = item:Clone()
+			if copy then
+				if copy:IsA("Model") then
+					copy:PivotTo(copy:GetPivot() + offset)
+				elseif copy:IsA("BasePart") then
+					copy.CFrame += offset
+				end
+				copy.Parent = extension
+				made += 1
+			end
+		end
+	end
+	return made
+end
+
 local function clearRoad(): number
 	local map = workspace:FindFirstChild("Map")
 	if not map then
@@ -120,12 +179,7 @@ local function clearRoad(): number
 	local moved = 0
 	for _, segment in map:GetChildren() do
 		for _, item in segment:GetChildren() do
-			local cf, size
-			if item:IsA("Model") then
-				cf, size = item:GetBoundingBox()
-			elseif item:IsA("BasePart") then
-				cf, size = item.CFrame, item.Size
-			end
+			local cf, size = bounds(item)
 			-- Props only: walls and ground slabs are far bigger than any tree.
 			if cf and math.max(size.X, size.Z) < 80 then
 				local p = cf.Position
@@ -210,7 +264,14 @@ function CollectorWorld.build(): Folder?
 	stroke.Color = Color3.fromRGB(30, 30, 40)
 	stroke.Parent = label
 
+	folder:SetAttribute("MapExtended", extendMap(folder))
 	folder:SetAttribute("SceneryMoved", clearRoad())
+
+	-- The end of the road: an invisible wall a little past the last zone, so nobody drives into the void.
+	local roadEnd = c.StartZ - #CollectorConfig.Zones * c.ZoneLength
+	local wall = part(folder, "RoadEnd", Vector3.new(width, 80, 4), CFrame.new(c.CenterX, c.FloorY + 40, roadEnd - 30),
+		Color3.new(1, 1, 1), Enum.Material.SmoothPlastic)
+	wall.Transparency = 1
 	folder.Parent = workspace
 	return folder
 end

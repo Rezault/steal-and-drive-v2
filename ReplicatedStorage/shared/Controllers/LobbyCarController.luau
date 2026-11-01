@@ -65,6 +65,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Dispatcher = require(ReplicatedStorage.Packages.Dispatcher)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local CarryConfig = require(ReplicatedStorage.shared.Configs.CarryConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 local LobbyCarConfig = require(ReplicatedStorage.shared.Configs.LobbyCarConfig)
 
 local LobbyCarController = Shard.new("LobbyCarController")
@@ -303,11 +304,10 @@ function LobbyCarController._jumpExit(self)
 	end
 	local ok, seating = pcall(require, module)
 	if ok and type(seating) == "table" and type(seating.ExitSeat) == "function" then
-		seating.ExitSeat()
-		-- Collector highway: with a car highlighted, the exit is the take-off of a leap onto it.
-		local Roaming = Shard.get("RoamingCarController")
-		if Roaming then
-			Roaming:leapFromSeat()
+		-- Collector highway: the exit is the race's bail, a glide you steal out of with E.
+		local Steal = Shard.get("StealController")
+		if not (CollectorConfig.Enabled and Steal and Steal:bailLobby(car, seating.ExitSeat)) then
+			seating.ExitSeat()
 		end
 	end
 end

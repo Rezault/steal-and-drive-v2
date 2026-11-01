@@ -15,9 +15,12 @@
 	    and its label says JUMP!. Jump (`JumpRequest`: Space, the mobile button, gamepad A — one input
 	    on every device) and you fly at where it will be, flip, land on the roof and ride it for a beat
 	    while the server decides. "ok" bursts the car into sparkles; anything else just drops you off.
-	  • ZONE BARRIERS: a glowing wall across the line of every zone whose cheapest car is beyond
-	    your Steal Power, solid for you only. The server re-checks power on every steal anyway, so
-	    the wall is a signpost, not the lock.
+	  • FROM THE DRIVER'S SEAT the jump is the race's bail and glide (`StealController.bailLobby`):
+	    `stealTargets` is the traffic it aims at, and a car taken with E comes back here (`landOn`)
+	    to be asked for exactly like a leap. No outline while seated or gliding; the bail marks its own.
+	  • NO ZONE BARRIERS (owner, 2026-11-01: "remove barriers i should be able to go to the next
+	    zone"). Every zone is open; the ⚡ on each car's label is the only gate, and the server
+	    re-checks it on every steal.
 
 	The result of a steal is published on `Dispatcher` ("CollectorCaptured") for the HUD's toast. ]]
 
@@ -61,6 +64,7 @@ type Rec = {
 	t0: number?,
 	t1: number?,
 	required: number,
+	steal: any?, -- this car as a bail target record; see stealTargets
 }
 
 local Controller = Shard.new("RoamingCarController")
@@ -281,9 +285,13 @@ function Controller._step(self)
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local me = if root and root:IsA("BasePart") then root.Position else nil
 	local y = floorY()
-	local range = CollectorConfig.Leap.Range
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	-- On foot only: in the seat and in the air the bail's own marker does the aiming.
+	if humanoid and humanoid.SeatPart or self:_gliding() then
+		me = nil
+	end
 
-	local best: Rec?, bestDistance = nil, range
+	local best: Rec?, bestDistance = nil, CollectorConfig.Leap.Range
 	for inst, rec in self._recs do
 		local a, b, t0, t1 = rec.a, rec.b, rec.t0, rec.t1
 		if not (a and b and t0 and t1) then
@@ -371,7 +379,7 @@ end
 
 --- Jump pressed: leap at the target, or explain why a car in reach cannot be taken.
 function Controller._onJump(self)
-	if self._leaping or os.clock() < (self._nextLeapAt or 0) then
+	if self._leaping or os.clock() < (self._nextLeapAt or 0) or self:_gliding() then
 		return
 	end
 	local target = self._target
@@ -395,22 +403,106 @@ function Controller._onJump(self)
 	end
 end
 
---[[ Public: Space in the driver's seat (`LobbyCarController._jumpExit`, which sinks the jump so
-	`JumpRequest` never fires). The caller has already asked to leave the seat; this waits for the
-	seat to let go, then leaps at whatever was highlighted. No target: nothing, a plain exit. ]]
-function Controller.leapFromSeat(self)
-	local target = self._target
-	local humanoid = self._player.Character and self._player.Character:FindFirstChildOfClass("Humanoid")
-	if not (target and humanoid) or self._leaping then
-		return
-	end
-	task.spawn(function()
-		local deadline = os.clock() + 0.5
-		while humanoid.SeatPart and os.clock() < deadline do
-			RunService.Heartbeat:Wait()
+function Controller._gliding(self): boolean
+	local steal = Shard.get("StealController")
+	return steal ~= nil and steal:getFlight() ~= "idle"
+end
+
+--[[ PUBLIC (`StealController.bailLobby`): the roaming cars as the bail's traffic records, in its road
+	frame (`info`). One record per car, kept on the car and refreshed per call, because the flight holds
+	on to the record it locked. Only cars you could take and that stay on the road a while longer. ]]
+function Controller.stealTargets(self, info): { any }
+	local out = {}
+	local t = workspace:GetServerTimeNow()
+	for inst, rec in self._recs do
+		local model = rec.model
+		local a, b, t0, t1 = rec.a, rec.b, rec.t0, rec.t1
+		if not (model and a and b and t0 and t1) or self._pending[inst.Name] or self._powerNow < rec.required or t1 - t < 3 then
+			continue
 		end
-		if target.inst.Parent then
-			self:_leap(target)
+		local hit = model:FindFirstChild("Hit") or model.PrimaryPart
+		if not (hit and hit:IsA("BasePart")) then
+			continue
+		end
+		local velocity = (CollectorConfig.positionAt(a, b, t0, t1, t + 0.1) - CollectorConfig.positionAt(a, b, t0, t1, t)) * 10
+		local cross = hit.Position:Dot(info.cross) - info.driveCenter
+		local lateral = velocity:Dot(info.cross)
+		local s = rec.steal or { roam = rec, physical = false, tier = {} }
+		rec.steal = s
+		s.model, s.hit, s.root = model, hit, model.PrimaryPart or hit
+		s.along, s.cross = hit.Position:Dot(info.forward), cross
+		s.speed, s.lateral, s.targetCross = velocity:Dot(info.forward), lateral, cross + lateral
+		s.body, s.paint, s.mutation = inst:GetAttribute("Body"), inst:GetAttribute("Paint"), inst:GetAttribute("Mutation")
+		s.tier.Tier = inst:GetAttribute("Tier")
+		table.insert(out, s)
+	end
+	return out
+end
+
+--[[ PUBLIC (`StealController._lobbyEnd`): the glide has put you on this car's roof. From here it is a
+	leap that just landed: ride it and ask the server. False when the car is already gone. ]]
+function Controller.landOn(self, rec: Rec): boolean
+	local character = self._player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local a, b, t0, t1 = rec.a, rec.b, rec.t0, rec.t1
+	if not (humanoid and root and root:IsA("BasePart") and rec.inst.Parent and a and b and t0 and t1) then
+		return false
+	end
+	if self._leaping or workspace:GetServerTimeNow() >= t1 then
+		return false
+	end
+	self._leaping = rec
+	self._pending[rec.inst.Name] = true
+	self:_setTarget(nil)
+	humanoid.PlatformStand = true
+	local standOff = humanoid.HipHeight + root.Size.Y / 2
+	local function roofAt(t: number): Vector3
+		local pos = CollectorConfig.positionAt(a, b, t0, t1, t)
+		return Vector3.new(pos.X, floorY() + rec.height + standOff, pos.Z)
+	end
+	local fov = workspace.CurrentCamera.FieldOfView
+	self._fov = fov
+	self:_landed(rec, humanoid, root, roofAt, fov)
+	return true
+end
+
+--[[ The leap's arc: PlatformStand, an FOV kick, a parabola from `start` to `finish` with one
+	front flip. `onLand(fov)` when it comes down, `onAbort(fov)` if the character dies mid-air. ]]
+function Controller._fly(self, humanoid: Humanoid, root: BasePart, start: Vector3, finish: Vector3, duration: number,
+	onLand: (number) -> (), onAbort: (number) -> ())
+	local cfg = CollectorConfig.Leap
+	local across = flat(finish - start)
+	local peak = cfg.Height[1] + (cfg.Height[2] - cfg.Height[1]) * math.clamp(across / cfg.Range, 0, 1)
+	local heading = Vector3.new(finish.X - start.X, 0, finish.Z - start.Z)
+	heading = if heading.Magnitude > 0.1 then heading.Unit else Vector3.new(0, 0, -1)
+
+	humanoid.Jump = false
+	humanoid.PlatformStand = true
+	local camera = workspace.CurrentCamera
+	local fov = self._fov or camera.FieldOfView
+	self._fov = fov
+	TweenService:Create(camera, TweenInfo.new(duration * 0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		FieldOfView = fov + cfg.Fov,
+	}):Play()
+
+	local began = os.clock()
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		if not root.Parent or humanoid.Health <= 0 then
+			connection:Disconnect()
+			onAbort(fov)
+			return
+		end
+		local s = math.clamp((os.clock() - began) / duration, 0, 1)
+		local p = start:Lerp(finish, s) + Vector3.new(0, peak * 4 * s * (1 - s), 0)
+		-- One forward flip over the flight, eased so it whips through the middle and settles upright.
+		local spin = s * s * (3 - 2 * s) * math.pi * 2
+		root.CFrame = CFrame.lookAt(p, p + heading) * CFrame.Angles(-spin, 0, 0)
+		root.AssemblyLinearVelocity = Vector3.zero
+		if s >= 1 then
+			connection:Disconnect()
+			onLand(fov)
 		end
 	end)
 end
@@ -448,39 +540,10 @@ function Controller._leap(self, rec: Rec)
 		local pos = CollectorConfig.positionAt(a, b, t0, t1, t)
 		return Vector3.new(pos.X, floorY() + rec.height + standOff, pos.Z)
 	end
-	local finish = roofAt(launchAt + duration)
-	local across = flat(finish - start)
-	local peak = cfg.Height[1] + (cfg.Height[2] - cfg.Height[1]) * math.clamp(across / cfg.Range, 0, 1)
-	local heading = Vector3.new(finish.X - start.X, 0, finish.Z - start.Z)
-	heading = if heading.Magnitude > 0.1 then heading.Unit else Vector3.new(0, 0, -1)
-
-	humanoid.Jump = false
-	humanoid.PlatformStand = true
-	local camera = workspace.CurrentCamera
-	local fov = self._fov or camera.FieldOfView
-	self._fov = fov
-	TweenService:Create(camera, TweenInfo.new(duration * 0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		FieldOfView = fov + cfg.Fov,
-	}):Play()
-
-	local began = os.clock()
-	local connection
-	connection = RunService.RenderStepped:Connect(function()
-		if not root.Parent or humanoid.Health <= 0 then
-			connection:Disconnect()
-			self:_release(rec, humanoid, root, fov)
-			return
-		end
-		local s = math.clamp((os.clock() - began) / duration, 0, 1)
-		local p = start:Lerp(finish, s) + Vector3.new(0, peak * 4 * s * (1 - s), 0)
-		-- One forward flip over the flight, eased so it whips through the middle and settles upright.
-		local spin = s * s * (3 - 2 * s) * math.pi * 2
-		root.CFrame = CFrame.lookAt(p, p + heading) * CFrame.Angles(-spin, 0, 0)
-		root.AssemblyLinearVelocity = Vector3.zero
-		if s >= 1 then
-			connection:Disconnect()
-			self:_landed(rec, humanoid, root, roofAt, fov)
-		end
+	self:_fly(humanoid, root, start, roofAt(launchAt + duration), duration, function(fov)
+		self:_landed(rec, humanoid, root, roofAt, fov)
+	end, function(fov)
+		self:_release(rec, humanoid, root, fov)
 	end)
 end
 
@@ -654,32 +717,6 @@ function Controller._burst(self, position: Vector3)
 	end)
 end
 
--- === Zone barriers ===========================================================
-
-function Controller._refreshBarriers(self)
-	local c = CollectorConfig.Corridor
-	for zone = 2, #CollectorConfig.Zones do
-		local locked = self._powerNow < CollectorConfig.zoneMinimum(zone)
-		local wall = self._barriers[zone]
-		if locked and not wall then
-			wall = Instance.new("Part")
-			wall.Name = "ZoneBarrier" .. zone
-			wall.Anchored = true
-			wall.CanQuery = false
-			wall.CanTouch = false
-			wall.Material = Enum.Material.ForceField
-			wall.Color = RED
-			wall.Size = Vector3.new(c.HalfWidth * 2 + 80, 40, 2)
-			wall.CFrame = CFrame.new(c.CenterX, c.FloorY + 20, c.StartZ - (zone - 1) * c.ZoneLength)
-			wall.Parent = self._world
-			self._barriers[zone] = wall
-		elseif not locked and wall then
-			wall:Destroy()
-			self._barriers[zone] = nil
-		end
-	end
-end
-
 function Controller._onPowerChanged(self)
 	local power = self:_power()
 	if power == self._powerNow then
@@ -689,7 +726,6 @@ function Controller._onPowerChanged(self)
 	for _, rec in self._recs do
 		self:_paintNeed(rec)
 	end
-	self:_refreshBarriers()
 end
 
 -- === Lifecycle ===============================================================
@@ -716,7 +752,6 @@ Controller:withLifecycle({
 		self._player = Players.LocalPlayer
 		self._recs = {} :: { [Instance]: Rec }
 		self._pending = {} :: { [string]: boolean }
-		self._barriers = {} :: { [number]: BasePart }
 		self._found = {}
 		self._powerNow = -1
 	end,

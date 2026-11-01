@@ -192,9 +192,9 @@
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/GetawayConfig.luau": {
-    "mtime": 1793537785.2884955,
-    "seen": 1793538925.5648186,
-    "ast_hash": "bcfee7038de7921ccf897a90d37cd34d",
+    "mtime": 1793540451.539397,
+    "seen": 1793541066.1669712,
+    "ast_hash": "9d02b3d74b9c36923c1590a18b33c086",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/GiftConfig.luau": {
@@ -462,9 +462,9 @@
     "semantic_hash": "85a2bb2c597c84acdc8ce256fbcb2155"
   },
   "ReplicatedStorage/shared/Configs/TipsConfig.luau": {
-    "mtime": 1793538823.6268508,
-    "seen": 1793538925.5648186,
-    "ast_hash": "c1ff87fc6311a9968db77fee91afa098",
+    "mtime": 1793540489.713677,
+    "seen": 1793541066.1669712,
+    "ast_hash": "3e0dffc84ddc5860391dc8d942c0f8f8",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/TrafficConfig.luau": {
@@ -804,10 +804,10 @@
     "semantic_hash": "f5404184b2109419909abc20a42cc2c2"
   },
   "ReplicatedStorage/shared/Controllers/RaceEntryController.luau": {
-    "mtime": 1793534374.0843067,
-    "seen": 1793534844.810617,
-    "ast_hash": "d9bf5bda06ed3e3eebba352b84f738e4",
-    "semantic_hash": "d9bf5bda06ed3e3eebba352b84f738e4"
+    "mtime": 1793540747.6983266,
+    "seen": 1793541066.1669712,
+    "ast_hash": "175a62ca5bb30e8a1991ba2afef28073",
+    "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/RaceFreezeController.luau": {
     "mtime": 1793534374.0843067,
@@ -2124,10 +2124,10 @@
     "semantic_hash": "dad50461d7d290f0725a195a9a0c3c89"
   },
   "ServerScriptService/server/Services/RaceService.luau": {
-    "mtime": 1793534374.4211166,
-    "seen": 1793534844.810617,
-    "ast_hash": "65b8a862ba49f9e7b0ccefc7012740f3",
-    "semantic_hash": "65b8a862ba49f9e7b0ccefc7012740f3"
+    "mtime": 1793540464.168048,
+    "seen": 1793541066.1669712,
+    "ast_hash": "989b1ec96b5fbf565a6a58162fa4916a",
+    "semantic_hash": ""
   },
   "ServerScriptService/server/Services/RadioService.luau": {
     "mtime": 1793534374.4221146,
@@ -2388,15 +2388,15 @@
     "semantic_hash": "c6293303d33d904d4b73b8ea256d7446"
   },
   "IMPLEMENTATION_PROGRESS.md": {
-    "mtime": 1793539357.276257,
-    "seen": 1793539372.5044825,
-    "ast_hash": "894d4e8a87e55ca65ff3e7758915d2da",
+    "mtime": 1793541050.8092215,
+    "seen": 1793541066.1669712,
+    "ast_hash": "d29531b774650e7d1a49463c9353fd55",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/CollectorConfig.luau": {
-    "mtime": 1793539060.0667603,
-    "seen": 1793539372.502975,
-    "ast_hash": "3363042b5071d971b5168e97844ad091",
+    "mtime": 1793540421.8639505,
+    "seen": 1793541066.1669712,
+    "ast_hash": "bea57c59e909921487330efc5163edbe",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/CollectorHudController.luau": {
@@ -2406,27 +2406,27 @@
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/RoamingCarController.luau": {
-    "mtime": 1793538113.343518,
-    "seen": 1793538925.5648186,
-    "ast_hash": "d089b837f21698dcba0fa54fcf297aef",
+    "mtime": 1793540405.3858035,
+    "seen": 1793541066.1669712,
+    "ast_hash": "2f6d304c1f6f68b09d0c2dbd728f6a27",
     "semantic_hash": ""
   },
   "ServerScriptService/server/Services/RoamingCarService/CollectorWorld.luau": {
-    "mtime": 1793535344.334957,
-    "seen": 1793537133.5042763,
-    "ast_hash": "2df55800a9aa3f1dff70507b596887f6",
+    "mtime": 1793540917.1612978,
+    "seen": 1793541066.1669712,
+    "ast_hash": "9a3047b798999e38fda97fb57807fb56",
     "semantic_hash": ""
   },
   "ServerScriptService/server/Services/RoamingCarService/init.luau": {
-    "mtime": 1793538179.7182176,
-    "seen": 1793538925.5658185,
-    "ast_hash": "dccb083026d241fc8fbd0a1619517aed",
+    "mtime": 1793540256.4426105,
+    "seen": 1793541066.1669712,
+    "ast_hash": "9d4d55571f8ad2e3627bb28508817f31",
     "semantic_hash": ""
   },
   "tests/collector/harness.luau": {
-    "mtime": 1793538351.7362604,
-    "seen": 1793538925.5658185,
-    "ast_hash": "87d9ec60afbc80b92d2a2587c1143781",
+    "mtime": 1793540557.138776,
+    "seen": 1793541066.1669712,
+    "ast_hash": "284342e6bb4cd2e135c6dd6db2cd5ab0",
     "semantic_hash": ""
   },
   "tests/collector/run.sh": {
