@@ -100,6 +100,7 @@ local UserInputService = game:GetService("UserInputService")
 local RoadEdgeGuard = require(ReplicatedStorage.shared.Modules.RoadEdgeGuard)
 local Shard = require(ReplicatedStorage.Packages.Shard)
 local DriveConfig = require(ReplicatedStorage.shared.Configs.DriveConfig)
+local CollectorConfig = require(ReplicatedStorage.shared.Configs.CollectorConfig)
 --- For `StudsPerMaxSpeed` alone — the chassis attribute is not in studs/s and that conversion is
 --- measured and documented there. Same one number `RaceCameraController` reads. See `_engineAudio`.
 local WindConfig = require(ReplicatedStorage.shared.Configs.WindConfig)
@@ -125,6 +126,12 @@ local EXTERNAL_LATERAL_FLOOR = 1.5
 	separately (see _touchSteering) so Studio's device emulator — which keeps KeyboardEnabled true —
 	still exercises the touch path the moment you click one. ]]
 local TOUCH_ONLY_DEVICE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+--- How far either side of the road's centre the car may go: the race road's `LaneHalfWidth`, or the
+--- road's own (the open-world highway is wider; see `driveHighway`).
+local function laneHalf(info): number
+	return info.laneHalfWidth or DriveConfig.LaneHalfWidth
+end
 
 -- Stock CarBones speedometer conversion. The audio gearbox consumes the same mph scale as the
 -- dashboard, which keeps what the player hears synchronized with the visible gear change.
@@ -833,8 +840,8 @@ function DriveController._lane(self, dt: number)
 		self._edgeHitBox = hull
 	end
 	local half = if hull and hull:IsA("BasePart")
-		then RoadEdgeGuard.limit(hull.CFrame,hull.Size,cross,info.driveWidth,DriveConfig.LaneHalfWidth)
-		else DriveConfig.LaneHalfWidth
+		then RoadEdgeGuard.limit(hull.CFrame,hull.Size,cross,info.driveWidth,laneHalf(info))
+		else laneHalf(info)
 	if half > 0 and want * offset > 0 then
 		local fade = math.max(DriveConfig.LaneEdgeFade, 1e-3)
 		want *= math.clamp((half - math.abs(offset)) / fade, 0, 1)
@@ -1189,8 +1196,8 @@ function DriveController._resetUpright(self, reason: string?)
 	-- Where we are on the road, minus the roll, minus the wall.
 	local pos = car:GetPivot().Position
 	local offset = pos:Dot(info.cross) - info.driveCenter
-	if DriveConfig.LaneHalfWidth > 0 then
-		offset = math.clamp(offset, -DriveConfig.LaneHalfWidth, DriveConfig.LaneHalfWidth)
+	if laneHalf(info) > 0 then
+		offset = math.clamp(offset, -laneHalf(info), laneHalf(info))
 	end
 	local deckPoint = info.forward * pos:Dot(info.forward)
 		+ info.cross * (info.driveCenter + offset)
@@ -2050,7 +2057,7 @@ function DriveController._guardRoadEdges(self, dt: number)
  if not (hull and hull:IsDescendantOf(car)) then hull=car:FindFirstChild("HitBox",true);self._edgeHitBox=hull end
  if not (hull and hull:IsA("BasePart")) then return end
  local cross=info.cross
- local limit=RoadEdgeGuard.limit(hull.CFrame,hull.Size,cross,info.driveWidth,DriveConfig.LaneHalfWidth)
+ local limit=RoadEdgeGuard.limit(hull.CFrame,hull.Size,cross,info.driveWidth,laneHalf(info))
  local offset=hull.Position:Dot(cross)-info.driveCenter
  local velocity=primary.AssemblyLinearVelocity
  local actual=velocity:Dot(cross)
@@ -2476,6 +2483,7 @@ end
 	RaceService may re-seat the player a few times while deploying, so polling is simpler and
 	more forgiving than trying to catch the one right event. ]]
 function DriveController._onRaceStart(self)
+	self:leaveHighway()
 	self:_teardown()
 	if not DriveConfig.Enabled then
 		return
@@ -2519,6 +2527,56 @@ function DriveController._onRaceStart(self)
 			self.log:warn("Never got a drivable car to shim; racing with stock controls.")
 		end
 	end)
+end
+
+--[[ PUBLIC (LobbyDriveController) — the open-world highway drives exactly like the race (owner,
+	2026-11-02: "make it so the driving becomes like how the old in-run system was when you enter the
+	play part of the map, you cant leave the map confines, you can use S to brake and A and D to steer").
+
+	The same shim on the same car, pointed at a stand-in road: the collector corridor, a straight frame
+	down -Z whose edges are the outer lanes. No race remotes, no seat hold (E still gets you out) and no
+	Driver watch; the caller tears it down with `leaveHighway` when the player leaves the seat. ]]
+function DriveController.driveHighway(self, car: Model): boolean
+	self:leaveHighway()
+	if not DriveConfig.Enabled then
+		return false
+	end
+	local corridor = CollectorConfig.Corridor
+	local half = CollectorConfig.roadHalfWidth()
+	local forward = -Vector3.zAxis
+	local cross = Vector3.yAxis:Cross(forward)
+	local info = {
+		forward = forward,
+		cross = cross,
+		driveCenter = Vector3.new(corridor.CenterX, 0, 0):Dot(cross),
+		driveWidth = half * 2,
+		laneHalfWidth = half,
+		deckY = corridor.FloorY,
+	}
+	self._raceRoad = self._road
+	self._road = {
+		getRoadInfo = function()
+			return info
+		end,
+		getCar = function()
+			return car
+		end,
+	}
+	self._highway = true
+	if self:_install(car) then
+		return true
+	end
+	self:leaveHighway()
+	return false
+end
+
+function DriveController.leaveHighway(self)
+	if not self._highway then
+		return
+	end
+	self._highway = false
+	self:_teardown()
+	self._road, self._raceRoad = self._raceRoad, nil
 end
 
 DriveController:withRemoteEvents({

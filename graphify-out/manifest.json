@@ -636,10 +636,10 @@
     "semantic_hash": "32e8769d5a1a24256f0ee53add49ee1e"
   },
   "ReplicatedStorage/shared/Controllers/DriveController.luau": {
-    "mtime": 1793534374.0442493,
-    "seen": 1793534844.810617,
-    "ast_hash": "5353d77dff3c18d0f4c70e27e24eb0dc",
-    "semantic_hash": "5353d77dff3c18d0f4c70e27e24eb0dc"
+    "mtime": 1793632246.314973,
+    "seen": 1793632695.9505546,
+    "ast_hash": "67d9f82f65f1e7d15d714311547e7f79",
+    "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/DrivingHudController.luau": {
     "mtime": 1793534374.0463555,
@@ -726,9 +726,9 @@
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/LobbyDriveController.luau": {
-    "mtime": 1793544326.225917,
-    "seen": 1793545842.5179236,
-    "ast_hash": "947e02527ef533718af0a8a52003ba6d",
+    "mtime": 1793632280.337855,
+    "seen": 1793632695.9505546,
+    "ast_hash": "4160f7d92b53faca17400ff44b5e3ec3",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Controllers/LuckProgressController.luau": {
@@ -2388,9 +2388,9 @@
     "semantic_hash": "c6293303d33d904d4b73b8ea256d7446"
   },
   "IMPLEMENTATION_PROGRESS.md": {
-    "mtime": 1793545821.472505,
-    "seen": 1793545842.518924,
-    "ast_hash": "e2e990b893097b95d6356b6fe81f9e56",
+    "mtime": 1793632665.8264875,
+    "seen": 1793632695.9510891,
+    "ast_hash": "d211fa5f989808658251f3340608f4b6",
     "semantic_hash": ""
   },
   "ReplicatedStorage/shared/Configs/CollectorConfig.luau": {

@@ -28,6 +28,11 @@ where dinos spawn and you go in and jump into one ... make that race area be one
    - A weak jump shows "You need ⚡N".
    - **Drive and chain.** You keep driving the car you took (owner: "let me drive it until i decide to jump
      into another"). It **drives forward on its own**; you steer, and S still brakes (`Drive.AutoThrottle`).
+   - **In the zones it drives like the old race** (owner, 2026-11-02: "you cant leave the map confines, you can
+     use S to brake and A and D to steer"). Once the car is inside a zone, `DriveController` (the race shim)
+     takes it over: always on the gas, A/D slide it across the road with the race lean, S brakes down to the
+     race floor speed (not a full stop), W boosts. The car is held between the outer lanes (±60 studs from the
+     centre line) and always points down the road. In the hub the lobby handling still applies.
    - **Space in the driver's seat is the old race bail** (owner: "re-use the previous jumping system ... he
      glides around and he gets to choose what car to hop into with E"). You are thrown out and glide; the car
      in reach is locked and marked, and E takes it. Landing on a roof takes it too (`StealConfig.Prompt.AutoSteal`).
@@ -101,6 +106,11 @@ Changed for driving:
 - `LobbyDriveController`: `Drive.AutoThrottle` holds the throttle at 1 unless you brake.
 - `CollectorConfig`: `ZoneLength = 720`, `MapTile`, `CarsPerZone = 28`, `Drive.AutoThrottle`, `Drive.BailCruise`.
 - `CollectorWorld` / `RoamingCarController`: the zone barriers are gone.
+- `DriveController.driveHighway(car)` / `leaveHighway()`: the race shim on a stand-in road (the corridor:
+  forward -Z, centre `Corridor.CenterX`, half-width `roadHalfWidth()`). The race road's `LaneHalfWidth`
+  cap is now read from the road (`info.laneHalfWidth`, falling back to `DriveConfig.LaneHalfWidth`).
+- `LobbyDriveController._toHighway`: when the seated car is in a zone (`CollectorConfig.zoneAt`), drops the
+  lobby handling and calls `driveHighway`; any seat change or respawn calls `leaveHighway`.
 
 ### Decisions
 - **The leap is client-animated, server-judged.** The client flies the character (PlatformStand + per-frame
@@ -146,6 +156,16 @@ Changed for driving:
     still seated 11 s later. No console errors.
   - E pressed once you are already in the new car exits it (the car kit's own E key), as before.
 
+- Studio play, race-drive build (2026-11-02):
+  - Starter Civic moved into zone 1: auto-drove 59 → 101 studs/s, nose straight down the road.
+  - Held D: slid right with ~12° lean and stopped at +54 studs; held A: crossed to −54 and stopped. Nose back
+    to 0° when held at the edge.
+  - Held S from ~98: slowed to 30–50 studs/s and held there (the race brake floor).
+  - Space: whiff landed on foot. Second bail glided onto a roaming Civic: taken, seated, the old car removed,
+    and the new car also slid and stopped at +52 on D (race driving took the stolen car too).
+  - At the road-end wall the race "pinned car" reset fires every few seconds (log "Freed a pinned car").
+  - No console errors. Harness 172/172.
+
 ### Bugs found and fixed during play
 - PLAY stayed up: nothing restated its visibility at boot. Fixed: `_watchPlayRoom` restates it.
 - `CollectorHudController:474` errored when an announcement arrived before the HUD was built at join. Fixed: guarded.
@@ -165,6 +185,9 @@ Changed for driving:
 - The old race HUD pieces (zone distance strip "▲ 60 m") still show on the highway.
 - A captured car starts from rest; it does not inherit the roaming car's speed.
 - Respawning gives the starter back, not the last car you drove (that one is in your inventory).
+- Race driving: speed climbs while you hold A/D (about 100 → 130–157 studs/s in the test). Same shim as the
+  race; not compared against a real race run.
+- Once in the zones you cannot drive back to the hub (the car always points down the road); you walk back or respawn.
 - Mobile: the bail from a seat is bound to Space and gamepad A only (`LobbyCarConfig.JumpExit.Keys`); the
   touch HUD's JUMP/STEAL button is not wired to it and was not checked.
 - If a roaming body has no rig in `CarSystem`, the swap fails (logged) and you keep your old car.

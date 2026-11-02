@@ -126,6 +126,9 @@ end
 	sides — is falling, which is quicker: a car that will not straighten up when you let go is the
 	stiffness this exists to remove. ]]
 function LobbyDriveController._tick(self, dt: number)
+	if self:_toHighway() then
+		return
+	end
 	local rack = self._rack
 	if not (rack and rack.Parent) then
 		return
@@ -140,6 +143,28 @@ function LobbyDriveController._tick(self, dt: number)
 	self:_drift(dt)
 	--- The rack's own limit is what the chassis set from `MaxSteer`; `LockScale` trims it for the lobby.
 	rack.TargetPosition = self._steerOut * self:_lockFor() * rack.UpperLimit * cfg.LockScale
+end
+
+--[[ Into the zones, the race drive takes the car (`DriveController.driveHighway`; owner, 2026-11-02:
+	"make it so the driving becomes like how the old in-run system was when you enter the play part of
+	the map") and this handling steps aside until the player leaves the seat. `_highwayFailed` keeps a
+	car the race shim could not take from retrying every frame. ]]
+function LobbyDriveController._toHighway(self): boolean
+	local car, seat = self._car, self._seat
+	if not (CollectorConfig.Enabled and car and seat and self._highwayFailed ~= car) then
+		return false
+	end
+	if CollectorConfig.zoneAt(car:GetPivot().Position) == 0 then
+		return false
+	end
+	local drive = Shard.get("DriveController")
+	self:_teardown()
+	if drive and drive:driveHighway(car) then
+		return true
+	end
+	self._highwayFailed = car
+	self:_install(car, seat)
+	return true
 end
 
 --[[ The drift, one frame (`LobbyCarConfig.Handling.Drift`): on while the key is held and the car is
@@ -592,6 +617,13 @@ function LobbyDriveController.getSteer(self): number
 	return math.clamp(self._raw or 0, -1, 1)
 end
 
+function LobbyDriveController._leaveHighway(self)
+	local drive = Shard.get("DriveController")
+	if drive then
+		drive:leaveHighway()
+	end
+end
+
 --- Follow one character's seat: install on the driver's seat of a lobby car, tear down on leaving.
 function LobbyDriveController._watch(self, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
@@ -599,6 +631,7 @@ function LobbyDriveController._watch(self, character: Model)
 		return
 	end
 	humanoid.Seated:Connect(function(active: boolean, seat: Instance?)
+		self:_leaveHighway()
 		if not (active and seat and seat:IsA("VehicleSeat")) then
 			self:_teardown()
 			return
@@ -635,6 +668,7 @@ LobbyDriveController:withLifecycle({
 			task.spawn(self._watch, self, player.Character)
 		end
 		player.CharacterAdded:Connect(function(character)
+			self:_leaveHighway()
 			self:_teardown()
 			self:_watch(character)
 		end)
